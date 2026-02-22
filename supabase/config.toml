@@ -1,0 +1,13 @@
+project_id = "iwlpqrulzkzpsiaddefq"
+
+[functions.ai-chat]
+verify_jwt = false
+
+[functions.ai-summary]
+verify_jwt = false
+
+[functions.ai-lesson-plan]
+verify_jwt = false
+
+[functions.atlas-diagnostic]
+verify_jwt = false

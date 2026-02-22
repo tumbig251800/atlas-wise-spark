@@ -1,0 +1,107 @@
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 222 47% 11%;
+    --foreground: 210 40% 98%;
+
+    --card: 222 47% 13%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222 47% 13%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 234 89% 74%;
+    --primary-foreground: 222 47% 6%;
+
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 45 93% 58%;
+    --accent-foreground: 222 47% 6%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217 33% 20%;
+    --input: 217 33% 20%;
+    --ring: 234 89% 74%;
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 222 47% 8%;
+    --sidebar-foreground: 210 40% 90%;
+    --sidebar-primary: 234 89% 74%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 217 33% 14%;
+    --sidebar-accent-foreground: 210 40% 90%;
+    --sidebar-border: 217 33% 17%;
+    --sidebar-ring: 234 89% 74%;
+
+    /* ATLAS custom tokens */
+    --atlas-indigo: 234 89% 74%;
+    --atlas-gold: 45 93% 58%;
+    --atlas-slate: 222 47% 11%;
+    --atlas-success: 142 76% 36%;
+    --atlas-warning: 38 92% 50%;
+    --atlas-info: 199 89% 48%;
+    --atlas-glass: 222 47% 15%;
+    --atlas-glass-border: 217 33% 25%;
+
+    font-family: 'Sarabun', sans-serif;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Sarabun', sans-serif;
+  }
+}
+
+/* Glassmorphism utilities */
+@layer components {
+  .glass-card {
+    @apply rounded-lg border;
+    background: hsl(var(--atlas-glass) / 0.6);
+    border-color: hsl(var(--atlas-glass-border) / 0.3);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .glass-card-hover {
+    @apply glass-card transition-all duration-300;
+  }
+  .glass-card-hover:hover {
+    background: hsl(var(--atlas-glass) / 0.8);
+    border-color: hsl(var(--atlas-indigo) / 0.3);
+    box-shadow: 0 0 20px hsl(var(--atlas-indigo) / 0.1);
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 5px hsl(var(--atlas-indigo) / 0.3); }
+    50% { box-shadow: 0 0 20px hsl(var(--atlas-indigo) / 0.6); }
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  @keyframes pivot-pulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 4px hsl(0 84% 60% / 0.4); }
+    50% { opacity: 0.7; box-shadow: 0 0 16px hsl(0 84% 60% / 0.8); }
+  }
+
+  .animate-pivot-pulse {
+    animation: pivot-pulse 1.5s ease-in-out infinite;
+  }
+}

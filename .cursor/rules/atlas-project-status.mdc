@@ -1,0 +1,51 @@
+---
+description: ATLAS Teaching System - Project Status & Continuity Rule
+alwaysApply: true
+---
+
+# ATLAS Teaching System - Project Status
+
+## Project Overview
+ATLAS = Adaptive Teaching & Learning Analytics System
+- Tech Stack: React + TypeScript + Vite + Supabase + Deno Edge Functions
+- AI Consultant: "พีท ร่างทอง" (Peat Rang-Thong)
+
+## Current Phase: Bug Fixes Complete (2026-02-22)
+
+### Completed
+- [x] Phase 1: Deterministic Normalization (topic_aliases table + topicNormalizer.ts)
+- [x] Phase 2: Eliminate Sycophancy (ai-chat SYSTEM_PROMPT revamp)
+- [x] Phase 3: Data Leakage Fix (context filtering by subject/class)
+
+### Recent Bug Fix (2026-02-22)
+**Problem:** AI pulled ศิลปะ data when user asked about คณิตศาสตร์ ป.4/1
+**Root Cause:** No subject/class filtering in Consultant.tsx
+**Solution Implemented:**
+1. `useDiagnosticData.ts` - Added DiagnosticFilter parameter
+2. `Consultant.tsx` - Added context filter UI + filtered logs before sending to AI
+3. `ai-chat/index.ts` - Added CITATION MANDATORY rules with [REF-X] format
+
+## Key Files Modified
+- `src/hooks/useDiagnosticData.ts` - Filter support
+- `src/pages/Consultant.tsx` - Filter UI + buildContextWithCitation
+- `supabase/functions/ai-chat/index.ts` - Strict citation rules
+
+## Next Steps (When Resuming)
+1. Deploy Edge Functions to Supabase: `supabase functions deploy`
+2. Test พีท with filter: Select คณิตศาสตร์ ป.4/1 and verify no ศิลปะ data appears
+3. Phase 4 (Optional): Validation Layer to prevent AI number hallucination
+
+## Important Commands
+```bash
+cd ~/atlas-wise-spark
+npm run dev                    # Start dev server
+supabase functions deploy      # Deploy Edge Functions
+```
+
+## Database Tables
+- teaching_logs, diagnostic_events, strike_counter, pivot_events
+- topic_aliases (for deterministic normalization)
+- profiles, user_roles
+
+## Quick Resume Prompt
+"มาทำโปรเจค ATLAS ที่ทำค้างกันไว้กันต่อ"

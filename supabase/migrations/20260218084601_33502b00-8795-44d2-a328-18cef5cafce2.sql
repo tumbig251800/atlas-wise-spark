@@ -1,0 +1,1 @@
+ALTER TABLE teaching_logs ADD COLUMN total_students integer;

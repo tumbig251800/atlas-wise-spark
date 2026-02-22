@@ -1,0 +1,1 @@
+ALTER TYPE major_gap ADD VALUE 'system-gap';
