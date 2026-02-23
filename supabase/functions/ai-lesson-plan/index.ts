@@ -195,7 +195,7 @@ serve(async (req) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
+          model: "gemini-2.0-flash",
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userContent },
@@ -216,9 +216,14 @@ serve(async (req) => {
           status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      if (response.status === 401 || response.status === 403) {
+        return new Response(JSON.stringify({ error: "API Key ไม่ถูกต้องหรือหมดอายุ กรุณาตรวจสอบ LOVABLE_API_KEY ใน Supabase" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       const t = await response.text();
       console.error("AI lesson plan error:", response.status, t);
-      return new Response(JSON.stringify({ error: "AI gateway error" }), {
+      return new Response(JSON.stringify({ error: `AI gateway error (${response.status}). ดู Supabase Logs สำหรับรายละเอียด` }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

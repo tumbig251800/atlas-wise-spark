@@ -8,6 +8,7 @@ import { CopyWorksheetButton } from "@/components/lesson-plan/CopyWorksheetButto
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { getEdgeFunctionHeaders, getAiLessonPlanUrl } from "@/lib/edgeFunctionFetch";
 
 export default function LessonPlan() {
   const { user } = useAuth();
@@ -85,13 +86,14 @@ export default function LessonPlan() {
 - หัวข้อล่าสุด: ${recentLogs.map((l) => l.topic).filter(Boolean).join(", ")}`;
       }
 
-      const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-lesson-plan`;
-      const resp = await fetch(CHAT_URL, {
+      const chatUrl = getAiLessonPlanUrl();
+      if (!chatUrl) {
+        toast.error("VITE_SUPABASE_URL ไม่ได้ตั้งค่าใน .env");
+        return;
+      }
+      const resp = await fetch(chatUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
+        headers: getEdgeFunctionHeaders(),
         body: JSON.stringify({
           ...config,
           context,

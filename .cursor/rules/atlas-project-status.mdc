@@ -10,7 +10,16 @@ ATLAS = Adaptive Teaching & Learning Analytics System
 - Tech Stack: React + TypeScript + Vite + Supabase + Deno Edge Functions
 - AI Consultant: "พีท ร่างทอง" (Peat Rang-Thong)
 
-## Current Phase: Bug Fixes Complete (2026-02-22)
+## Current Phase: Data Leakage Fix v2 (2026-02-23)
+
+### Completed
+- [x] SCOPE assertion ใน Consultant.tsx — บังคับให้ AI ตอบเฉพาะวิชาที่มีใน filteredLogs
+- [x] Strengthen CITATION MANDATORY ใน ai-chat — ห้ามกล่าวถึงวิชาที่ไม่มีใน SCOPE
+- [x] Context preamble — เตือน AI ก่อนตอบให้ตรวจสอบ filter
+- [x] Switch AI model: gemini-2.0-flash (รองรับ Gemini API Key)
+- [x] Improve error messages: 401/403, 429, 402
+
+## Previous Phase: Bug Fixes (2026-02-22)
 
 ### Completed
 - [x] Phase 1: Deterministic Normalization (topic_aliases table + topicNormalizer.ts)

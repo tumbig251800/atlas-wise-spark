@@ -123,9 +123,9 @@ Gap Types:
 
 ## [CRITICAL - CITATION MANDATORY]
 1. ห้ามอ้างอิงข้อมูลนอกเหนือจากที่ระบุใน [REF-X] เด็ดขาด
-2. หากข้อมูลไม่ตรงกับวิชา/ห้องที่ระบุใน [ACTIVE FILTER] ให้ตอบว่า "ไม่พบข้อมูลในระบบ"
-3. ห้ามนำข้อมูลจากวิชาอื่น (เช่น ศิลปะ ภาษาไทย) มาตอบเมื่อถามเรื่องคณิตศาสตร์ หรือในทางกลับกัน
-4. ทุกครั้งที่อ้างอิงข้อมูล ต้องระบุ [REF-X] ที่มา เช่น "[REF-1] แสดงว่า Mastery = 2/5"
+2. ห้ามกล่าวถึงวิชาที่ไม่มีใน [REF-X] หรือ [ANSWER SCOPE] โดยเด็ดขาด — เช่น ถ้า SCOPE = คณิตศาสตร์ ห้ามพูดถึง ศิลปะ ภาษาไทย หรือวิชาอื่น
+3. หากข้อมูลไม่ตรงกับวิชา/ห้องที่ระบุใน [ACTIVE FILTER] ให้ตอบว่า "ไม่พบข้อมูลในระบบ"
+4. ทุกครั้งที่อ้างอิงข้อมูล ต้องระบุ [REF-X] พร้อมวันที่และหัวข้อ เช่น "[REF-1] (22 ม.ค. หัวข้อเศษส่วน) Mastery = 2/5"
 5. หากไม่มีข้อมูลที่เกี่ยวข้อง ให้ตอบตรงๆ ว่า:
    "ไม่พบข้อมูลการสอน [วิชา] [ห้อง] ในระบบ กรุณาเลือกวิชา/ห้องที่ถูกต้องจากตัวกรองด้านบน"
 
@@ -143,8 +143,9 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
+    const contextPreamble = `ก่อนตอบ: ตรวจสอบว่า [ACTIVE FILTER] และ [REF-X] มีเฉพาะวิชาและห้องที่ผู้ใช้เลือกเท่านั้น ห้ามอ้างอิงหรือกล่าวถึงวิชาที่ไม่มีใน context เด็ดขาด`;
     const systemContent = context
-      ? `${SYSTEM_PROMPT}\n\nบริบทข้อมูลปัจจุบัน:\n${context}`
+      ? `${SYSTEM_PROMPT}\n\n${contextPreamble}\n\nบริบทข้อมูลปัจจุบัน:\n${context}`
       : SYSTEM_PROMPT;
 
     const response = await fetch(
@@ -156,12 +157,13 @@ serve(async (req) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
+          model: "gemini-2.0-flash",
           messages: [
             { role: "system", content: systemContent },
             ...messages,
           ],
           stream: true,
+          temperature: 0,
         }),
       }
     );
@@ -179,10 +181,16 @@ serve(async (req) => {
           { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+      if (response.status === 401 || response.status === 403) {
+        return new Response(
+          JSON.stringify({ error: "API Key ไม่ถูกต้องหรือหมดอายุ กรุณาตรวจสอบ LOVABLE_API_KEY ใน Supabase" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
       const t = await response.text();
       console.error("AI gateway error:", response.status, t);
       return new Response(
-        JSON.stringify({ error: "AI gateway error" }),
+        JSON.stringify({ error: `AI gateway error (${response.status}). ดู Supabase Logs สำหรับรายละเอียด` }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

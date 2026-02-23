@@ -4,6 +4,7 @@ import { Headphones, Presentation, ImageIcon, Loader2, Copy, Check } from "lucid
 import { supabase } from "@/integrations/supabase/client";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
+import { getEdgeFunctionHeaders, getAiLessonPlanUrl } from "@/lib/edgeFunctionFetch";
 
 interface Props {
   lessonContent: string;
@@ -23,13 +24,15 @@ export function AddonPrompts({ lessonContent }: Props) {
   const generate = async (addonType: string) => {
     setLoading(addonType);
     try {
-      const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-lesson-plan`;
-      const resp = await fetch(CHAT_URL, {
+      const chatUrl = getAiLessonPlanUrl();
+      if (!chatUrl) {
+        toast.error("VITE_SUPABASE_URL ไม่ได้ตั้งค่าใน .env");
+        setLoading(null);
+        return;
+      }
+      const resp = await fetch(chatUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
+        headers: getEdgeFunctionHeaders(),
         body: JSON.stringify({ addonType, topic: lessonContent }),
       });
 

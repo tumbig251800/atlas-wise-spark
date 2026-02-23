@@ -27,7 +27,7 @@ async function normalizeTopic(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "gemini-2.0-flash",
         messages: [
           {
             role: "user",

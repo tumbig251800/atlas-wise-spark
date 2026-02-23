@@ -11,10 +11,9 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { getEdgeFunctionHeaders, getAiChatUrl } from "@/lib/edgeFunctionFetch";
 
 type Msg = { role: "user" | "assistant"; content: string };
-
-const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`;
 
 interface ChatSidebarProps {
   open: boolean;
@@ -59,12 +58,15 @@ export function ChatSidebar({ open, onOpenChange, context }: ChatSidebarProps) {
     };
 
     try {
-      const resp = await fetch(CHAT_URL, {
+      const chatUrl = getAiChatUrl();
+      if (!chatUrl) {
+        toast.error("VITE_SUPABASE_URL ไม่ได้ตั้งค่าใน .env");
+        setIsLoading(false);
+        return;
+      }
+      const resp = await fetch(chatUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
+        headers: getEdgeFunctionHeaders(),
         body: JSON.stringify({
           messages: [...messages, userMsg],
           context: context || "",

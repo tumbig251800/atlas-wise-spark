@@ -10,10 +10,9 @@ import { toast } from "sonner";
 import { useDashboardData, loadPersistedFilters } from "@/hooks/useDashboardData";
 import { useDiagnosticData, type DiagnosticFilter } from "@/hooks/useDiagnosticData";
 import { buildStrictAnswerTH, type DecisionObject } from "@/lib/atlasStrictNarrator";
+import { getEdgeFunctionHeaders, getAiChatUrl } from "@/lib/edgeFunctionFetch";
 
 type Msg = { role: "user" | "assistant"; content: string };
-
-const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`;
 
 function buildContextWithCitation(
   logs: { teaching_date: string; subject: string; grade_level: string; classroom: string | number; topic?: string; mastery_score: number; major_gap: string; key_issue?: string; next_strategy?: string; remedial_ids?: string; total_students?: number }[]
@@ -79,6 +78,16 @@ export default function Consultant() {
     strictContext = `\n\n[ATLAS STRICT MODE]\n${strict.answer_th}`;
   }
   
+  // SCOPE assertion - prevents Data Leakage (ห้าม AI พูดถึงวิชาอื่น)
+  const allowedSubjects = [...new Set(filteredLogs.map((l) => l.subject))];
+  const scopeAssertion =
+    allowedSubjects.length > 0
+      ? `\n\n## [CRITICAL - ANSWER SCOPE]
+ตอบเฉพาะวิชา: ${allowedSubjects.join(", ")} เท่านั้น
+ห้ามกล่าวถึง ศิลปะ ภาษาไทย หรือวิชาอื่นที่ไม่มีในรายการข้างต้นเด็ดขาด`
+      : `\n\n## [CRITICAL - ANSWER SCOPE]
+ไม่มีข้อมูลที่ตรงกับ filter หากจะตอบ ให้ตอบว่า "ไม่พบข้อมูลในระบบ"`;
+
   // Add filter info to context
   const filterInfo = `\n\n## [ACTIVE FILTER]
 วิชา: ${contextFilter.subject || "ทั้งหมด"}
@@ -86,7 +95,7 @@ export default function Consultant() {
 ห้อง: ${contextFilter.classroom || "ทั้งหมด"}
 ⚠️ AI ต้องตอบเฉพาะข้อมูลที่อยู่ใน [REF-X] เท่านั้น ห้ามนำข้อมูลวิชาอื่นมาปน`;
   
-  const context = baseContext + strictContext + filterInfo;
+  const context = baseContext + strictContext + scopeAssertion + filterInfo;
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -118,12 +127,15 @@ export default function Consultant() {
     };
 
     try {
-      const resp = await fetch(CHAT_URL, {
+      const chatUrl = getAiChatUrl();
+      if (!chatUrl) {
+        toast.error("VITE_SUPABASE_URL ไม่ได้ตั้งค่าใน .env");
+        setIsLoading(false);
+        return;
+      }
+      const resp = await fetch(chatUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
+        headers: getEdgeFunctionHeaders(),
         body: JSON.stringify({
           messages: [...messages, userMsg],
           context,

@@ -2,8 +2,20 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+// Must be valid URL and ByteString to prevent "Parameter 0 is not a valid URLString" / "Headers not valid ByteString"
+const SUPABASE_URL = (() => {
+  const v = import.meta.env.VITE_SUPABASE_URL;
+  const s = v != null && typeof v === "string" ? String(v).trim() : "";
+  if (!s || s === "undefined" || !s.startsWith("http")) {
+    return "https://placeholder.supabase.co";
+  }
+  return s;
+})();
+const SUPABASE_PUBLISHABLE_KEY = (() => {
+  const v = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  const s = v != null && typeof v === "string" ? String(v).trim() : "";
+  return s || "placeholder-key";
+})();
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
