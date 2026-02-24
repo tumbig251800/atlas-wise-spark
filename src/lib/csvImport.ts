@@ -70,7 +70,7 @@ const EXPORT_ORDER: Record<string, number> = {
 };
 
 const HEADER_MAP: Record<string, string[]> = {
-  date: ["วันที่สอน", "date", "teaching_date"],
+  date: ["วันที่สอน", "date", "teaching_date", "วันที่เรียน"],
   grade: ["ระดับชั้น", "grade", "grade_level"],
   room: ["ห้องเรียน", "room", "classroom", "ห้อง"],
   total: ["จำนวนนักเรียน", "total", "total_students"],
@@ -88,6 +88,67 @@ const HEADER_MAP: Record<string, string[]> = {
   strategy: ["next strategy", "next_strategy"],
   reflection: ["สะท้อนคิด", "reflection"],
 };
+
+/** Convert DD/MM/YYYY or MM/DD/YYYY (with optional time) to YYYY-MM-DD for PostgreSQL */
+function toISODate(s: string): string {
+  const cleaned = s.replace(/\uFEFF/g, "").replace(/\r/g, "").trim();
+  const datePart = cleaned.split(/\s+/)[0];
+  if (!datePart) return cleaned || s;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return datePart;
+  const m = datePart.match(/^(\d{1,2})\D(\d{1,2})\D(\d{4})$/);
+  if (m) {
+    const [, a, b, y] = m;
+    let month: string;
+    let day: string;
+    const aNum = parseInt(a, 10);
+    const bNum = parseInt(b, 10);
+    if (aNum > 12) {
+      day = a;
+      month = b;
+    } else if (bNum > 12) {
+      month = a;
+      day = b;
+    } else {
+      month = a;
+      day = b;
+    }
+    let yearNum = parseInt(y, 10);
+    if (yearNum > 2400) yearNum -= 543;
+    return `${yearNum}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  }
+  const parts = datePart.split(/\D+/).filter(Boolean);
+  if (parts.length === 3) {
+    const [a, b, y] = parts;
+    const aNum = parseInt(a, 10);
+    const bNum = parseInt(b, 10);
+    const yNum = parseInt(y, 10);
+    if (!isNaN(aNum) && !isNaN(bNum) && !isNaN(yNum) && a.length <= 2 && b.length <= 2 && y.length === 4) {
+      let month: string;
+      let day: string;
+      if (aNum > 12) {
+        day = a.padStart(2, "0");
+        month = b.padStart(2, "0");
+      } else if (bNum > 12) {
+        month = a.padStart(2, "0");
+        day = b.padStart(2, "0");
+      } else {
+        month = a.padStart(2, "0");
+        day = b.padStart(2, "0");
+      }
+      const yearNum = yNum > 2400 ? yNum - 543 : yNum;
+      return `${yearNum}-${month}-${day}`;
+    }
+  }
+  return datePart;
+}
+
+/** Safety: ให้แน่ใจว่าค่าวันที่เป็น YYYY-MM-DD ก่อนส่งไป insert */
+export function ensureISODate(s: string): string {
+  if (!s) return s;
+  const t = s.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
+  return toISODate(s);
+}
 
 function buildColumnMap(headers: string[]): Record<string, number> {
   const map: Record<string, number> = { ...EXPORT_ORDER };
@@ -124,7 +185,7 @@ export function parseCSVFile(text: string): ParseResult {
       return (j >= 0 && cols[j] !== undefined ? String(cols[j]).trim() : "") || "";
     };
 
-    const teaching_date = get("date");
+    const teaching_date = toISODate(get("date"));
     const grade_level = get("grade");
     const roomRaw = get("room");
     const classroom = cleanClassroomData(roomRaw) || roomRaw || "";

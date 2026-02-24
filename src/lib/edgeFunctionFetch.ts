@@ -1,27 +1,50 @@
 /**
+ * Sanitize string for use in HTTP headers - prevents "not a valid ByteString" errors.
+ * Keeps only printable ASCII (0x20-0x7E) to avoid control chars and invalid Unicode.
+ */
+function sanitizeHeaderValue(s: string): string {
+  return String(s)
+    .replace(/[\r\n\t]+/g, "")
+    .replace(/[\x00-\x1F\x7F]/g, "")
+    .replace(/[^\x20-\x7E]/g, "")
+    .trim();
+}
+
+/**
  * Returns safe headers for Supabase Edge Function fetch calls.
  * Ensures all header values are valid HTTP tokens to prevent
- * "Headers of RequestInit is not a valid HTTPToken" errors.
+ * "Headers of RequestInit is not a valid ByteString" errors.
  */
 export function getEdgeFunctionHeaders(): Record<string, string> {
   const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
   const raw = key != null && typeof key === "string" ? String(key) : "";
-  const authValue = raw.replace(/[\r\n]+/g, "").trim();
+  const authValue = sanitizeHeaderValue(raw);
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-  if (authValue && authValue.length > 50) {
+  if (authValue && authValue.length >= 30) {
     headers.Authorization = `Bearer ${authValue}`;
   }
   return headers;
 }
 
+/** Sanitize and validate URL - prevents "not a valid ByteString" errors */
+function sanitizeAndValidateUrl(raw: string): string {
+  if (!raw || raw === "undefined") return "";
+  let s = String(raw).replace(/[\r\n\t]+/g, "").replace(/\s+/g, "").trim();
+  if (!s || !s.startsWith("http")) return "";
+  try {
+    new URL(s);
+    return s;
+  } catch {
+    return "";
+  }
+}
+
 /** Base URL for Edge Functions - must be valid absolute URL */
 function getBaseUrl(): string {
   const v = import.meta.env.VITE_SUPABASE_URL;
-  const s = v != null && typeof v === "string" ? String(v).trim() : "";
-  if (!s || s === "undefined" || !s.startsWith("http")) return "";
-  return s;
+  return sanitizeAndValidateUrl(v ?? "");
 }
 
 /** Base URL for Edge Functions */

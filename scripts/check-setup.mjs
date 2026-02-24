@@ -55,7 +55,7 @@ if (existsSync(envPath)) {
     fail("VITE_SUPABASE_URL ไม่ได้ตั้งค่าหรือไม่ถูกต้อง");
   }
 
-  if (env.VITE_SUPABASE_PUBLISHABLE_KEY && env.VITE_SUPABASE_PUBLISHABLE_KEY.length > 50) {
+  if (env.VITE_SUPABASE_PUBLISHABLE_KEY && env.VITE_SUPABASE_PUBLISHABLE_KEY.length >= 30) {
     ok("VITE_SUPABASE_PUBLISHABLE_KEY ตั้งค่าแล้ว");
   } else {
     fail("VITE_SUPABASE_PUBLISHABLE_KEY ไม่ได้ตั้งค่าหรือสั้นเกินไป");
@@ -70,12 +70,11 @@ if (base && base.startsWith("http")) {
   const chatUrl = `${base.replace(/\/$/, "")}/functions/v1/ai-chat`;
   console.log("\nทดสอบ ai-chat endpoint...");
   try {
+    const headers = { "Content-Type": "application/json" };
+    if (anonKey && anonKey.length >= 30) headers.Authorization = `Bearer ${anonKey}`;
     const res = await fetch(chatUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: anonKey ? `Bearer ${anonKey}` : "",
-      },
+      headers,
       body: JSON.stringify({
         messages: [{ role: "user", content: "ทดสอบ" }],
         context: "",

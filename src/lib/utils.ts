@@ -29,6 +29,10 @@ export function cleanClassroomData(value: string): string {
   const slashMatch = trimmed.match(/^\d+\/(\d+)$/);
   if (slashMatch) return slashMatch[1];
 
+  // "ห้อง2", "ห้อง1" → "2", "1"
+  const roomMatch = trimmed.match(/^ห้อง\s*(\d+)$/);
+  if (roomMatch) return roomMatch[1];
+
   // Already a pure number or valid format
   return trimmed;
 }

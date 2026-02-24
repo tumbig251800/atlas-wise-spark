@@ -3,7 +3,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { parseCSVFile, type ParsedCSVRow } from "@/lib/csvImport";
+import { parseCSVFile, ensureISODate, type ParsedCSVRow } from "@/lib/csvImport";
 import { Upload, FileText, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -43,7 +43,7 @@ export default function UploadCSV() {
     for (const row of parsed.rows) {
       const { error } = await supabase.from("teaching_logs").insert({
         teacher_id: user.id,
-        teaching_date: row.teaching_date,
+        teaching_date: ensureISODate(row.teaching_date),
         grade_level: row.grade_level,
         classroom: row.classroom,
         subject: row.subject,

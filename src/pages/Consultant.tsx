@@ -12,7 +12,11 @@ import { useDiagnosticData, type DiagnosticFilter } from "@/hooks/useDiagnosticD
 import { buildStrictAnswerTH, type DecisionObject } from "@/lib/atlasStrictNarrator";
 import { getEdgeFunctionHeaders, getAiChatUrl } from "@/lib/edgeFunctionFetch";
 
-type Msg = { role: "user" | "assistant"; content: string };
+type Msg = { id: string; role: "user" | "assistant"; content: string };
+
+function genMsgId() {
+  return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
 
 function buildContextWithCitation(
   logs: { teaching_date: string; subject: string; grade_level: string; classroom: string | number; topic?: string; mastery_score: number; major_gap: string; key_issue?: string; next_strategy?: string; remedial_ids?: string; total_students?: number }[]
@@ -39,6 +43,7 @@ export default function Consultant() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const sendingRef = useRef(false);
   
   // Context filter state - prevents Data Leakage
   const [contextFilter, setContextFilter] = useState<DiagnosticFilter>({
@@ -116,13 +121,14 @@ export default function Consultant() {
 
   const send = async () => {
     const text = input.trim();
-    if (!text || isLoading) return;
+    if (!text || isLoading || sendingRef.current) return;
     if (dataLoading) {
       toast.info("กำลังโหลดข้อมูล... กรุณารอสักครู่");
       return;
     }
+    sendingRef.current = true;
 
-    const userMsg: Msg = { role: "user", content: text };
+    const userMsg: Msg = { id: genMsgId(), role: "user", content: text };
     setInput("");
     setMessages((prev) => [...prev, userMsg]);
     setIsLoading(true);
@@ -137,7 +143,7 @@ export default function Consultant() {
             i === prev.length - 1 ? { ...m, content: assistantSoFar } : m
           );
         }
-        return [...prev, { role: "assistant", content: assistantSoFar }];
+        return [...prev, { id: genMsgId(), role: "assistant", content: assistantSoFar }];
       });
     };
 
@@ -145,6 +151,7 @@ export default function Consultant() {
       const chatUrl = getAiChatUrl();
       if (!chatUrl) {
         toast.error("VITE_SUPABASE_URL ไม่ได้ตั้งค่าใน .env");
+        sendingRef.current = false;
         setIsLoading(false);
         return;
       }
@@ -160,6 +167,7 @@ export default function Consultant() {
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({ error: "Unknown error" }));
         toast.error(err.error || `Error ${resp.status}`);
+        sendingRef.current = false;
         setIsLoading(false);
         return;
       }
@@ -219,6 +227,7 @@ export default function Consultant() {
       toast.error("เกิดข้อผิดพลาดในการเชื่อมต่อ AI");
     } finally {
       setIsLoading(false);
+      sendingRef.current = false;
     }
   };
 
@@ -285,9 +294,9 @@ export default function Consultant() {
             </div>
           )}
           <div className="space-y-4">
-            {messages.map((msg, i) => (
+            {messages.map((msg) => (
               <div
-                key={i}
+                key={msg.id}
                 className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
               >
                 <div

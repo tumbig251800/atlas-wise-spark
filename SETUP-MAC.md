@@ -50,11 +50,12 @@ npm run dev
 
 ---
 
-## ถ้า AI (พีท) ไม่ตอบ
+## ถ้า AI (พีท) ไม่ตอบ หรือ check-setup แสดง ai-chat HTTP 500
 
-1. **เช็ค LOVABLE_API_KEY**  
-   Supabase Dashboard → Project Settings → Edge Functions → Secrets  
-   ต้องมี `LOVABLE_API_KEY` (ใช้คีย์จาก Lovable หรือ Gemini API Key จาก Google AI Studio)
+1. **ตั้งค่า LOVABLE_API_KEY** (จำเป็น!)  
+   ไปที่: https://supabase.com/dashboard/project/ebyelctqcdhjmqujeskx/settings/functions  
+   → เปิดแท็บ **Edge Function Secrets**  
+   → เพิ่ม `LOVABLE_API_KEY` = คีย์จาก Lovable หรือ **Gemini API Key** จาก [Google AI Studio](https://aistudio.google.com/apikey)
 
 2. **รัน check-setup**  
    ```bash
@@ -65,6 +66,19 @@ npm run dev
 3. **เช็ค .env**  
    ต้องมีทั้ง `VITE_SUPABASE_URL` และ `VITE_SUPABASE_PUBLISHABLE_KEY`  
    ถ้าขาด จะเกิด error "Headers of RequestInit is not a valid ByteString"
+
+---
+
+## อัปโหลด CSV แล้ว error "Could not find activity_mode column"
+
+ถ้าเจอ error นี้ตอนนำเข้า CSV หมายความว่า schema ของ Supabase ยังไม่มีคอลัมน์ `activity_mode`:
+
+1. เปิด Supabase Dashboard → SQL Editor
+2. เลือก project ที่ app เชื่อมต่อ (ดูจาก `.env` → `VITE_SUPABASE_URL`)
+3. Copy เนื้อหาจาก `scripts/repair-activity-mode.sql` มา Run
+4. ลองอัปโหลด CSV อีกครั้ง
+
+ถ้ามี Supabase CLI: `supabase db push` จะ apply migrations ทั้งหมดรวม repair
 
 ---
 
