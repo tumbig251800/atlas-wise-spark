@@ -47,8 +47,10 @@ export default function Consultant() {
     classroom: "1",
   });
 
-  const { allLogs, filterOptions } = useDashboardData(loadPersistedFilters());
-  const { diagnosticEvents } = useDiagnosticData(contextFilter);
+  const { allLogs, filterOptions, isLoading: dashboardLoading } = useDashboardData(loadPersistedFilters());
+  const { diagnosticEvents, colorCounts, activeStrikes, isLoading: diagnosticLoading } = useDiagnosticData(contextFilter);
+
+  const dataLoading = dashboardLoading || diagnosticLoading;
   
   // Filter logs by context to prevent Data Leakage
   const filteredLogs = allLogs.filter(log => {
@@ -60,6 +62,15 @@ export default function Consultant() {
   
   // Build context with citation format
   const baseContext = buildContextWithCitation(filteredLogs);
+
+  // Diagnostic summary (colorCounts + activeStrikes) — ตรงกับ ChatSidebar
+  let diagnosticSummary = "";
+  if (colorCounts) {
+    diagnosticSummary += `\nDiagnostic: RED=${colorCounts.red} ORANGE=${colorCounts.orange} YELLOW=${colorCounts.yellow} BLUE=${colorCounts.blue} GREEN=${colorCounts.green}`;
+  }
+  if (activeStrikes && activeStrikes.length > 0) {
+    diagnosticSummary += `\nActive Strikes (≥2): ${activeStrikes.length} รายการ`;
+  }
 
   // Inject strict narrator context from latest FILTERED decision_object
   let strictContext = "";
@@ -95,7 +106,7 @@ export default function Consultant() {
 ห้อง: ${contextFilter.classroom || "ทั้งหมด"}
 ⚠️ AI ต้องตอบเฉพาะข้อมูลที่อยู่ใน [REF-X] เท่านั้น ห้ามนำข้อมูลวิชาอื่นมาปน`;
   
-  const context = baseContext + strictContext + scopeAssertion + filterInfo;
+  const context = baseContext + diagnosticSummary + strictContext + scopeAssertion + filterInfo;
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -106,6 +117,10 @@ export default function Consultant() {
   const send = async () => {
     const text = input.trim();
     if (!text || isLoading) return;
+    if (dataLoading) {
+      toast.info("กำลังโหลดข้อมูล... กรุณารอสักครู่");
+      return;
+    }
 
     const userMsg: Msg = { role: "user", content: text };
     setInput("");
@@ -302,6 +317,9 @@ export default function Consultant() {
           </div>
         </ScrollArea>
 
+        {dataLoading && (
+          <p className="text-xs text-muted-foreground mb-2">⏳ กำลังโหลดข้อมูล...</p>
+        )}
         <form
           onSubmit={(e) => { e.preventDefault(); send(); }}
           className="flex gap-2"
@@ -309,11 +327,11 @@ export default function Consultant() {
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="ถามพีทได้เลยครับ เช่น 'แนะนำกิจกรรมแก้ K-Gap หน่อย'"
-            disabled={isLoading}
+            placeholder={dataLoading ? "กำลังโหลดข้อมูล... รอสักครู่" : "ถามพีทได้เลยครับ เช่น 'แนะนำกิจกรรมแก้ K-Gap หน่อย'"}
+            disabled={isLoading || dataLoading}
             className="flex-1"
           />
-          <Button type="submit" size="icon" disabled={isLoading || !input.trim()}>
+          <Button type="submit" size="icon" disabled={isLoading || dataLoading || !input.trim()}>
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         </form>

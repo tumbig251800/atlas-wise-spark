@@ -1,16 +1,19 @@
 /**
  * Returns safe headers for Supabase Edge Function fetch calls.
- * Ensures all header values are valid ByteStrings to prevent
- * "Headers of RequestInit is not a valid ByteString" errors.
+ * Ensures all header values are valid HTTP tokens to prevent
+ * "Headers of RequestInit is not a valid HTTPToken" errors.
  */
 export function getEdgeFunctionHeaders(): Record<string, string> {
   const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-  const authValue =
-    key != null && typeof key === "string" ? String(key).trim() : "";
-  return {
+  const raw = key != null && typeof key === "string" ? String(key) : "";
+  const authValue = raw.replace(/[\r\n]+/g, "").trim();
+  const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    Authorization: authValue ? `Bearer ${authValue}` : "",
   };
+  if (authValue && authValue.length > 50) {
+    headers.Authorization = `Bearer ${authValue}`;
+  }
+  return headers;
 }
 
 /** Base URL for Edge Functions - must be valid absolute URL */
