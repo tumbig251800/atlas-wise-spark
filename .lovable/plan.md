@@ -1,29 +1,65 @@
 
 
-# แผนแก้ไข: Invalid Model Error — `gemini-2.0-flash` ไม่รองรับแล้ว
+# แผนแก้ไข: ให้ปุ่มแชทลอยส่ง context แบบ [REF-X] — AI ตอบเฉพาะข้อมูลที่ถูกถาม
 
-## สาเหตุ
+## ตอบคำถาม: AI จะตอบเหมารวมไหม?
 
-จาก logs ของ backend functions แสดง error ชัดเจน:
+**ไม่** — system prompt บรรทัด 124-128 บังคับว่า:
+- AI ต้องอ้างอิงเฉพาะ `[REF-X]` ที่ตรงกับคำถาม
+- ห้ามพูดถึงวิชา/ห้องที่ไม่เกี่ยวข้อง
 
+ดังนั้นถ้าผู้ใช้ถาม "สรุปห้อง ป.4/1" แต่ข้อมูลมี ป.2/1 กับ ป.3/1 → AI จะตอบว่า "ไม่พบข้อมูลห้อง ป.4/1 ในระบบ" ตามกฎข้อ 5 (บรรทัด 129-130)
+
+ถ้าถามว่า "สรุปห้อง ป.2/1" → AI จะเลือกเฉพาะ REF ที่มี ป.2/1 มาตอบ ไม่เอา ป.3/1 มาปน
+
+**กฎเข้มงวดทำงานได้ดีอยู่แล้ว** — ปัญหาคือ context ปัจจุบันไม่มี `[REF-X]` markers ทำให้ AI เห็นว่าไม่มีข้อมูลเลย
+
+---
+
+## สิ่งที่ต้องแก้
+
+| ไฟล์ | สิ่งที่ทำ |
+|------|-----------|
+| `src/components/AppLayout.tsx` | เปลี่ยน `chatContext` จาก `buildLogsSummary()` (plain text) เป็นรูปแบบ `[REF-X]` + `[ACTIVE FILTER]` + `[ANSWER SCOPE]` |
+
+## รายละเอียด
+
+แทนที่การเรียก `buildLogsSummary()` ด้วยฟังก์ชันใหม่ `buildChatContext()` ที่สร้าง context ดังนี้:
+
+```text
+## ข้อมูลการสอนทั้งหมด (5 คาบ)
+Mastery เฉลี่ย: 2.6/5
+
+### รายละเอียด (ใช้ [REF-X] อ้างอิงเสมอ):
+[REF-1] วันที่: 2026-02-09 | วิชา: คณิตศาสตร์ | ห้อง: ป.2/1 | หัวข้อ: เศษส่วน | Mastery: 2/5 | Gap: k-gap | Remedial: 5/30 (16.7%) [S01,S03] | Issue: ... | Strategy: ...
+[REF-2] วันที่: 2026-02-10 | วิชา: ภาษาไทย | ห้อง: ป.3/1 | หัวข้อ: ... | Mastery: 4/5 | ...
+...
+
+Gap หลัก: k-gap (3 คาบ), p-gap (2 คาบ)
+Diagnostic: RED=0 ORANGE=1 YELLOW=2 BLUE=1 GREEN=1
+
+## [ACTIVE FILTER]
+วิชา: ทั้งหมด
+ระดับชั้น: ทั้งหมด
+ห้อง: ทั้งหมด
+
+## [ANSWER SCOPE]
+ตอบได้ทุกวิชาและทุกห้องที่มีใน [REF-X] — แต่ต้องอ้างอิงเฉพาะ REF ที่ตรงกับคำถามของผู้ใช้
+
+หน้าปัจจุบัน: History (ประวัติการบันทึก)
 ```
-invalid model: gemini-2.0-flash, allowed models: [openai/gpt-5-mini openai/gpt-5 openai/gpt-5-nano openai/gpt-5.2 google/gemini-2.5-pro google/gemini-2.5-flash google/gemini-2.5-flash-lite google/gemini-2.5-flash-image google/gemini-3-pro-preview google/gemini-3-flash-preview google/gemini-3-pro-image-preview]
-```
 
-โมเดล `gemini-2.0-flash` **ถูกยกเลิกแล้ว** จาก Lovable AI Gateway ต้องเปลี่ยนเป็นโมเดลที่รองรับ เช่น `google/gemini-2.5-flash` (เร็ว, ประหยัด, เหมาะกับงานสรุปและแชท)
+### จุดสำคัญ:
+- แสดงข้อมูลสูงสุด **20 คาบล่าสุด** (แทนที่จะแค่ 5)
+- แต่ละ log ถูก tag ด้วย `[REF-X]` → AI สามารถอ้างอิงได้ตามกฎ
+- `[ACTIVE FILTER]` ระบุ "ทั้งหมด" → AI ไม่บล็อกข้อมูล
+- `[ANSWER SCOPE]` ระบุชัดว่า "ตอบได้ทุกวิชาแต่ต้องอ้างอิงเฉพาะ REF ที่ตรง" → ป้องกันการตอบเหมารวม
+- ยังคง Diagnostic counts และ Active Strikes ไว้
 
-## ไฟล์ที่ต้องแก้ (4 ไฟล์)
+## ผลลัพธ์
 
-| ไฟล์ | บรรทัด | เปลี่ยนจาก | เปลี่ยนเป็น |
-|------|--------|------------|-------------|
-| `supabase/functions/ai-chat/index.ts` | 160 | `gemini-2.0-flash` | `google/gemini-2.5-flash` |
-| `supabase/functions/ai-summary/index.ts` | 49 | `gemini-2.0-flash` | `google/gemini-2.5-flash` |
-| `supabase/functions/ai-lesson-plan/index.ts` | 198 | `gemini-2.0-flash` | `google/gemini-2.5-flash` |
-| `supabase/functions/atlas-diagnostic/index.ts` | 30 | `gemini-2.0-flash` | `google/gemini-2.5-flash` |
-
-## ผลลัพธ์ที่คาดหวัง
-
-- Error 400 "invalid model" จะหายไป
-- AI Chat (พีท), AI Summary, Lesson Plan, และ Diagnostic จะกลับมาทำงานได้ทั้งหมด
-- Backend functions จะ deploy อัตโนมัติหลังแก้โค้ด
+- พีทจะเห็นข้อมูล demo 5 คาบในรูปแบบ `[REF-1]` ถึง `[REF-5]` → ตอบคำถามได้
+- ถามเจาะจงห้อง → ตอบเฉพาะห้องนั้น (ไม่เหมารวม)
+- ถามวิชาที่ไม่มี → ตอบว่า "ไม่พบข้อมูล" (ไม่แต่งเอง)
+- กฎเข้มงวดทุกข้อยังคงอยู่ครบ
 
