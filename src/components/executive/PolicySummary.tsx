@@ -22,7 +22,8 @@ export function PolicySummary({ logs }: Props) {
     logs.forEach((l) => { gapCounts[l.major_gap] = (gapCounts[l.major_gap] || 0) + 1; });
 
     const totalLogs = logs.length;
-    const avgMastery = Math.round(logs.reduce((s, l) => s + l.mastery_score, 0) / totalLogs);
+    const avgMasteryRaw = logs.reduce((s, l) => s + l.mastery_score, 0) / totalLogs;
+    const avgMastery = Math.round((avgMasteryRaw / 5) * 100);
 
     const gradeSummary: Record<string, { total: number; count: number }> = {};
     logs.forEach((l) => {
@@ -33,9 +34,9 @@ export function PolicySummary({ logs }: Props) {
 
     const logsSummary = `
 จำนวน Log ทั้งหมด: ${totalLogs}
-Mastery เฉลี่ย: ${avgMastery}%
+Mastery เฉลี่ย: ${avgMastery}% (${(avgMasteryRaw).toFixed(1)}/5)
 การกระจายตัว Gap: ${Object.entries(gapCounts).map(([k, v]) => `${k}: ${v}`).join(", ")}
-Mastery ตามชั้น: ${Object.entries(gradeSummary).map(([g, v]) => `${g}: ${Math.round(v.total / v.count)}%`).join(", ")}
+Mastery ตามชั้น: ${Object.entries(gradeSummary).map(([g, v]) => `${g}: ${Math.round((v.total / v.count / 5) * 100)}% (${(v.total / v.count).toFixed(1)}/5)`).join(", ")}
     `.trim();
 
     try {
