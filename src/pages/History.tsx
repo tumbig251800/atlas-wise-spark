@@ -24,8 +24,10 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
-import { History as HistoryIcon, Eye, BookOpen, Trash2, Loader2 } from "lucide-react";
+import { History as HistoryIcon, Eye, BookOpen, Trash2, Loader2, UserCog } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { ReassignTeacherDialog } from "@/components/history/ReassignTeacherDialog";
 import type { Tables } from "@/integrations/supabase/types";
 
 type TeachingLog = Tables<"teaching_logs">;
@@ -59,7 +61,10 @@ export default function History() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<TeachingLog | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [reassignLog, setReassignLog] = useState<TeachingLog | null>(null);
   const { toast } = useToast();
+  const { role } = useAuth();
+  const isDirector = role === "director";
 
   useEffect(() => {
     const fetchLogs = async () => {
@@ -170,6 +175,16 @@ export default function History() {
                           )}
                         </div>
                         <div className="flex gap-2 shrink-0">
+                          {isDirector && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setReassignLog(log)}
+                              title="เปลี่ยนครูผู้สอน"
+                            >
+                              <UserCog className="h-4 w-4" />
+                            </Button>
+                          )}
                           <Button
                             variant="outline"
                             size="sm"
@@ -266,6 +281,22 @@ export default function History() {
               )}
             </DialogContent>
           </Dialog>
+
+          {/* Reassign Teacher Dialog */}
+          <ReassignTeacherDialog
+            log={reassignLog}
+            open={!!reassignLog}
+            onOpenChange={(open) => { if (!open) setReassignLog(null); }}
+            onSuccess={(logId, newTeacherId, newTeacherName) => {
+              setLogs((prev) =>
+                prev.map((l) =>
+                  l.id === logId
+                    ? { ...l, teacher_id: newTeacherId, teacher_name: newTeacherName }
+                    : l
+                )
+              );
+            }}
+          />
         </main>
       </div>
     </SidebarProvider>
