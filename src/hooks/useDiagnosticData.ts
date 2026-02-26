@@ -103,12 +103,14 @@ export function useDiagnosticData(filter?: DiagnosticFilter) {
       })
     : allPivotEvents;
 
+  // Strict UI Policy: count only session-level rows (student_id IS NULL)
+  const sessionEvents = diagnosticEvents.filter((e) => !e.student_id);
   const colorCounts: DiagnosticColorCounts = {
-    red: diagnosticEvents.filter((e) => e.status_color === "red").length,
-    orange: diagnosticEvents.filter((e) => e.status_color === "orange").length,
-    yellow: diagnosticEvents.filter((e) => e.status_color === "yellow").length,
-    blue: diagnosticEvents.filter((e) => e.status_color === "blue").length,
-    green: diagnosticEvents.filter((e) => e.status_color === "green").length,
+    red: sessionEvents.filter((e) => e.status_color === "red").length,
+    orange: sessionEvents.filter((e) => e.status_color === "orange").length,
+    yellow: sessionEvents.filter((e) => e.status_color === "yellow").length,
+    blue: sessionEvents.filter((e) => e.status_color === "blue").length,
+    green: sessionEvents.filter((e) => e.status_color === "green").length,
   };
 
   const activeStrikes = strikes.filter((s) => s.status === "active" && s.strike_count >= 2);
