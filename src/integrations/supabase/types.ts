@@ -253,6 +253,7 @@ export type Database = {
       }
       teaching_logs: {
         Row: {
+          academic_term: string | null
           activity_mode: Database["public"]["Enums"]["activity_mode"]
           classroom: string
           classroom_management: string | null
@@ -277,6 +278,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          academic_term?: string | null
           activity_mode?: Database["public"]["Enums"]["activity_mode"]
           classroom: string
           classroom_management?: string | null
@@ -301,6 +303,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          academic_term?: string | null
           activity_mode?: Database["public"]["Enums"]["activity_mode"]
           classroom?: string
           classroom_management?: string | null
