@@ -211,6 +211,7 @@ export default function TeachingLog() {
       const cleanedClassroom = cleanClassroomData(form.classroom.trim());
       const { data: logData, error } = await supabase.from("teaching_logs").insert({
         teacher_id: user.id,
+        teacher_name: teacherName || null,
         teaching_date: form.teachingDate,
         grade_level: form.gradeLevel,
         classroom: cleanedClassroom,

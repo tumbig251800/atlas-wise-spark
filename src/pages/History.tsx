@@ -100,6 +100,12 @@ export default function History() {
                             <span className="text-muted-foreground">
                               {log.grade_level}/{log.classroom}
                             </span>
+                            {log.teacher_name && (
+                              <>
+                                <span className="text-muted-foreground">|</span>
+                                <span className="text-muted-foreground">{log.teacher_name}</span>
+                              </>
+                            )}
                             {log.total_students && (
                               <>
                                 <span className="text-muted-foreground">|</span>
@@ -148,6 +154,7 @@ export default function History() {
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-3 text-sm">
+                    <Row label="ผู้สอน" value={selected.teacher_name} />
                     <Row label="ระดับชั้น / ห้อง" value={`${selected.grade_level} / ${selected.classroom}`} />
                     <Row label="จำนวนนักเรียน" value={selected.total_students ? `${selected.total_students} คน` : null} />
                     <Row label="หน่วยการเรียนรู้" value={selected.learning_unit} />

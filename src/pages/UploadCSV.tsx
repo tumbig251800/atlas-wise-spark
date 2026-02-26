@@ -60,6 +60,7 @@ export default function UploadCSV() {
         remedial_ids: row.remedial_ids,
         next_strategy: row.next_strategy,
         reflection: row.reflection,
+        teacher_name: row.teacher_name,
       });
       if (error) errs.push(`แถว ${row.teaching_date} ${row.subject}: ${error.message}`);
       else ok++;
