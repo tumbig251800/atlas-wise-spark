@@ -176,11 +176,17 @@ export default function Executive() {
         <PolicySummary logs={filteredLogs} />
 
         {/* Phase 4 panels */}
-        <div className="space-y-6">
-          <ReferralQueue events={filteredDiagnosticEvents} />
-          <StrikeEscalationView strikes={filteredStrikes} />
-          <SystemGapReport events={filteredDiagnosticEvents} />
-        </div>
+        {diagLoading ? (
+          <div className="space-y-6">
+            {[1, 2, 3].map((i) => <Skeleton key={i} className="h-48 rounded-lg" />)}
+          </div>
+        ) : (
+          <div className="space-y-6">
+            <ReferralQueue events={filteredDiagnosticEvents} />
+            <StrikeEscalationView strikes={filteredStrikes} />
+            <SystemGapReport events={filteredDiagnosticEvents} />
+          </div>
+        )}
       </div>
     </AppLayout>
   );
