@@ -143,8 +143,9 @@ function toISODate(s: string): string {
       month = a;
       day = b;
     } else {
-      month = a;
-      day = b;
+      // Thai convention: DD/MM/YYYY
+      day = a;
+      month = b;
     }
     let yearNum = parseInt(y, 10);
     if (yearNum > 2400) yearNum -= 543;
@@ -166,8 +167,9 @@ function toISODate(s: string): string {
         month = a.padStart(2, "0");
         day = b.padStart(2, "0");
       } else {
-        month = a.padStart(2, "0");
-        day = b.padStart(2, "0");
+        // Thai convention: DD/MM/YYYY
+        day = a.padStart(2, "0");
+        month = b.padStart(2, "0");
       }
       const yearNum = yNum > 2400 ? yNum - 543 : yNum;
       return `${yearNum}-${month}-${day}`;
