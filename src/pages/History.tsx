@@ -12,8 +12,20 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
-import { History as HistoryIcon, Eye, BookOpen } from "lucide-react";
+import { History as HistoryIcon, Eye, BookOpen, Trash2, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import type { Tables } from "@/integrations/supabase/types";
 
 type TeachingLog = Tables<"teaching_logs">;
@@ -46,6 +58,8 @@ export default function History() {
   const [logs, setLogs] = useState<TeachingLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<TeachingLog | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     const fetchLogs = async () => {
@@ -59,6 +73,35 @@ export default function History() {
     };
     fetchLogs();
   }, []);
+
+  const handleDelete = async (log: TeachingLog) => {
+    setDeletingId(log.id);
+    try {
+      // Cascade delete related records first
+      await Promise.all([
+        supabase.from("diagnostic_events").delete().eq("teaching_log_id", log.id),
+        supabase.from("remedial_tracking").delete().eq("teaching_log_id", log.id),
+        supabase.from("pivot_events").delete().eq("trigger_session_id", log.id),
+      ]);
+
+      // Delete strike_counter by teacher + subject (best effort)
+      await supabase.from("strike_counter").delete()
+        .eq("teacher_id", log.teacher_id)
+        .eq("subject", log.subject)
+        .eq("last_session_id", log.id);
+
+      // Finally delete the teaching log itself
+      const { error } = await supabase.from("teaching_logs").delete().eq("id", log.id);
+      if (error) throw error;
+
+      setLogs((prev) => prev.filter((l) => l.id !== log.id));
+      toast({ title: "ลบสำเร็จ", description: `ลบบันทึก ${formatDate(log.teaching_date)} ${log.subject} แล้ว` });
+    } catch (err: any) {
+      toast({ title: "ลบไม่สำเร็จ", description: err.message, variant: "destructive" });
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   return (
     <SidebarProvider>
@@ -86,6 +129,7 @@ export default function History() {
               <div className="space-y-3">
                 {logs.map((log) => {
                   const gap = gapConfig[log.major_gap] ?? gapConfig.success;
+                  const isDeleting = deletingId === log.id;
                   return (
                     <Card key={log.id} className="hover:shadow-md transition-shadow">
                       <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center gap-3">
@@ -125,15 +169,51 @@ export default function History() {
                             </p>
                           )}
                         </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setSelected(log)}
-                          className="shrink-0"
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          ดูรายละเอียด
-                        </Button>
+                        <div className="flex gap-2 shrink-0">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setSelected(log)}
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            ดูรายละเอียด
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-destructive hover:bg-destructive/10"
+                                disabled={isDeleting}
+                              >
+                                {isDeleting ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>ยืนยันการลบ</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  ลบบันทึก {formatDate(log.teaching_date)} วิชา {log.subject} ({log.grade_level}/{log.classroom})?
+                                  <br />
+                                  ข้อมูลวินิจฉัย, สถิติ Strike และข้อมูลซ่อมเสริมที่เกี่ยวข้องจะถูกลบด้วย
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDelete(log)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  ลบบันทึก
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
                       </CardContent>
                     </Card>
                   );
