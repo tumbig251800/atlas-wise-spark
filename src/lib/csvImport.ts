@@ -117,7 +117,7 @@ const HEADER_MAP: Record<string, string[]> = {
   classMgmt: ["classroom management", "classroom_management", "ปัญหาพฤติกรรม", "การจัดการชั้นเรียน"],
   healthStatus: ["health care status", "health_care_status", "health care", "นักเรียนกลุ่ม health"],
   healthIds: ["health care ids", "health_care_ids", "ระบุเลขประจำตัวนักเรียนกลุ่ม health"],
-  remedial: ["remedial ids", "remedial", "remedial_ids", "ซ่อมเสริม", "ติดตามพิเศษ"],
+  remedial: ["remedial ids", "remedial", "remedial_ids", "รายชื่อนักเรียนที่ต้อง", "ติดตามพิเศษ"],
   strategy: ["next strategy", "next_strategy", "กลยุทธ์"],
   reflection: ["สะท้อนคิด", "reflection", "สะท้อนผล"],
   teacherName: ["รหัสครู", "ชื่อครู", "ชื่อ-สกุล", "teacher_name", "ผู้สอน", "รหัสครูผู้สอน"],

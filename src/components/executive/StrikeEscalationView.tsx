@@ -14,23 +14,21 @@ interface Props {
 type TabFilter = "all" | "active" | "resolved" | "referred";
 
 const strikeBadgeVariant = (count: number) => {
-  if (count >= 3) return "destructive";
-  if (count >= 2) return "secondary";
+  if (count >= 2) return "destructive";
+  if (count >= 1) return "secondary";
   return "outline";
 };
 
 const strikeBadgeClass = (count: number) => {
-  if (count >= 3) return "";
-  if (count >= 2) return "border-orange-400 bg-orange-100 text-orange-700";
-  if (count >= 1) return "border-yellow-400 bg-yellow-100 text-yellow-700";
+  if (count >= 2) return "";
+  if (count >= 1) return "border-orange-400 bg-orange-100 text-orange-700";
   return "border-green-400 bg-green-100 text-green-700";
 };
 
 const statusLabel = (s: StrikeCounter) => {
   if (s.status === "resolved" || s.strike_count === 0) return "🟢 PASS";
-  if (s.strike_count >= 3) return "🔴 Referral";
-  if (s.strike_count >= 2) return "🟠 แจ้ง ผอ.";
-  if (s.strike_count >= 1) return "🟡 ครู Pivot";
+  if (s.strike_count >= 2) return "🔴 Force Pivot";
+  if (s.strike_count >= 1) return "🟠 Plan Fail";
   return "";
 };
 
@@ -43,7 +41,7 @@ export function StrikeEscalationView({ strikes }: Props) {
   const filtered = sorted.filter((s) => {
     if (tab === "active" && !(s.status === "active" && s.strike_count >= 1)) return false;
     if (tab === "resolved" && !(s.status === "resolved" || s.strike_count === 0)) return false;
-    if (tab === "referred" && s.strike_count < 3) return false;
+    if (tab === "referred" && s.strike_count < 2) return false;
     if (scopeFilter !== "all") {
       const scopeMatch = scopeFilter === "classroom"
         ? (s.scope === "class" || s.scope === "classroom")
@@ -67,7 +65,7 @@ export function StrikeEscalationView({ strikes }: Props) {
             <TabsTrigger value="all">ทั้งหมด ({strikes.length})</TabsTrigger>
             <TabsTrigger value="active">Active ({sorted.filter(s => s.status === "active" && s.strike_count >= 1).length})</TabsTrigger>
             <TabsTrigger value="resolved">Resolved ({sorted.filter(s => s.status === "resolved" || s.strike_count === 0).length})</TabsTrigger>
-            <TabsTrigger value="referred">Referred ({sorted.filter(s => s.strike_count >= 3).length})</TabsTrigger>
+            <TabsTrigger value="referred">Pivot ({sorted.filter(s => s.strike_count >= 2).length})</TabsTrigger>
           </TabsList>
         </Tabs>
 
@@ -120,7 +118,7 @@ export function StrikeEscalationView({ strikes }: Props) {
                   <TableCell className="uppercase text-xs">{s.gap_type || "-"}</TableCell>
                   <TableCell>
                     <Badge variant={strikeBadgeVariant(s.strike_count)} className={strikeBadgeClass(s.strike_count)}>
-                      {s.strike_count}/3
+                      {s.strike_count}/2
                     </Badge>
                   </TableCell>
                   <TableCell className="text-xs whitespace-nowrap">
