@@ -16,6 +16,17 @@ const pageNameMap: Record<string, string> = {
   "/lesson-plan": "Lesson Plan (แผนการสอน)",
 };
 
+const THAI_MONTHS = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+
+/** Convert "2026-02-19" → "19ก.พ." */
+function toThaiShortDate(dateStr: string): string {
+  const parts = dateStr.split("-");
+  if (parts.length < 3) return dateStr;
+  const day = parseInt(parts[2], 10);
+  const month = parseInt(parts[1], 10);
+  return `${day}${THAI_MONTHS[month - 1] || parts[1]}`;
+}
+
 /** Build chat context with [REF-X] citations for strict AI system prompt compliance */
 function buildChatContext(
   allLogs: TeachingLog[],
@@ -34,15 +45,17 @@ function buildChatContext(
 
   const avgMastery = (recentLogs.reduce((s, l) => s + l.mastery_score, 0) / recentLogs.length).toFixed(1);
 
-  // Build [REF-X] lines
-  const refLines = recentLogs.map((l, i) => {
+  // Build [REF-X] lines with traceable IDs: [REF-19ก.พ.-คณิต-ป.2/1]
+  const refLines = recentLogs.map((l) => {
+    const shortDate = toThaiShortDate(l.teaching_date);
+    const refId = `REF-${shortDate}-${l.subject}-${l.grade_level}/${l.classroom}`;
     const remedialIds = l.remedial_ids || "-";
     const total = l.total_students ?? "?";
     const remedialCount = l.remedial_ids ? l.remedial_ids.split(",").filter(Boolean).length : 0;
     const remedialPct = l.total_students && l.total_students > 0
       ? `${((remedialCount / l.total_students) * 100).toFixed(1)}%`
       : "-";
-    return `[REF-${i + 1}] วันที่: ${l.teaching_date} | วิชา: ${l.subject} | ระดับชั้น: ${l.grade_level} | ห้อง: ${l.classroom} | หัวข้อ: ${l.topic || "-"} | Mastery: ${l.mastery_score}/5 | Gap: ${l.major_gap} | Remedial: ${remedialCount}/${total} (${remedialPct}) [${remedialIds}] | Issue: ${l.key_issue || "-"} | Strategy: ${l.next_strategy || "-"}`;
+    return `[${refId}] วันที่: ${l.teaching_date} | วิชา: ${l.subject} | ระดับชั้น: ${l.grade_level} | ห้อง: ${l.classroom} | หัวข้อ: ${l.topic || "-"} | Mastery: ${l.mastery_score}/5 | Gap: ${l.major_gap} | Remedial: ${remedialCount}/${total} (${remedialPct}) [${remedialIds}] | Issue: ${l.key_issue || "-"} | Strategy: ${l.next_strategy || "-"}`;
   });
 
   // Gap summary
