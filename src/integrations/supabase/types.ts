@@ -270,6 +270,7 @@ export type Database = {
           remedial_ids: string | null
           subject: string
           teacher_id: string
+          teacher_name: string | null
           teaching_date: string
           topic: string | null
           total_students: number | null
@@ -293,6 +294,7 @@ export type Database = {
           remedial_ids?: string | null
           subject: string
           teacher_id: string
+          teacher_name?: string | null
           teaching_date?: string
           topic?: string | null
           total_students?: number | null
@@ -316,6 +318,7 @@ export type Database = {
           remedial_ids?: string | null
           subject?: string
           teacher_id?: string
+          teacher_name?: string | null
           teaching_date?: string
           topic?: string | null
           total_students?: number | null

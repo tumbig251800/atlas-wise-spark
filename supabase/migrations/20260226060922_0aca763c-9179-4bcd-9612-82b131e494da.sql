@@ -1,0 +1,1 @@
+ALTER TABLE public.teaching_logs ADD COLUMN teacher_name TEXT DEFAULT NULL;

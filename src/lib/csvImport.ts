@@ -25,6 +25,7 @@ export interface ParsedCSVRow {
   remedial_ids: string | null;
   next_strategy: string | null;
   reflection: string | null;
+  teacher_name: string | null;
 }
 
 export interface ParseResult {
@@ -119,6 +120,7 @@ const HEADER_MAP: Record<string, string[]> = {
   remedial: ["remedial ids", "remedial", "remedial_ids", "ซ่อมเสริม", "ติดตามพิเศษ"],
   strategy: ["next strategy", "next_strategy", "กลยุทธ์"],
   reflection: ["สะท้อนคิด", "reflection", "สะท้อนผล"],
+  teacherName: ["รหัสครู", "ชื่อครู", "ชื่อ-สกุล", "teacher_name", "ผู้สอน", "รหัสครูผู้สอน"],
 };
 
 /** Convert DD/MM/YYYY or MM/DD/YYYY (with optional time) to YYYY-MM-DD for PostgreSQL */
@@ -303,6 +305,7 @@ export function parseCSVFile(text: string): ParseResult {
       remedial_ids: remedial_ids || null,
       next_strategy: get("strategy") || null,
       reflection: get("reflection") || null,
+      teacher_name: get("teacherName") || null,
     });
   }
 
