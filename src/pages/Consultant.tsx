@@ -241,43 +241,43 @@ export default function Consultant() {
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-muted-foreground" />
             <Select
-              value={contextFilter.subject || ""}
-              onValueChange={(v) => setContextFilter(prev => ({ ...prev, subject: v || undefined }))}
+              value={contextFilter.subject || "__all__"}
+              onValueChange={(v) => setContextFilter(prev => ({ ...prev, subject: v === "__all__" ? undefined : v }))}
             >
               <SelectTrigger className="w-[120px] h-8 text-xs">
                 <SelectValue placeholder="วิชา" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">ทุกวิชา</SelectItem>
-                {filterOptions.subjects.map(s => (
+                <SelectItem value="__all__">ทุกวิชา</SelectItem>
+                {filterOptions.subjects.filter(Boolean).map(s => (
                   <SelectItem key={s} value={s}>{s}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <Select
-              value={contextFilter.gradeLevel || ""}
-              onValueChange={(v) => setContextFilter(prev => ({ ...prev, gradeLevel: v || undefined }))}
+              value={contextFilter.gradeLevel || "__all__"}
+              onValueChange={(v) => setContextFilter(prev => ({ ...prev, gradeLevel: v === "__all__" ? undefined : v }))}
             >
               <SelectTrigger className="w-[80px] h-8 text-xs">
                 <SelectValue placeholder="ชั้น" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">ทุกชั้น</SelectItem>
-                {filterOptions.gradeLevels.map(g => (
+                <SelectItem value="__all__">ทุกชั้น</SelectItem>
+                {filterOptions.gradeLevels.filter(Boolean).map(g => (
                   <SelectItem key={g} value={g}>{g}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <Select
-              value={contextFilter.classroom || ""}
-              onValueChange={(v) => setContextFilter(prev => ({ ...prev, classroom: v || undefined }))}
+              value={contextFilter.classroom || "__all__"}
+              onValueChange={(v) => setContextFilter(prev => ({ ...prev, classroom: v === "__all__" ? undefined : v }))}
             >
               <SelectTrigger className="w-[70px] h-8 text-xs">
                 <SelectValue placeholder="ห้อง" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">ทุกห้อง</SelectItem>
-                {filterOptions.classrooms.map(c => (
+                <SelectItem value="__all__">ทุกห้อง</SelectItem>
+                {filterOptions.classrooms.filter(Boolean).map(c => (
                   <SelectItem key={c} value={c}>{c}</SelectItem>
                 ))}
               </SelectContent>
