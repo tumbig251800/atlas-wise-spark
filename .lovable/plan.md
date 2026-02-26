@@ -1,54 +1,29 @@
 
 
-# แผนแก้ไข: AI ไม่ตอบแชท — VITE_SUPABASE_URL ไม่ได้ตั้งค่า
+# แผนแก้ไข: Invalid Model Error — `gemini-2.0-flash` ไม่รองรับแล้ว
 
 ## สาเหตุ
 
-จากภาพหน้าจอ มี toast error ที่มุมขวาล่าง: **"VITE_SUPABASE_URL ไม่ได้ตั้งค่าใน .env"**
+จาก logs ของ backend functions แสดง error ชัดเจน:
 
-ไฟล์ `src/lib/edgeFunctionFetch.ts` ใช้ `import.meta.env.VITE_SUPABASE_URL` เพื่อสร้าง URL สำหรับเรียก Edge Functions แต่ตอนนี้ไฟล์ `.env` ไม่มีอยู่ในโปรเจกต์ (ถูกลบไปแล้ว) และ Lovable Cloud อาจยังไม่ได้ inject ค่านี้ให้
-
-เมื่อ `VITE_SUPABASE_URL` เป็น undefined → `getAiChatUrl()` return `""` → โค้ดแสดง toast error แทนการเรียก AI
-
-## วิธีแก้ไข
-
-แก้ไฟล์ `src/lib/edgeFunctionFetch.ts` ให้มี **fallback** ไปใช้ URL ที่ hardcode ไว้ (เหมือนกับใน `client.ts`) เมื่อ environment variable ไม่พร้อมใช้งาน:
-
-```typescript
-// src/lib/edgeFunctionFetch.ts
-
-const FALLBACK_SUPABASE_URL = "https://iwlpqrulzkzpsiaddefq.supabase.co";
-
-function getBaseUrl(): string {
-  const v = import.meta.env.VITE_SUPABASE_URL;
-  const sanitized = sanitizeAndValidateUrl(v ?? "");
-  return sanitized || FALLBACK_SUPABASE_URL;
-}
+```
+invalid model: gemini-2.0-flash, allowed models: [openai/gpt-5-mini openai/gpt-5 openai/gpt-5-nano openai/gpt-5.2 google/gemini-2.5-pro google/gemini-2.5-flash google/gemini-2.5-flash-lite google/gemini-2.5-flash-image google/gemini-3-pro-preview google/gemini-3-flash-preview google/gemini-3-pro-image-preview]
 ```
 
-เช่นเดียวกับ `getEdgeFunctionHeaders()` ที่ต้องมี fallback สำหรับ key:
+โมเดล `gemini-2.0-flash` **ถูกยกเลิกแล้ว** จาก Lovable AI Gateway ต้องเปลี่ยนเป็นโมเดลที่รองรับ เช่น `google/gemini-2.5-flash` (เร็ว, ประหยัด, เหมาะกับงานสรุปและแชท)
 
-```typescript
-const FALLBACK_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."; // anon key
+## ไฟล์ที่ต้องแก้ (4 ไฟล์)
 
-export function getEdgeFunctionHeaders(): Record<string, string> {
-  const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-  const raw = key != null && typeof key === "string" ? String(key) : FALLBACK_KEY;
-  // ... rest of logic
-}
-```
-
-วิธีนี้ทำให้ไม่ว่า `.env` จะมีหรือไม่มี แอปก็เรียก Edge Functions ได้ถูกต้องเสมอ — เหมือนกับที่ `client.ts` hardcode URL ไว้อยู่แล้ว
-
-## ไฟล์ที่ต้องแก้
-
-| ไฟล์ | สิ่งที่ทำ |
-|------|-----------|
-| `src/lib/edgeFunctionFetch.ts` | เพิ่ม fallback URL และ fallback key เมื่อ env var ไม่มีค่า |
+| ไฟล์ | บรรทัด | เปลี่ยนจาก | เปลี่ยนเป็น |
+|------|--------|------------|-------------|
+| `supabase/functions/ai-chat/index.ts` | 160 | `gemini-2.0-flash` | `google/gemini-2.5-flash` |
+| `supabase/functions/ai-summary/index.ts` | 49 | `gemini-2.0-flash` | `google/gemini-2.5-flash` |
+| `supabase/functions/ai-lesson-plan/index.ts` | 198 | `gemini-2.0-flash` | `google/gemini-2.5-flash` |
+| `supabase/functions/atlas-diagnostic/index.ts` | 30 | `gemini-2.0-flash` | `google/gemini-2.5-flash` |
 
 ## ผลลัพธ์ที่คาดหวัง
 
-- Toast error "VITE_SUPABASE_URL ไม่ได้ตั้งค่าใน .env" จะหายไป
-- AI Chat (พีท ร่างทอง) จะเรียก Edge Function ได้ถูกต้อง
-- Lesson Plan และ Add-on Prompts ก็จะทำงานได้เช่นกัน
+- Error 400 "invalid model" จะหายไป
+- AI Chat (พีท), AI Summary, Lesson Plan, และ Diagnostic จะกลับมาทำงานได้ทั้งหมด
+- Backend functions จะ deploy อัตโนมัติหลังแก้โค้ด
 
