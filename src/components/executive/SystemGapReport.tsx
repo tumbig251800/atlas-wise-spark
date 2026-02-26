@@ -9,7 +9,7 @@ interface Props {
 }
 
 export function SystemGapReport({ events }: Props) {
-  const blueEvents = events.filter((e) => e.status_color === "blue");
+  const blueEvents = events.filter((e) => e.status_color === "blue" && !e.student_id);
 
   return (
     <Card className="glass-card">
