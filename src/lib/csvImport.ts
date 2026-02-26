@@ -1,6 +1,6 @@
 /**
  * CSV Import utilities for teaching_logs
- * Supports format matching Export (Thai headers) + optional columns
+ * Supports format matching Export (Thai headers) + Google Forms multi-line headers
  */
 import { cleanClassroomData } from "./utils";
 
@@ -30,6 +30,38 @@ export interface ParsedCSVRow {
 export interface ParseResult {
   rows: ParsedCSVRow[];
   errors: string[];
+}
+
+/**
+ * Split CSV text into logical rows, respecting quoted fields that contain newlines.
+ * A row is "complete" when the number of unescaped quotes seen so far is even.
+ */
+function splitCSVRows(text: string): string[] {
+  const rows: string[] = [];
+  let current = "";
+  let inQuotes = false;
+
+  const rawLines = text.split(/\r?\n/);
+  for (const line of rawLines) {
+    if (current) {
+      current += "\n" + line;
+    } else {
+      current = line;
+    }
+
+    // Count unescaped quotes to determine if we're still inside a quoted field
+    for (const ch of line) {
+      if (ch === '"') inQuotes = !inQuotes;
+    }
+
+    if (!inQuotes) {
+      if (current.trim()) rows.push(current);
+      current = "";
+    }
+  }
+  // Flush any remaining content
+  if (current.trim()) rows.push(current);
+  return rows;
 }
 
 function parseCSVLine(line: string): string[] {
@@ -71,22 +103,22 @@ const EXPORT_ORDER: Record<string, number> = {
 
 const HEADER_MAP: Record<string, string[]> = {
   date: ["วันที่สอน", "date", "teaching_date", "วันที่เรียน"],
-  grade: ["ระดับชั้น", "grade", "grade_level"],
+  grade: ["ระดับชั้น", "grade", "grade_level", "คอลัมน์ 4"],
   room: ["ห้องเรียน", "room", "classroom", "ห้อง"],
-  total: ["จำนวนนักเรียน", "total", "total_students"],
-  subject: ["วิชา", "subject"],
-  unit: ["หน่วยการเรียนรู้", "unit", "learning_unit"],
+  total: ["จำนวนนักเรียน", "total", "total_students", "column 19"],
+  subject: ["วิชา", "subject", "วิชาที่สอน"],
+  unit: ["หน่วยการเรียนรู้", "unit", "learning_unit", "หน่วยการเรียน"],
   topic: ["เรื่องที่สอน", "topic"],
-  mastery: ["mastery score", "mastery", "mastery_score"],
-  activity: ["activity mode", "activity", "activity_mode"],
-  keyIssue: ["key issue", "key_issue"],
-  majorGap: ["major gap", "major_gap", "gap"],
-  classMgmt: ["classroom management", "classroom_management"],
-  healthStatus: ["health care status", "health_care_status"],
-  healthIds: ["health care ids", "health_care_ids"],
-  remedial: ["remedial ids", "remedial", "remedial_ids"],
-  strategy: ["next strategy", "next_strategy"],
-  reflection: ["สะท้อนคิด", "reflection"],
+  mastery: ["mastery score", "mastery", "mastery_score", "ระดับความสำเร็จ"],
+  activity: ["activity mode", "activity", "activity_mode", "รูปแบบกิจกรรม"],
+  keyIssue: ["key issue", "key_issue", "จุดที่นักเรียน"],
+  majorGap: ["major gap", "major_gap", "gap", "สาเหตุหลัก", "gap analysis"],
+  classMgmt: ["classroom management", "classroom_management", "ปัญหาพฤติกรรม", "การจัดการชั้นเรียน"],
+  healthStatus: ["health care status", "health_care_status", "health care", "นักเรียนกลุ่ม health"],
+  healthIds: ["health care ids", "health_care_ids", "ระบุเลขประจำตัวนักเรียนกลุ่ม health"],
+  remedial: ["remedial ids", "remedial", "remedial_ids", "ซ่อมเสริม", "ติดตามพิเศษ"],
+  strategy: ["next strategy", "next_strategy", "กลยุทธ์"],
+  reflection: ["สะท้อนคิด", "reflection", "สะท้อนผล"],
 };
 
 /** Convert DD/MM/YYYY or MM/DD/YYYY (with optional time) to YYYY-MM-DD for PostgreSQL */
@@ -164,20 +196,40 @@ function buildColumnMap(headers: string[]): Record<string, number> {
   return map;
 }
 
+/** Detect if a CSV field value looks like a date/timestamp (data row indicator) */
+const DATE_PATTERN = /^\d{1,2}\/\d{1,2}\/\d{4}|^\d{4}-\d{2}-\d{2}/;
+
+/**
+ * Find the first data row index and the header row index.
+ * For Google Forms CSVs, the header is a single logical row (possibly multi-line quoted)
+ * followed by data rows starting with a timestamp/date.
+ * For standard CSVs, header is row 0 and data starts at row 1.
+ */
+function findDataStart(rows: string[]): { headerIdx: number; dataStartIdx: number } {
+  for (let i = 1; i < rows.length; i++) {
+    const firstField = parseCSVLine(rows[i])[0]?.trim().replace(/^"/, "") || "";
+    if (DATE_PATTERN.test(firstField)) {
+      return { headerIdx: i - 1, dataStartIdx: i };
+    }
+  }
+  // Fallback: standard CSV
+  return { headerIdx: 0, dataStartIdx: 1 };
+}
+
 export function parseCSVFile(text: string): ParseResult {
   const errors: string[] = [];
-  const lines = text.split(/\r?\n/).filter((l) => l.trim());
-  if (lines.length < 2) {
+  const rows = splitCSVRows(text);
+  if (rows.length < 2) {
     return { rows: [], errors: ["ไฟล์ว่างหรือมีเฉพาะหัวคอลัมน์"] };
   }
 
-  const headerCols = parseCSVLine(lines[0]);
+  const { headerIdx, dataStartIdx } = findDataStart(rows);
+  const headerCols = parseCSVLine(rows[headerIdx]);
   const colMap = buildColumnMap(headerCols);
-  const startRow = 1;
 
-  const rows: ParsedCSVRow[] = [];
-  for (let i = startRow; i < lines.length; i++) {
-    const cols = parseCSVLine(lines[i]);
+  const parsed: ParsedCSVRow[] = [];
+  for (let i = dataStartIdx; i < rows.length; i++) {
+    const cols = parseCSVLine(rows[i]);
     if (cols.length < 5) continue;
 
     const get = (key: string) => {
@@ -204,20 +256,24 @@ export function parseCSVFile(text: string): ParseResult {
     }
 
     const masteryStr = get("mastery");
-    const mastery_score = Math.min(5, Math.max(0, parseInt(masteryStr, 10) || 0));
+    const mastery_score = Math.min(5, Math.max(1, parseInt(masteryStr, 10) || 1));
 
     let major_gap = "success" as (typeof MAJOR_GAP_VALUES)[number];
     const gapStr = get("majorGap").toLowerCase().replace(/\s/g, "");
-    if (gapStr.includes("a2-gap")) major_gap = "a2-gap";
-    else if (gapStr.includes("k-gap") || gapStr === "k") major_gap = "k-gap";
-    else if (gapStr.includes("p-gap") || gapStr === "p") major_gap = "p-gap";
-    else if (gapStr.includes("a-gap") || gapStr === "a") major_gap = "a-gap";
-    else if (gapStr.includes("system")) major_gap = "system-gap";
+    if (gapStr.includes("a2-gap") || gapStr.includes("a2gap")) major_gap = "a2-gap";
+    else if (gapStr.includes("k-gap") || gapStr.includes("kgap") || gapStr.includes("ความรู้") || gapStr === "k") major_gap = "k-gap";
+    else if (gapStr.includes("p-gap") || gapStr.includes("pgap") || gapStr.includes("ทักษะ") || gapStr === "p") major_gap = "p-gap";
+    else if (gapStr.includes("a-gap") || gapStr.includes("agap") || gapStr.includes("เจตคติ") || gapStr === "a") major_gap = "a-gap";
+    else if (gapStr.includes("system") || gapStr.includes("ระบบ")) major_gap = "system-gap";
 
     let activity_mode = "active" as (typeof ACTIVITY_MODE_VALUES)[number];
     const actStr = get("activity").toLowerCase();
-    if (ACTIVITY_MODE_VALUES.some((a) => actStr.includes(a))) {
-      activity_mode = ACTIVITY_MODE_VALUES.find((a) => actStr.includes(a)) ?? "active";
+    if (actStr.includes("passive") || actStr.includes("รับสาร") || actStr.includes("ฟังครู")) {
+      activity_mode = "passive";
+    } else if (actStr.includes("constructive") || actStr.includes("วิเคราะห์") || actStr.includes("สร้างสรรค์")) {
+      activity_mode = "constructive";
+    } else if (actStr.includes("active") || actStr.includes("ลงมือทำ") || actStr.includes("ฝึกฝน")) {
+      activity_mode = "active";
     }
 
     const healthStatusStr = get("healthStatus").toLowerCase();
@@ -227,9 +283,9 @@ export function parseCSVFile(text: string): ParseResult {
     if (health_care_ids === "[None]" || health_care_ids === "[N/A]") health_care_ids = null;
 
     let remedial_ids = get("remedial").trim();
-    if (remedial_ids === "[None]" || remedial_ids === "[N/A]") remedial_ids = "";
+    if (remedial_ids === "[None]" || remedial_ids === "[N/A]" || remedial_ids === "-") remedial_ids = "";
 
-    rows.push({
+    parsed.push({
       teaching_date,
       grade_level,
       classroom,
@@ -250,5 +306,5 @@ export function parseCSVFile(text: string): ParseResult {
     });
   }
 
-  return { rows, errors };
+  return { rows: parsed, errors };
 }
