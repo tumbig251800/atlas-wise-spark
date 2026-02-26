@@ -2,54 +2,10 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-/** Sanitize string to valid ByteString for HTTP headers (printable ASCII only) */
-function toByteString(s: string): string {
-  return String(s).replace(/[\x00-\x1F\x7F]/g, "").replace(/[^\x20-\x7E]/g, "").trim();
-}
-
-/** Custom fetch that sanitizes all header values to prevent ByteString errors */
-function safeFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-  if (!init?.headers) return fetch(input, init);
-  const headers = new Headers();
-  const src = init.headers instanceof Headers ? init.headers : new Headers(init.headers as HeadersInit);
-  src.forEach((value, key) => {
-    headers.set(key, toByteString(value));
-  });
-  return fetch(input, { ...init, headers });
-}
-
-// Must be valid URL and ByteString to prevent "Parameter 0 is not a valid URLString" errors
-const SUPABASE_URL = (() => {
-  const v = import.meta.env.VITE_SUPABASE_URL;
-  let s = v != null && typeof v === "string" ? String(v) : "";
-  s = s.replace(/[\r\n\t]+/g, "").replace(/\s+/g, "").trim();
-  if (!s || s === "undefined" || !s.startsWith("http")) {
-    return "https://placeholder.supabase.co";
-  }
-  try {
-    new URL(s);
-    return s;
-  } catch {
-    return "https://placeholder.supabase.co";
-  }
-})();
-const SUPABASE_PUBLISHABLE_KEY = (() => {
-  const v = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-  let s = v != null && typeof v === "string" ? String(v) : "";
-  s = s.replace(/[\r\n\t]+/g, "").replace(/[\x00-\x1F\x7F]/g, "").replace(/[^\x20-\x7E]/g, "").trim();
-  return s || "placeholder-key";
-})();
+const SUPABASE_URL = "https://iwlpqrulzkzpsiaddefq.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml3bHBxcnVsemt6cHNpYWRkZWZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExNDUzOTEsImV4cCI6MjA4NjcyMTM5MX0.31uIYLKq8kHZQHJp7M9XDxIvwM8mUHI8w1FqO5J5-48";
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-  auth: {
-    storage: localStorage,
-    persistSession: true,
-    autoRefreshToken: true,
-  },
-  global: {
-    fetch: safeFetch,
-  },
-});
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
