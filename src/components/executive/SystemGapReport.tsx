@@ -3,13 +3,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import type { DiagnosticEvent } from "@/hooks/useDiagnosticData";
+import type { TeachingLog } from "@/hooks/useDashboardData";
 
 interface Props {
   events: DiagnosticEvent[];
+  logs: TeachingLog[];
 }
 
-export function SystemGapReport({ events }: Props) {
+export function SystemGapReport({ events, logs }: Props) {
   const blueEvents = events.filter((e) => e.status_color === "blue" && !e.student_id);
+  const dateMap = new Map(logs.map((l) => [l.id, l.teaching_date]));
 
   return (
     <Card className="glass-card">
@@ -41,7 +44,9 @@ export function SystemGapReport({ events }: Props) {
                   <TableCell>{e.grade_level || "-"}</TableCell>
                   <TableCell>{e.classroom || "-"}</TableCell>
                   <TableCell className="text-muted-foreground text-xs">
-                    {new Date(e.created_at).toLocaleDateString("th-TH")}
+                    {dateMap.get(e.teaching_log_id)
+                      ? new Date(dateMap.get(e.teaching_log_id)!).toLocaleDateString("th-TH")
+                      : new Date(e.created_at).toLocaleDateString("th-TH")}
                   </TableCell>
                 </TableRow>
               ))}
