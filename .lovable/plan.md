@@ -1,22 +1,44 @@
 
 
-## แก้ System-Gap Report: กรองเฉพาะ Session-Level
+## แก้ System-Gap Report: แสดงวันที่สอนจริงแทนวันที่ประมวลผล
 
 ### ปัญหา
-System-Gap Report แสดง 4 แถว ทั้งที่มีเพียง 2 session จริง เพราะรวมแถวรายนักเรียน (student_id มีค่า) เข้ามาด้วย ซึ่งผิดหลัก **Strict UI Policy** ที่กำหนดว่าต้องใช้เฉพาะแถว Session-Level (`student_id IS NULL`)
+`SystemGapReport` ใช้ `e.created_at` (วันที่ระบบสร้าง diagnostic event) ซึ่งเป็นวันนี้ 26/2/2569 ทั้งที่บันทึกการสอนจริงคือ:
+- "การอ่านจับใจความสำคัญฯ" → teaching_date = **17/12/2568**
+- "นิราศเดือด" → teaching_date = **6/1/2569**
 
 ### แผนแก้ไข
 
-**แก้ `src/components/executive/SystemGapReport.tsx`** — 1 จุด:
+**แก้ `src/components/executive/SystemGapReport.tsx`**:
+1. รับ prop `logs` (TeachingLog[]) เพิ่มจาก parent เพื่อ lookup วันที่สอนจริง
+2. สร้าง Map จาก `log.id → log.teaching_date`
+3. แสดง `teaching_date` แทน `created_at` ในคอลัมน์วันที่
 
-- **บรรทัด 13**: เพิ่มเงื่อนไข `&& !e.student_id` ในการกรอง `blueEvents` เพื่อแสดงเฉพาะแถว Session-Level
+**แก้ `src/pages/Executive.tsx`**:
+1. ส่ง `filteredLogs` เป็น prop ให้ `SystemGapReport`
+
+### โค้ดที่เปลี่ยน
 
 ```typescript
-// จาก
-const blueEvents = events.filter((e) => e.status_color === "blue");
-// เป็น
-const blueEvents = events.filter((e) => e.status_color === "blue" && !e.student_id);
+// SystemGapReport.tsx — เพิ่ม logs prop
+interface Props {
+  events: DiagnosticEvent[];
+  logs: TeachingLog[];
+}
+
+// สร้าง lookup map
+const dateMap = new Map(logs.map(l => [l.id, l.teaching_date]));
+
+// แสดงวันที่สอนจริง
+<TableCell>
+  {dateMap.get(e.teaching_log_id)
+    ? new Date(dateMap.get(e.teaching_log_id)!).toLocaleDateString("th-TH")
+    : new Date(e.created_at).toLocaleDateString("th-TH")}
+</TableCell>
 ```
 
-ผลลัพธ์: จาก 4 แถวซ้ำ → 2 แถว (1 แถวต่อ 1 คาบสอน) ตรงกับข้อมูลจริง
+```typescript
+// Executive.tsx — ส่ง logs
+<SystemGapReport events={filteredDiagnosticEvents} logs={filteredLogs} />
+```
 
