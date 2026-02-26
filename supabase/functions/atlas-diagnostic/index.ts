@@ -218,13 +218,12 @@ serve(async (req) => {
 
     // 3. Deterministic Topic Normalization (v1.4 - Lookup Table + Fuzzy Match)
     const currentTopic = log.topic || "";
-    const normResult: NormalizationResult = await normalizeTopic(
+    const historicalTopics = matchedHistoryLogs.map((h: any) => h.topic || "");
+    const normalizedTopic = await normalizeTopic(
       currentTopic,
-      log.subject,
-      supabase,
-      log.grade_level
+      historicalTopics,
+      LOVABLE_API_KEY
     );
-    const normalizedTopic = normResult.canonical;
 
     // Build trend for same normalized topic
     const sameTopicLogs = matchedHistoryLogs.filter((h: any) => {
