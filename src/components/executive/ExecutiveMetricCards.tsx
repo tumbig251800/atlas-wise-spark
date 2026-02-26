@@ -8,9 +8,10 @@ interface Props {
 
 export function ExecutiveMetricCards({ logs }: Props) {
   const totalLogs = logs.length;
-  const avgMastery = totalLogs > 0
-    ? Math.round(logs.reduce((s, l) => s + l.mastery_score, 0) / totalLogs)
+  const avgMasteryRaw = totalLogs > 0
+    ? logs.reduce((s, l) => s + l.mastery_score, 0) / totalLogs
     : 0;
+  const avgMasteryPct = Math.round((avgMasteryRaw / 5) * 100);
 
   const gapCounts: Record<string, number> = {};
   logs.forEach((l) => {
@@ -37,7 +38,7 @@ export function ExecutiveMetricCards({ logs }: Props) {
     {
       icon: TrendingUp,
       label: "Mastery เฉลี่ย",
-      value: `${avgMastery}%`,
+      value: `${avgMasteryPct}%`,
       color: "text-[hsl(var(--atlas-success))]",
       bg: "bg-[hsl(var(--atlas-success)/0.1)]",
     },
