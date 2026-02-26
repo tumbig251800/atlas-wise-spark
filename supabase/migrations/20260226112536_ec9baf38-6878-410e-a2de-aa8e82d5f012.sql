@@ -1,0 +1,1 @@
+ALTER TABLE public.teaching_logs ADD COLUMN academic_term text DEFAULT NULL;
