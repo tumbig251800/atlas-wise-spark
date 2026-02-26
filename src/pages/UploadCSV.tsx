@@ -1,20 +1,15 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { parseCSVFile, ensureISODate, type ParsedCSVRow } from "@/lib/csvImport";
-import { Upload, FileText, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { Upload, FileText, AlertCircle, CheckCircle2, Loader2, Pencil } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 
 const BOM = "\uFEFF";
-
-interface TeacherOption {
-  user_id: string;
-  full_name: string;
-}
 
 export default function UploadCSV() {
   const { user, role } = useAuth();
@@ -25,61 +20,38 @@ export default function UploadCSV() {
   const [result, setResult] = useState<{ ok: number; err: string[] } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Teacher selector state (Director only)
+  // Director: teacher name override (read from CSV, editable)
   const isDirector = role === "director";
-  const [teachers, setTeachers] = useState<TeacherOption[]>([]);
-  const [selectedTeacherId, setSelectedTeacherId] = useState<string>("");
-
-  // Fetch teacher list for Director
-  useEffect(() => {
-    if (!isDirector) return;
-    (async () => {
-      // Get all user_ids with teacher role
-      const { data: roles } = await supabase
-        .from("user_roles")
-        .select("user_id")
-        .eq("role", "teacher");
-      if (!roles?.length) return;
-
-      const teacherUserIds = roles.map((r) => r.user_id);
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("user_id, full_name")
-        .in("user_id", teacherUserIds);
-
-      if (profiles) {
-        setTeachers(profiles as TeacherOption[]);
-      }
-    })();
-  }, [isDirector]);
+  const [teacherNameOverride, setTeacherNameOverride] = useState<string>("");
+  const [editingName, setEditingName] = useState(false);
 
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     setFile(f ?? null);
     setParsed(null);
     setResult(null);
+    setEditingName(false);
     if (!f) return;
     const reader = new FileReader();
     reader.onload = () => {
       const text = String(reader.result ?? "").replace(BOM, "");
       const res = parseCSVFile(text);
       setParsed(res);
+      // Auto-detect teacher name from first row that has one
+      if (isDirector) {
+        const firstName = res.rows.find((r) => r.teacher_name)?.teacher_name ?? "";
+        setTeacherNameOverride(firstName);
+      }
     };
     reader.readAsText(f, "UTF-8");
-  }, []);
+  }, [isDirector]);
 
   const handleUpload = useCallback(async () => {
     if (!user || !parsed?.rows.length) return;
 
-    // Determine teacher_id and teacher_name
-    let teacherId = user.id;
-    let teacherNameFallback: string | null = null;
-
-    if (isDirector && selectedTeacherId) {
-      teacherId = selectedTeacherId;
-      const selected = teachers.find((t) => t.user_id === selectedTeacherId);
-      teacherNameFallback = selected?.full_name || null;
-    }
+    // teacher_id is always the logged-in user (Director's UUID)
+    // teacher_name comes from: override field (Director) → row's own teacher_name → null
+    const teacherId = user.id;
 
     setUploading(true);
     setResult(null);
@@ -87,6 +59,10 @@ export default function UploadCSV() {
     let ok = 0;
 
     for (const row of parsed.rows) {
+      const resolvedTeacherName = isDirector
+        ? (teacherNameOverride.trim() || row.teacher_name || null)
+        : (row.teacher_name || null);
+
       const { data: logData, error } = await supabase.from("teaching_logs").insert({
         teacher_id: teacherId,
         teaching_date: ensureISODate(row.teaching_date),
@@ -106,7 +82,7 @@ export default function UploadCSV() {
         remedial_ids: row.remedial_ids,
         next_strategy: row.next_strategy,
         reflection: row.reflection,
-        teacher_name: row.teacher_name || teacherNameFallback,
+        teacher_name: resolvedTeacherName,
       }).select("id").single();
 
       if (!error && logData?.id) {
@@ -130,9 +106,9 @@ export default function UploadCSV() {
       queryClient.invalidateQueries({ queryKey: ["diagnostic-events"] });
       queryClient.invalidateQueries({ queryKey: ["strike-counters"] });
     }
-  }, [user, parsed, queryClient, isDirector, selectedTeacherId, teachers]);
+  }, [user, parsed, queryClient, isDirector, teacherNameOverride]);
 
-  const canUpload = parsed && parsed.rows.length > 0 && !uploading && (!isDirector || selectedTeacherId);
+  const canUpload = parsed && parsed.rows.length > 0 && !uploading;
 
   return (
     <AppLayout>
@@ -169,24 +145,41 @@ export default function UploadCSV() {
             )}
           </div>
 
-          {/* Teacher selector - Director only */}
-          {isDirector && (
+          {/* Teacher name - Director only: auto-read from CSV, editable */}
+          {isDirector && parsed && (
             <div className="space-y-1.5">
-              <Label className="text-sm font-medium">ครูผู้สอน (อัปโหลดแทน)</Label>
-              <Select value={selectedTeacherId} onValueChange={setSelectedTeacherId}>
-                <SelectTrigger className="w-[280px]">
-                  <SelectValue placeholder="เลือกครูผู้สอน..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {teachers.map((t) => (
-                    <SelectItem key={t.user_id} value={t.user_id}>
-                      {t.full_name || t.user_id}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label className="text-sm font-medium">ชื่อครูผู้สอน</Label>
+              {editingName ? (
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={teacherNameOverride}
+                    onChange={(e) => setTeacherNameOverride(e.target.value)}
+                    placeholder="พิมพ์ชื่อครู..."
+                    className="w-[280px] h-9 text-sm"
+                    autoFocus
+                    onBlur={() => setEditingName(false)}
+                    onKeyDown={(e) => { if (e.key === "Enter") setEditingName(false); }}
+                  />
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-foreground">
+                    {teacherNameOverride || <span className="text-muted-foreground italic">ไม่พบชื่อครูใน CSV</span>}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-muted-foreground"
+                    onClick={() => setEditingName(true)}
+                  >
+                    <Pencil className="h-3.5 w-3.5 mr-1" />
+                    แก้ไข
+                  </Button>
+                </div>
+              )}
               <p className="text-xs text-muted-foreground">
-                ข้อมูลจะถูกบันทึกภายใต้ชื่อครูที่เลือก (ไม่ใช่ชื่อแอดมิน)
+                อ่านจาก CSV อัตโนมัติ — กด "แก้ไข" เพื่อเปลี่ยนชื่อ
               </p>
             </div>
           )}
@@ -213,12 +206,6 @@ export default function UploadCSV() {
               <p className="text-sm">
                 พบ <strong>{parsed.rows.length}</strong> แถวที่พร้อมนำเข้า
               </p>
-
-              {isDirector && !selectedTeacherId && (
-                <p className="text-sm text-amber-600 dark:text-amber-400">
-                  ⚠️ กรุณาเลือกครูผู้สอนก่อนนำเข้าข้อมูล
-                </p>
-              )}
 
               <Button
                 onClick={handleUpload}

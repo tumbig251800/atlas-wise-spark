@@ -33,23 +33,6 @@ export default function Executive() {
     enabled: !!user,
   });
 
-  // Fetch profiles for teacher filter
-  const { data: profiles = [] } = useQuery({
-    queryKey: ["exec-profiles"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("profiles").select("user_id, full_name");
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user,
-  });
-
-  const teacherMap = useMemo(() => {
-    const m: Record<string, string> = {};
-    profiles.forEach((p) => { m[p.user_id] = p.full_name; });
-    return m;
-  }, [profiles]);
-
   // Derive filter options (cascading: options narrow based on prior selections)
   const gradeLevels = useMemo(() => [...new Set(allLogs.map((l) => l.grade_level))].sort(), [allLogs]);
 
@@ -66,17 +49,14 @@ export default function Executive() {
     return [...new Set(base.map((l) => l.subject))].sort();
   }, [allLogs, filters.gradeLevel, filters.classroom]);
 
+  // Build teacher name list from teacher_name field in logs (not from profiles)
   const teacherNames = useMemo(() => {
     let base = allLogs;
     if (filters.gradeLevel) base = base.filter((l) => l.grade_level === filters.gradeLevel);
     if (filters.classroom) base = base.filter((l) => String(l.classroom ?? "") === String(filters.classroom ?? ""));
     if (filters.subject) base = base.filter((l) => l.subject === filters.subject);
-    const ids = new Set(base.map((l) => l.teacher_id));
-    return profiles
-      .filter((p) => ids.has(p.user_id) && p.full_name)
-      .map((p) => p.full_name as string)
-      .sort();
-  }, [allLogs, profiles, filters.gradeLevel, filters.classroom, filters.subject]);
+    return [...new Set(base.map((l) => l.teacher_name).filter(Boolean) as string[])].sort();
+  }, [allLogs, filters.gradeLevel, filters.classroom, filters.subject]);
 
   useEffect(() => {
     if (filters.teacherName && !teacherNames.includes(filters.teacherName)) {
@@ -84,12 +64,7 @@ export default function Executive() {
     }
   }, [filters.teacherName, teacherNames]);
 
-  const teacherIdForName = useMemo(() => {
-    const p = profiles.find((x) => x.full_name === filters.teacherName);
-    return p?.user_id ?? null;
-  }, [profiles, filters.teacherName]);
-
-  // Apply filters to logs
+  // Apply filters to logs — use teacher_name directly
   const filteredLogs = useMemo(() => {
     return allLogs.filter((l) => {
       if (filters.dateFrom && l.teaching_date < filters.dateFrom) return false;
@@ -97,13 +72,10 @@ export default function Executive() {
       if (filters.gradeLevel && l.grade_level !== filters.gradeLevel) return false;
       if (filters.classroom && String(l.classroom ?? "") !== String(filters.classroom ?? "")) return false;
       if (filters.subject && l.subject !== filters.subject) return false;
-      if (filters.teacherName) {
-        const name = teacherMap[l.teacher_id];
-        if (name !== filters.teacherName) return false;
-      }
+      if (filters.teacherName && l.teacher_name !== filters.teacherName) return false;
       return true;
     });
-  }, [allLogs, filters, teacherMap]);
+  }, [allLogs, filters]);
 
   const filteredLogIds = useMemo(() => new Set(filteredLogs.map((l) => l.id)), [filteredLogs]);
 
@@ -114,16 +86,19 @@ export default function Executive() {
       if (filters.subject && e.subject !== filters.subject) return false;
       if (filters.gradeLevel && e.grade_level !== filters.gradeLevel) return false;
       if (filters.classroom && String(e.classroom ?? "") !== String(filters.classroom ?? "")) return false;
-      if (teacherIdForName && e.teacher_id !== teacherIdForName) return false;
       return true;
     });
-  }, [diagnosticEvents, filteredLogIds, filters.subject, filters.gradeLevel, filters.classroom, teacherIdForName]);
+  }, [diagnosticEvents, filteredLogIds, filters.subject, filters.gradeLevel, filters.classroom]);
 
   // Filter strikes by subject, teacher, and grade/room (via scope_id for class-level strikes)
   const filteredStrikes = useMemo(() => {
     return strikes.filter((s) => {
       if (filters.subject && s.subject !== filters.subject) return false;
-      if (teacherIdForName && s.teacher_id !== teacherIdForName) return false;
+      if (filters.teacherName) {
+        // Match strike's teacher via logs that are already filtered
+        const logIds = new Set(filteredLogs.map((l) => l.id));
+        if (s.last_session_id && !logIds.has(s.last_session_id)) return false;
+      }
       const isClassScope = s.scope === "class" || s.scope === "classroom";
       if (!isClassScope) return true;
       const sid = String(s.scope_id ?? "").trim();
@@ -136,7 +111,7 @@ export default function Executive() {
       }
       return true;
     });
-  }, [strikes, filters.subject, filters.gradeLevel, filters.classroom, teacherIdForName]);
+  }, [strikes, filters.subject, filters.gradeLevel, filters.classroom, filters.teacherName, filteredLogs]);
 
   return (
     <AppLayout>
