@@ -180,6 +180,7 @@ serve(async (req) => {
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY") || SUPABASE_SERVICE_ROLE_KEY;
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -302,9 +303,9 @@ serve(async (req) => {
       class_id: classId,
       subject: log.subject,
       normalized_topic: normalizedTopic,
-      original_topic: normResult.originalInput,
-      normalization_method: normResult.method,
-      normalization_confidence: normResult.confidence,
+      original_topic: currentTopic,
+      normalization_method: "ai-fuzzy",
+      normalization_confidence: 1.0,
       gap_rate: gapRate,
       class_strike_count: classStrikeResult?.strike_count ?? 0,
       intervention_size: classStrikeAction === "force_pivot" ? "force-pivot"
@@ -444,8 +445,8 @@ serve(async (req) => {
           interventionSize,
           thresholdPct,
           normalizedTopic,
-          normalizationMethod: normResult.method,
-          normalizationConfidence: normResult.confidence,
+          normalizationMethod: "ai-fuzzy",
+          normalizationConfidence: 1.0,
         },
         classStrike: decisionObject,
       }),
