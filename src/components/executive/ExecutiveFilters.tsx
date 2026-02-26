@@ -10,6 +10,7 @@ export interface ExecFilters {
   classroom: string;
   subject: string;
   teacherName: string;
+  academicTerm: string;
 }
 
 interface Props {
@@ -19,11 +20,12 @@ interface Props {
   classrooms: string[];
   subjects: string[];
   teacherNames: string[];
+  academicTerms: string[];
 }
 
 const ALL = "all";
 
-export function ExecutiveFilters({ filters, onChange, gradeLevels, classrooms, subjects, teacherNames }: Props) {
+export function ExecutiveFilters({ filters, onChange, gradeLevels, classrooms, subjects, teacherNames, academicTerms }: Props) {
   const update = (partial: Partial<ExecFilters>) => {
     const next = { ...filters, ...partial };
     if (partial.gradeLevel !== undefined) next.classroom = next.subject = next.teacherName = "";
@@ -38,8 +40,9 @@ export function ExecutiveFilters({ filters, onChange, gradeLevels, classrooms, s
     classroom: "",
     subject: "",
     teacherName: "",
+    academicTerm: "",
   });
-  const hasActiveFilter = filters.dateFrom || filters.dateTo || filters.gradeLevel || filters.classroom || filters.subject || filters.teacherName;
+  const hasActiveFilter = filters.dateFrom || filters.dateTo || filters.gradeLevel || filters.classroom || filters.subject || filters.teacherName || filters.academicTerm;
 
   return (
     <div className="glass-card p-4 space-y-3">
@@ -55,6 +58,16 @@ export function ExecutiveFilters({ filters, onChange, gradeLevels, classrooms, s
       <div className="space-y-1">
         <label className="text-xs text-muted-foreground">ถึง</label>
         <Input type="date" value={filters.dateTo} onChange={(e) => update({ dateTo: e.target.value })} className="w-36 h-9 text-sm" />
+      </div>
+      <div className="space-y-1">
+        <label className="text-xs text-muted-foreground">ปีการศึกษา/เทอม</label>
+        <Select value={filters.academicTerm || ALL} onValueChange={(v) => update({ academicTerm: v === ALL ? "" : v })}>
+          <SelectTrigger className="w-36 h-9"><SelectValue placeholder="ทั้งหมด" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>ทั้งหมด</SelectItem>
+            {academicTerms.filter(Boolean).map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+          </SelectContent>
+        </Select>
       </div>
       <div className="space-y-1">
         <label className="text-xs text-muted-foreground">ระดับชั้น</label>

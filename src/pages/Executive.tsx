@@ -18,7 +18,7 @@ import type { TeachingLog } from "@/hooks/useDashboardData";
 
 export default function Executive() {
   const { user } = useAuth();
-  const [filters, setFilters] = useState<ExecFilters>({ dateFrom: "", dateTo: "", gradeLevel: "", classroom: "", subject: "", teacherName: "" });
+  const [filters, setFilters] = useState<ExecFilters>({ dateFrom: "", dateTo: "", gradeLevel: "", classroom: "", subject: "", teacherName: "", academicTerm: "" });
   const [barGroupBy, setBarGroupBy] = useState<"grade" | "subject">("grade");
   const { diagnosticEvents, strikes, isLoading: diagLoading } = useDiagnosticData();
 
@@ -49,6 +49,11 @@ export default function Executive() {
     return [...new Set(base.map((l) => l.subject))].sort();
   }, [allLogs, filters.gradeLevel, filters.classroom]);
 
+  // Build academic term list from logs
+  const academicTerms = useMemo(() => {
+    return [...new Set(allLogs.map((l) => (l as any).academic_term).filter(Boolean) as string[])].sort().reverse();
+  }, [allLogs]);
+
   // Build teacher name list from teacher_name field in logs (not from profiles)
   const teacherNames = useMemo(() => {
     let base = allLogs;
@@ -73,6 +78,7 @@ export default function Executive() {
       if (filters.classroom && String(l.classroom ?? "") !== String(filters.classroom ?? "")) return false;
       if (filters.subject && l.subject !== filters.subject) return false;
       if (filters.teacherName && l.teacher_name !== filters.teacherName) return false;
+      if (filters.academicTerm && (l as any).academic_term !== filters.academicTerm) return false;
       return true;
     });
   }, [allLogs, filters]);
@@ -125,6 +131,7 @@ export default function Executive() {
           classrooms={classrooms}
           subjects={subjects}
           teacherNames={teacherNames}
+          academicTerms={academicTerms}
         />
 
         {isLoading ? (

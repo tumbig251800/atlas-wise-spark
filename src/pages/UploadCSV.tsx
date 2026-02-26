@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { parseCSVFile, ensureISODate, type ParsedCSVRow } from "@/lib/csvImport";
@@ -12,7 +13,7 @@ import { Label } from "@/components/ui/label";
 const BOM = "\uFEFF";
 
 export default function UploadCSV() {
-  const { user, role } = useAuth();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [file, setFile] = useState<File | null>(null);
   const [parsed, setParsed] = useState<{ rows: ParsedCSVRow[]; errors: string[] } | null>(null);
@@ -20,10 +21,19 @@ export default function UploadCSV() {
   const [result, setResult] = useState<{ ok: number; err: string[] } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Director: teacher name override (read from CSV, editable)
-  const isDirector = role === "director";
+  // Teacher name override: auto-read from CSV, editable by anyone
   const [teacherNameOverride, setTeacherNameOverride] = useState<string>("");
   const [editingName, setEditingName] = useState(false);
+
+  // Academic term selection (e.g. "2568-1", "2568-2")
+  const currentYear = new Date().getFullYear() + 543; // Buddhist Era
+  const termOptions = [
+    `${currentYear}-1`,
+    `${currentYear}-2`,
+    `${currentYear - 1}-1`,
+    `${currentYear - 1}-2`,
+  ];
+  const [academicTerm, setAcademicTerm] = useState<string>(`${currentYear}-1`);
 
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -38,13 +48,11 @@ export default function UploadCSV() {
       const res = parseCSVFile(text);
       setParsed(res);
       // Auto-detect teacher name from first row that has one
-      if (isDirector) {
-        const firstName = res.rows.find((r) => r.teacher_name)?.teacher_name ?? "";
-        setTeacherNameOverride(firstName);
-      }
+      const firstName = res.rows.find((r) => r.teacher_name)?.teacher_name ?? "";
+      setTeacherNameOverride(firstName);
     };
     reader.readAsText(f, "UTF-8");
-  }, [isDirector]);
+  }, []);
 
   const handleUpload = useCallback(async () => {
     if (!user || !parsed?.rows.length) return;
@@ -59,9 +67,7 @@ export default function UploadCSV() {
     let ok = 0;
 
     for (const row of parsed.rows) {
-      const resolvedTeacherName = isDirector
-        ? (teacherNameOverride.trim() || row.teacher_name || null)
-        : (row.teacher_name || null);
+      const resolvedTeacherName = teacherNameOverride.trim() || row.teacher_name || null;
 
       const { data: logData, error } = await supabase.from("teaching_logs").insert({
         teacher_id: teacherId,
@@ -83,7 +89,8 @@ export default function UploadCSV() {
         next_strategy: row.next_strategy,
         reflection: row.reflection,
         teacher_name: resolvedTeacherName,
-      }).select("id").single();
+        academic_term: academicTerm || null,
+      } as any).select("id").single();
 
       if (!error && logData?.id) {
         ok++;
@@ -106,7 +113,7 @@ export default function UploadCSV() {
       queryClient.invalidateQueries({ queryKey: ["diagnostic-events"] });
       queryClient.invalidateQueries({ queryKey: ["strike-counters"] });
     }
-  }, [user, parsed, queryClient, isDirector, teacherNameOverride]);
+  }, [user, parsed, queryClient, teacherNameOverride, academicTerm]);
 
   const canUpload = parsed && parsed.rows.length > 0 && !uploading;
 
@@ -145,8 +152,8 @@ export default function UploadCSV() {
             )}
           </div>
 
-          {/* Teacher name - Director only: auto-read from CSV, editable */}
-          {isDirector && parsed && (
+          {/* Teacher name - auto-read from CSV, editable by anyone */}
+          {parsed && (
             <div className="space-y-1.5">
               <Label className="text-sm font-medium">ชื่อครูผู้สอน</Label>
               {editingName ? (
@@ -183,6 +190,22 @@ export default function UploadCSV() {
               </p>
             </div>
           )}
+
+          {/* Academic term selector — always visible */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">ปีการศึกษา / เทอม</Label>
+            <Select value={academicTerm} onValueChange={setAcademicTerm}>
+              <SelectTrigger className="w-[200px] h-9 text-sm">
+                <SelectValue placeholder="เลือกเทอม" />
+              </SelectTrigger>
+              <SelectContent>
+                {termOptions.map((t) => (
+                  <SelectItem key={t} value={t}>{t}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">ข้อมูลที่นำเข้าจะถูกแท็กด้วยเทอมนี้ เพื่อแยกวิเคราะห์ตามปีการศึกษา</p>
+          </div>
 
           {parsed && (
             <div className="space-y-3">
