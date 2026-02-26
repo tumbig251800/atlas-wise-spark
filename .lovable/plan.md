@@ -1,49 +1,80 @@
 
 
-# แผนแก้ไข: CSV Import ล้มเหลว 20 แถว (mastery_score check constraint)
+# แผนแก้ไข: Admin อัปโหลด CSV แทนครู — แสดงชื่อผู้สอนจริงแทนชื่อ Admin
 
-## สาเหตุหลัก (Root Cause)
+## สาเหตุของปัญหา
 
-ไฟล์ CSV จาก Google Forms มี **header แบบ multi-line** (หัวคอลัมน์ที่มีคำอธิบายยาวอยู่ในเครื่องหมายคำพูด ครอบคลุมบรรทัดที่ 1-32) แต่ parser ปัจจุบันแยกบรรทัดด้วย `\n` ก่อนแล้วค่อยจับคู่ — ทำให้:
+ปัจจุบัน `UploadCSV.tsx` บรรทัด 45 ใช้ `teacher_id: user.id` (คือ ID ของคนที่ Login อยู่) ทุกแถว ดังนั้นเมื่อ Admin อัปโหลดไฟล์ของครูวรกานต์ ข้อมูลทั้งหมดจะผูกกับ Admin → แสดงชื่อ Admin ทุกที่
 
-1. **Column mapping ผิด**: บรรทัดที่ 1 ถูกตัดกลางทาง (เพราะ quoted field มี newline) → `buildColumnMap` จับคู่คอลัมน์ผิดตำแหน่ง → อ่าน mastery_score จากคอลัมน์ที่ไม่ใช่ตัวเลข → ได้ 0
-2. **mastery_score = 0 ผิด constraint**: ฐานข้อมูลมี `CHECK (mastery_score BETWEEN 1 AND 5)` แต่ parser ใช้ `Math.max(0, ...)` ทำให้ค่าต่ำสุดเป็น 0
+## แนวทางแก้ไข
 
-## ไฟล์ที่ต้องแก้ (1 ไฟล์)
+เพิ่มคอลัมน์ `teacher_name` ในตาราง `teaching_logs` เพื่อเก็บชื่อครูผู้สอนจริงจากไฟล์ CSV โดยไม่ต้องเปลี่ยน `teacher_id` (ยังคงเป็น ID ของผู้อัปโหลด เพื่อให้ RLS ทำงานได้ถูกต้อง)
 
-| ไฟล์ | สิ่งที่ทำ |
+เหตุผลที่ไม่ใช้วิธี match teacher_id กับ profiles:
+- ครูบางคนอาจยังไม่ได้สมัครบัญชีในระบบ
+- ต้องมีระบบจับคู่รหัสครูกับ user_id ซึ่งซับซ้อนเกินไปในตอนนี้
+- วิธีเพิ่มคอลัมน์ `teacher_name` เรียบง่าย ปลอดภัย และแก้ปัญหาได้ทันที
+
+## ไฟล์ที่ต้องแก้ (4 ส่วน)
+
+| ส่วน | สิ่งที่ทำ |
 |------|-----------|
-| `src/lib/csvImport.ts` | 3 การแก้ไข |
+| Database Migration | เพิ่มคอลัมน์ `teacher_name TEXT` ใน `teaching_logs` |
+| `src/lib/csvImport.ts` | เพิ่ม parsing คอลัมน์ "รหัสครูผู้สอน / ชื่อ-สกุล" → `teacher_name` |
+| `src/pages/UploadCSV.tsx` | ส่ง `teacher_name` ไปกับ insert |
+| `src/pages/History.tsx` | แสดง `teacher_name` ในรายการและ modal |
 
-### การแก้ไขที่ 1: รองรับ multi-line CSV rows
+---
 
-เพิ่มฟังก์ชัน `splitCSVRows(text)` ที่รวมบรรทัดที่อยู่ภายในเครื่องหมายคำพูดเข้าด้วยกัน แทนที่จะ split ด้วย `\n` ตรงๆ
+### 1. Database Migration
 
-```text
-ก่อน: text.split(/\r?\n/).filter(l => l.trim())
-หลัง: splitCSVRows(text)  // respect quoted multi-line fields
+```sql
+ALTER TABLE public.teaching_logs
+ADD COLUMN teacher_name TEXT DEFAULT NULL;
 ```
 
-### การแก้ไขที่ 2: ตรวจจับ data row แรก (skip description lines)
+- ค่าเริ่มต้นเป็น `NULL` → ข้อมูลเก่าไม่กระทบ
+- เมื่อครูบันทึกผ่านหน้า Log เอง จะดึงชื่อจาก profiles เหมือนเดิม
+- เมื่อ Admin อัปโหลด CSV จะเก็บชื่อครูจากไฟล์ CSV
 
-เพิ่มการสแกนหาบรรทัดแรกที่เริ่มด้วยรูปแบบวันที่/timestamp เพื่อข้าม description block ของ Google Forms:
+### 2. csvImport.ts — เพิ่ม parsing ชื่อครู
 
-```text
-// สแกนหาแถวแรกที่ขึ้นต้นด้วย timestamp หรือวันที่
-// เช่น "15/12/2025, 14:04:34" หรือ "2026-02-09"
-// แถวก่อนหน้า = header row จริง
+เพิ่ม key ใน `HEADER_MAP`:
+```typescript
+teacherName: ["รหัสครู", "ชื่อครู", "ชื่อ-สกุล", "teacher_name", "ผู้สอน"],
 ```
 
-### การแก้ไขที่ 3: mastery_score ขั้นต่ำ = 1
-
-```text
-ก่อน: Math.min(5, Math.max(0, parseInt(masteryStr, 10) || 0))
-หลัง: Math.min(5, Math.max(1, parseInt(masteryStr, 10) || 1))
+เพิ่ม field ใน `ParsedCSVRow`:
+```typescript
+teacher_name: string | null;
 ```
+
+ใน parsing loop:
+```typescript
+teacher_name: get("teacherName") || null,
+```
+
+### 3. UploadCSV.tsx — ส่ง teacher_name ไปกับ insert
+
+```typescript
+teacher_name: row.teacher_name,
+```
+
+### 4. History.tsx — แสดงชื่อครูผู้สอน
+
+- ในรายการ card: แสดง `log.teacher_name` ถ้ามี
+- ใน modal รายละเอียด: เพิ่มแถว "ผู้สอน" แสดง `teacher_name`
+
+### 5. หน้า Teaching Log (บันทึกเอง) — ส่งชื่อครูจาก profile
+
+เมื่อครูบันทึกผ่าน UI เอง ระบบจะดึง `full_name` จาก profiles มาเก็บใน `teacher_name` ด้วย เพื่อให้ข้อมูลสอดคล้องกันทั้ง 2 ช่องทาง
+
+---
 
 ## ผลลัพธ์ที่คาดหวัง
 
-- CSV จาก Google Forms (header multi-line 32 บรรทัด) นำเข้าได้สำเร็จ
-- CSV จาก Export มาตรฐาน (header 1 บรรทัด) ยังทำงานได้เหมือนเดิม
-- mastery_score จะอยู่ในช่วง 1-5 เสมอ ไม่มี constraint violation
+- Admin อัปโหลด CSV ของครูวรกานต์ → หน้า History แสดง "T006 ครูวรกานต์ ศรีไชยวาล" เป็นผู้สอน
+- ครูบันทึกเอง → แสดงชื่อจาก profile
+- ข้อมูลเก่าที่ไม่มี `teacher_name` → แสดง "—" หรือดึงจาก profile ตามเดิม
+- RLS ยังทำงานปกติ (teacher_id ยังเป็น ID ของผู้อัปโหลด)
 
