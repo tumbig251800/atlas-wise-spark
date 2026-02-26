@@ -36,13 +36,7 @@ const statusLabel = (s: StrikeCounter) => {
 
 export function StrikeEscalationView({ strikes }: Props) {
   const [tab, setTab] = useState<TabFilter>("all");
-  const [subjectFilter, setSubjectFilter] = useState("all");
   const [scopeFilter, setScopeFilter] = useState("all");
-
-  const subjects = useMemo(
-    () => [...new Set(strikes.map((s) => s.subject).filter(Boolean))] as string[],
-    [strikes]
-  );
 
   const sorted = [...strikes].sort((a, b) => b.strike_count - a.strike_count);
 
@@ -50,7 +44,6 @@ export function StrikeEscalationView({ strikes }: Props) {
     if (tab === "active" && !(s.status === "active" && s.strike_count >= 1)) return false;
     if (tab === "resolved" && !(s.status === "resolved" || s.strike_count === 0)) return false;
     if (tab === "referred" && s.strike_count < 3) return false;
-    if (subjectFilter !== "all" && s.subject !== subjectFilter) return false;
     if (scopeFilter !== "all") {
       const scopeMatch = scopeFilter === "classroom"
         ? (s.scope === "class" || s.scope === "classroom")
@@ -78,24 +71,7 @@ export function StrikeEscalationView({ strikes }: Props) {
           </TabsList>
         </Tabs>
 
-        <p className="text-xs text-muted-foreground">
-          กรองตาราง Strike ด้านล่างเท่านั้น (รายห้อง = Strike สรุปตามห้อง, รายนักเรียน = Strike ตามรหัสนักเรียน)
-        </p>
         <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground">วิชา:</span>
-            <Select value={subjectFilter} onValueChange={setSubjectFilter}>
-              <SelectTrigger className="h-8 w-[140px] text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">ทั้งหมด</SelectItem>
-                {subjects.map((s) => (
-                  <SelectItem key={s} value={s}>{s}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-muted-foreground">ขอบเขต:</span>
             <Select value={scopeFilter} onValueChange={setScopeFilter}>
