@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
@@ -6,17 +6,52 @@ import { supabase } from "@/integrations/supabase/client";
 import { parseCSVFile, ensureISODate, type ParsedCSVRow } from "@/lib/csvImport";
 import { Upload, FileText, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 const BOM = "\uFEFF";
 
+interface TeacherOption {
+  user_id: string;
+  full_name: string;
+}
+
 export default function UploadCSV() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const queryClient = useQueryClient();
   const [file, setFile] = useState<File | null>(null);
   const [parsed, setParsed] = useState<{ rows: ParsedCSVRow[]; errors: string[] } | null>(null);
   const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState<{ ok: number; err: string[] } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Teacher selector state (Director only)
+  const isDirector = role === "director";
+  const [teachers, setTeachers] = useState<TeacherOption[]>([]);
+  const [selectedTeacherId, setSelectedTeacherId] = useState<string>("");
+
+  // Fetch teacher list for Director
+  useEffect(() => {
+    if (!isDirector) return;
+    (async () => {
+      // Get all user_ids with teacher role
+      const { data: roles } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "teacher");
+      if (!roles?.length) return;
+
+      const teacherUserIds = roles.map((r) => r.user_id);
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("user_id, full_name")
+        .in("user_id", teacherUserIds);
+
+      if (profiles) {
+        setTeachers(profiles as TeacherOption[]);
+      }
+    })();
+  }, [isDirector]);
 
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -35,6 +70,17 @@ export default function UploadCSV() {
 
   const handleUpload = useCallback(async () => {
     if (!user || !parsed?.rows.length) return;
+
+    // Determine teacher_id and teacher_name
+    let teacherId = user.id;
+    let teacherNameFallback: string | null = null;
+
+    if (isDirector && selectedTeacherId) {
+      teacherId = selectedTeacherId;
+      const selected = teachers.find((t) => t.user_id === selectedTeacherId);
+      teacherNameFallback = selected?.full_name || null;
+    }
+
     setUploading(true);
     setResult(null);
     const errs: string[] = [];
@@ -42,7 +88,7 @@ export default function UploadCSV() {
 
     for (const row of parsed.rows) {
       const { data: logData, error } = await supabase.from("teaching_logs").insert({
-        teacher_id: user.id,
+        teacher_id: teacherId,
         teaching_date: ensureISODate(row.teaching_date),
         grade_level: row.grade_level,
         classroom: row.classroom,
@@ -60,16 +106,14 @@ export default function UploadCSV() {
         remedial_ids: row.remedial_ids,
         next_strategy: row.next_strategy,
         reflection: row.reflection,
-        teacher_name: row.teacher_name,
+        teacher_name: row.teacher_name || teacherNameFallback,
       }).select("id").single();
 
       if (!error && logData?.id) {
         ok++;
-        // Fire-and-forget: trigger diagnostic engine
         supabase.functions.invoke("atlas-diagnostic", {
           body: { logId: logData.id }
         }).catch(() => {});
-        // Small delay to avoid overwhelming the backend
         if (parsed.rows.indexOf(row) < parsed.rows.length - 1) {
           await new Promise(r => setTimeout(r, 100));
         }
@@ -86,7 +130,9 @@ export default function UploadCSV() {
       queryClient.invalidateQueries({ queryKey: ["diagnostic-events"] });
       queryClient.invalidateQueries({ queryKey: ["strike-counters"] });
     }
-  }, [user, parsed, queryClient]);
+  }, [user, parsed, queryClient, isDirector, selectedTeacherId, teachers]);
+
+  const canUpload = parsed && parsed.rows.length > 0 && !uploading && (!isDirector || selectedTeacherId);
 
   return (
     <AppLayout>
@@ -96,7 +142,6 @@ export default function UploadCSV() {
         <div className="glass-card p-6 space-y-4">
           <p className="text-sm text-muted-foreground">
             เลือกไฟล์ CSV ที่มีรูปแบบตรงกับ Export (หรือมีคอลัมน์: วันที่สอน, ระดับชั้น, ห้องเรียน, จำนวนนักเรียน, วิชา ฯลฯ)
-            ข้อมูลจะถูกนำเข้าภายใต้บัญชีของคุณ
           </p>
 
           <div className="flex flex-wrap items-center gap-3">
@@ -124,6 +169,28 @@ export default function UploadCSV() {
             )}
           </div>
 
+          {/* Teacher selector - Director only */}
+          {isDirector && (
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">ครูผู้สอน (อัปโหลดแทน)</Label>
+              <Select value={selectedTeacherId} onValueChange={setSelectedTeacherId}>
+                <SelectTrigger className="w-[280px]">
+                  <SelectValue placeholder="เลือกครูผู้สอน..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {teachers.map((t) => (
+                    <SelectItem key={t.user_id} value={t.user_id}>
+                      {t.full_name || t.user_id}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                ข้อมูลจะถูกบันทึกภายใต้ชื่อครูที่เลือก (ไม่ใช่ชื่อแอดมิน)
+              </p>
+            </div>
+          )}
+
           {parsed && (
             <div className="space-y-3">
               {parsed.errors.length > 0 && (
@@ -147,9 +214,15 @@ export default function UploadCSV() {
                 พบ <strong>{parsed.rows.length}</strong> แถวที่พร้อมนำเข้า
               </p>
 
+              {isDirector && !selectedTeacherId && (
+                <p className="text-sm text-amber-600 dark:text-amber-400">
+                  ⚠️ กรุณาเลือกครูผู้สอนก่อนนำเข้าข้อมูล
+                </p>
+              )}
+
               <Button
                 onClick={handleUpload}
-                disabled={uploading || parsed.rows.length === 0}
+                disabled={!canUpload}
                 className="gap-2"
               >
                 {uploading ? (
