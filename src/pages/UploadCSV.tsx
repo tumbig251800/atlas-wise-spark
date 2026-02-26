@@ -41,7 +41,7 @@ export default function UploadCSV() {
     let ok = 0;
 
     for (const row of parsed.rows) {
-      const { error } = await supabase.from("teaching_logs").insert({
+      const { data: logData, error } = await supabase.from("teaching_logs").insert({
         teacher_id: user.id,
         teaching_date: ensureISODate(row.teaching_date),
         grade_level: row.grade_level,
@@ -61,9 +61,21 @@ export default function UploadCSV() {
         next_strategy: row.next_strategy,
         reflection: row.reflection,
         teacher_name: row.teacher_name,
-      });
-      if (error) errs.push(`แถว ${row.teaching_date} ${row.subject}: ${error.message}`);
-      else ok++;
+      }).select("id").single();
+
+      if (!error && logData?.id) {
+        ok++;
+        // Fire-and-forget: trigger diagnostic engine
+        supabase.functions.invoke("atlas-diagnostic", {
+          body: { logId: logData.id }
+        }).catch(() => {});
+        // Small delay to avoid overwhelming the backend
+        if (parsed.rows.indexOf(row) < parsed.rows.length - 1) {
+          await new Promise(r => setTimeout(r, 100));
+        }
+      } else if (error) {
+        errs.push(`แถว ${row.teaching_date} ${row.subject}: ${error.message}`);
+      }
     }
 
     setResult({ ok, err: errs });
