@@ -62,7 +62,7 @@ export function ExecutiveFilters({ filters, onChange, gradeLevels, classrooms, s
           <SelectTrigger className="w-32 h-9"><SelectValue placeholder="ทั้งหมด" /></SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL}>ทั้งหมด</SelectItem>
-            {gradeLevels.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+            {gradeLevels.filter(Boolean).map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
@@ -72,7 +72,7 @@ export function ExecutiveFilters({ filters, onChange, gradeLevels, classrooms, s
           <SelectTrigger className="w-28 h-9"><SelectValue placeholder="ทั้งหมด" /></SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL}>ทั้งหมด</SelectItem>
-            {classrooms.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            {classrooms.filter(Boolean).map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
@@ -82,7 +82,7 @@ export function ExecutiveFilters({ filters, onChange, gradeLevels, classrooms, s
           <SelectTrigger className="w-36 h-9"><SelectValue placeholder="ทั้งหมด" /></SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL}>ทั้งหมด</SelectItem>
-            {subjects.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+            {subjects.filter(Boolean).map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
@@ -92,7 +92,7 @@ export function ExecutiveFilters({ filters, onChange, gradeLevels, classrooms, s
           <SelectTrigger className="w-40 h-9" title="เลือกระดับชั้น ห้อง วิชา ก่อน เพื่อกรองรายชื่อครู"><SelectValue placeholder="ทั้งหมด" /></SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL}>ทั้งหมด</SelectItem>
-            {teacherNames.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+            {teacherNames.filter(Boolean).map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
