@@ -49,7 +49,7 @@ export function LessonPlanForm({ config, onChange, gradeLevels, classrooms, subj
           <Select value={config.gradeLevel} onValueChange={(v) => update({ gradeLevel: v })}>
             <SelectTrigger><SelectValue placeholder="เลือก" /></SelectTrigger>
             <SelectContent>
-              {gradeLevels.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+              {gradeLevels.filter(Boolean).map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
@@ -59,7 +59,7 @@ export function LessonPlanForm({ config, onChange, gradeLevels, classrooms, subj
           <Select value={config.classroom} onValueChange={(v) => update({ classroom: v })}>
             <SelectTrigger><SelectValue placeholder="เลือก" /></SelectTrigger>
             <SelectContent>
-              {classrooms.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              {classrooms.filter(Boolean).map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
@@ -69,7 +69,7 @@ export function LessonPlanForm({ config, onChange, gradeLevels, classrooms, subj
           <Select value={config.subject} onValueChange={(v) => update({ subject: v })}>
             <SelectTrigger><SelectValue placeholder="เลือก" /></SelectTrigger>
             <SelectContent>
-              {subjects.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              {subjects.filter(Boolean).map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>

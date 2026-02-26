@@ -81,7 +81,7 @@ function FilterSelect({
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">ทั้งหมด</SelectItem>
-          {options.map((opt) => (
+          {options.filter(Boolean).map((opt) => (
             <SelectItem key={opt} value={opt}>
               {opt}
             </SelectItem>
