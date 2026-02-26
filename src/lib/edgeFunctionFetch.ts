@@ -2,6 +2,9 @@
  * Sanitize string for use in HTTP headers - prevents "not a valid ByteString" errors.
  * Keeps only printable ASCII (0x20-0x7E) to avoid control chars and invalid Unicode.
  */
+const FALLBACK_SUPABASE_URL = "https://iwlpqrulzkzpsiaddefq.supabase.co";
+const FALLBACK_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml3bHBxcnVsemt6cHNpYWRkZWZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExNDUzOTEsImV4cCI6MjA4NjcyMTM5MX0.31uIYLKq8kHZQHJp7M9XDxIvwM8mUHI8w1FqO5J5-48";
+
 function sanitizeHeaderValue(s: string): string {
   return String(s)
     .replace(/[\r\n\t]+/g, "")
@@ -17,7 +20,7 @@ function sanitizeHeaderValue(s: string): string {
  */
 export function getEdgeFunctionHeaders(): Record<string, string> {
   const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-  const raw = key != null && typeof key === "string" ? String(key) : "";
+  const raw = key != null && typeof key === "string" ? String(key) : FALLBACK_KEY;
   const authValue = sanitizeHeaderValue(raw);
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -44,7 +47,7 @@ function sanitizeAndValidateUrl(raw: string): string {
 /** Base URL for Edge Functions - must be valid absolute URL */
 function getBaseUrl(): string {
   const v = import.meta.env.VITE_SUPABASE_URL;
-  return sanitizeAndValidateUrl(v ?? "");
+  return sanitizeAndValidateUrl(v ?? "") || FALLBACK_SUPABASE_URL;
 }
 
 /** Base URL for Edge Functions */
