@@ -69,11 +69,11 @@ Director เปิดหน้า Upload CSV
 
 | เฟส | สถานะ | รายละเอียด |
 |-----|--------|------------|
-| 1 | Done | แก้ Date Parser DD/MM |
-| 2 | Done | เพิ่มปุ่มลบใน History + RLS |
-| 3 | Done | Loading Guard สำหรับ Executive |
-| 4 | **ลบตัวกรองวิชาซ้ำใน Strike** | ลบ subject filter ออกจาก StrikeEscalationView |
-| 5 | **ชื่อครูใน CSV Upload** | เพิ่ม teacher selector + แก้ teacher_id + RLS |
+| 1 | ✅ Done | แก้ Date Parser DD/MM |
+| 2 | ✅ Done | เพิ่มปุ่มลบใน History + RLS |
+| 3 | ✅ Done | Loading Guard สำหรับ Executive |
+| 4 | ✅ Done | ลบตัวกรองวิชาซ้ำใน Strike |
+| 5 | ✅ Done | ชื่อครูใน CSV Upload + Teacher Selector + RLS |
 
 ### ขั้นตอนหลังแก้ไข
 1. ลบข้อมูลเก่าผ่านปุ่มลบในหน้า History
