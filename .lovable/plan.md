@@ -1,80 +1,61 @@
 
 
-# แผนแก้ไข: Admin อัปโหลด CSV แทนครู — แสดงชื่อผู้สอนจริงแทนชื่อ Admin
+# แผนแก้ไข: CSV Import ไม่สร้าง Diagnostic Events (System Gap Report ว่างเปล่า)
 
 ## สาเหตุของปัญหา
 
-ปัจจุบัน `UploadCSV.tsx` บรรทัด 45 ใช้ `teacher_id: user.id` (คือ ID ของคนที่ Login อยู่) ทุกแถว ดังนั้นเมื่อ Admin อัปโหลดไฟล์ของครูวรกานต์ ข้อมูลทั้งหมดจะผูกกับ Admin → แสดงชื่อ Admin ทุกที่
+จากการตรวจสอบไฟล์ CSV พบว่ามีข้อมูลที่ควรแสดงใน System Gap Report จริง เช่น แถววันที่ 17/12/2025 ที่ครูวรกานต์ระบุ Major Gap = **System-Gap** (เวลาไม่พอ / สื่อการสอนไม่มี)
 
-## แนวทางแก้ไข
+ปัญหาคือ: **`UploadCSV.tsx` เพียงแค่ insert ข้อมูลลงตาราง `teaching_logs` เท่านั้น** แต่ไม่ได้เรียก Backend Function `atlas-diagnostic` ซึ่งเป็นตัวสร้างข้อมูลในตาราง `diagnostic_events` (รวมถึง strike_counter, remedial_tracking, pivot_events)
 
-เพิ่มคอลัมน์ `teacher_name` ในตาราง `teaching_logs` เพื่อเก็บชื่อครูผู้สอนจริงจากไฟล์ CSV โดยไม่ต้องเปลี่ยน `teacher_id` (ยังคงเป็น ID ของผู้อัปโหลด เพื่อให้ RLS ทำงานได้ถูกต้อง)
+เมื่อไม่มี diagnostic_events → System Gap Report ที่กรอง `status_color === "blue"` จึงว่างเปล่า
 
-เหตุผลที่ไม่ใช้วิธี match teacher_id กับ profiles:
-- ครูบางคนอาจยังไม่ได้สมัครบัญชีในระบบ
-- ต้องมีระบบจับคู่รหัสครูกับ user_id ซึ่งซับซ้อนเกินไปในตอนนี้
-- วิธีเพิ่มคอลัมน์ `teacher_name` เรียบง่าย ปลอดภัย และแก้ปัญหาได้ทันที
+```text
+ปัจจุบัน:
+  CSV → teaching_logs ✅ → (จบ) ❌
 
-## ไฟล์ที่ต้องแก้ (4 ส่วน)
+ที่ควรจะเป็น:
+  CSV → teaching_logs ✅ → atlas-diagnostic ✅ → diagnostic_events ✅
+```
 
-| ส่วน | สิ่งที่ทำ |
+## ไฟล์ที่ต้องแก้ (1 ไฟล์)
+
+| ไฟล์ | สิ่งที่ทำ |
 |------|-----------|
-| Database Migration | เพิ่มคอลัมน์ `teacher_name TEXT` ใน `teaching_logs` |
-| `src/lib/csvImport.ts` | เพิ่ม parsing คอลัมน์ "รหัสครูผู้สอน / ชื่อ-สกุล" → `teacher_name` |
-| `src/pages/UploadCSV.tsx` | ส่ง `teacher_name` ไปกับ insert |
-| `src/pages/History.tsx` | แสดง `teacher_name` ในรายการและ modal |
+| `src/pages/UploadCSV.tsx` | หลัง insert สำเร็จแต่ละแถว เรียก `atlas-diagnostic` function |
 
----
+### การแก้ไข: เรียก atlas-diagnostic หลัง insert สำเร็จ
 
-### 1. Database Migration
+ใน loop ที่ insert แต่ละแถว เมื่อ insert สำเร็จ (ไม่มี error):
 
-```sql
-ALTER TABLE public.teaching_logs
-ADD COLUMN teacher_name TEXT DEFAULT NULL;
-```
-
-- ค่าเริ่มต้นเป็น `NULL` → ข้อมูลเก่าไม่กระทบ
-- เมื่อครูบันทึกผ่านหน้า Log เอง จะดึงชื่อจาก profiles เหมือนเดิม
-- เมื่อ Admin อัปโหลด CSV จะเก็บชื่อครูจากไฟล์ CSV
-
-### 2. csvImport.ts — เพิ่ม parsing ชื่อครู
-
-เพิ่ม key ใน `HEADER_MAP`:
-```typescript
-teacherName: ["รหัสครู", "ชื่อครู", "ชื่อ-สกุล", "teacher_name", "ผู้สอน"],
-```
-
-เพิ่ม field ใน `ParsedCSVRow`:
-```typescript
-teacher_name: string | null;
-```
-
-ใน parsing loop:
-```typescript
-teacher_name: get("teacherName") || null,
-```
-
-### 3. UploadCSV.tsx — ส่ง teacher_name ไปกับ insert
+1. เปลี่ยน insert ให้ใช้ `.select("id").single()` เพื่อรับ `logData.id` กลับมา
+2. เรียก `supabase.functions.invoke("atlas-diagnostic", { body: { logId: logData.id } })` แบบ fire-and-forget (ใช้ `.catch(() => {})` เพื่อไม่ให้ error ของ diagnostic หยุดการ import)
+3. เพิ่ม delay เล็กน้อย (100ms) ระหว่างแถว เพื่อไม่ให้ backend ทำงานหนักเกินไป
 
 ```typescript
-teacher_name: row.teacher_name,
+// เปลี่ยนจาก:
+const { error } = await supabase.from("teaching_logs").insert({...});
+
+// เป็น:
+const { data: logData, error } = await supabase.from("teaching_logs")
+  .insert({...})
+  .select("id")
+  .single();
+
+if (!error && logData?.id) {
+  ok++;
+  // Fire-and-forget: เรียก diagnostic engine
+  supabase.functions.invoke("atlas-diagnostic", {
+    body: { logId: logData.id }
+  }).catch(() => {});
+} else if (error) {
+  errs.push(...);
+}
 ```
-
-### 4. History.tsx — แสดงชื่อครูผู้สอน
-
-- ในรายการ card: แสดง `log.teacher_name` ถ้ามี
-- ใน modal รายละเอียด: เพิ่มแถว "ผู้สอน" แสดง `teacher_name`
-
-### 5. หน้า Teaching Log (บันทึกเอง) — ส่งชื่อครูจาก profile
-
-เมื่อครูบันทึกผ่าน UI เอง ระบบจะดึง `full_name` จาก profiles มาเก็บใน `teacher_name` ด้วย เพื่อให้ข้อมูลสอดคล้องกันทั้ง 2 ช่องทาง
-
----
 
 ## ผลลัพธ์ที่คาดหวัง
 
-- Admin อัปโหลด CSV ของครูวรกานต์ → หน้า History แสดง "T006 ครูวรกานต์ ศรีไชยวาล" เป็นผู้สอน
-- ครูบันทึกเอง → แสดงชื่อจาก profile
-- ข้อมูลเก่าที่ไม่มี `teacher_name` → แสดง "—" หรือดึงจาก profile ตามเดิม
-- RLS ยังทำงานปกติ (teacher_id ยังเป็น ID ของผู้อัปโหลด)
+- CSV ที่มี `System-Gap` → สร้าง diagnostic_events ที่มี `status_color = "blue"` → แสดงใน System Gap Report
+- CSV ที่มี `P-Gap`, `K-Gap` → สร้าง diagnostic_events สีอื่นๆ และอัปเดต Strike Counter
+- ข้อมูลที่ import ไปแล้วก่อนหน้านี้จะไม่มี diagnostic events (ต้อง re-import หรือ trigger ด้วยตนเอง)
 
