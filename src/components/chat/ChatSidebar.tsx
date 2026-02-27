@@ -30,12 +30,11 @@ export function ChatSidebar({ open, onOpenChange, context }: ChatSidebarProps) {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
   const sendingRef = useRef(false);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   const send = async () => {
@@ -160,7 +159,7 @@ export function ChatSidebar({ open, onOpenChange, context }: ChatSidebarProps) {
           </SheetTitle>
         </SheetHeader>
 
-        <ScrollArea className="flex-1 px-4 py-3" ref={scrollRef}>
+        <ScrollArea className="flex-1 px-4 py-3">
           {messages.length === 0 && (
             <div className="flex h-full items-center justify-center text-muted-foreground text-sm text-center py-12">
               สวัสดีครับ! ผมพีท ร่างทอง 🙏<br />
@@ -197,6 +196,7 @@ export function ChatSidebar({ open, onOpenChange, context }: ChatSidebarProps) {
                 </div>
               </div>
             )}
+            <div ref={bottomRef} />
           </div>
         </ScrollArea>
 

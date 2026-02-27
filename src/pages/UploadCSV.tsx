@@ -69,9 +69,26 @@ export default function UploadCSV() {
     for (const row of parsed.rows) {
       const resolvedTeacherName = teacherNameOverride.trim() || row.teacher_name || null;
 
+      // Check for duplicate before inserting
+      const isoDate = ensureISODate(row.teaching_date);
+      const { data: existing } = await supabase
+        .from("teaching_logs")
+        .select("id")
+        .eq("teacher_id", teacherId)
+        .eq("teaching_date", isoDate)
+        .eq("subject", row.subject)
+        .eq("grade_level", row.grade_level)
+        .eq("classroom", row.classroom)
+        .maybeSingle();
+
+      if (existing) {
+        errs.push(`ข้ามแถว ${row.teaching_date} ${row.subject} ${row.grade_level}/${row.classroom}: มีข้อมูลนี้อยู่แล้ว`);
+        continue;
+      }
+
       const { data: logData, error } = await supabase.from("teaching_logs").insert({
         teacher_id: teacherId,
-        teaching_date: ensureISODate(row.teaching_date),
+        teaching_date: isoDate,
         grade_level: row.grade_level,
         classroom: row.classroom,
         subject: row.subject,
@@ -90,7 +107,7 @@ export default function UploadCSV() {
         reflection: row.reflection,
         teacher_name: resolvedTeacherName,
         academic_term: academicTerm || null,
-      } as any).select("id").single();
+      }).select("id").single();
 
       if (!error && logData?.id) {
         ok++;

@@ -3,32 +3,20 @@
  * Keeps only printable ASCII (0x20-0x7E) to avoid control chars and invalid Unicode.
  */
 const FALLBACK_SUPABASE_URL = "https://iwlpqrulzkzpsiaddefq.supabase.co";
-const FALLBACK_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml3bHBxcnVsemt6cHNpYWRkZWZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExNDUzOTEsImV4cCI6MjA4NjcyMTM5MX0.31uIYLKq8kHZQHJp7M9XDxIvwM8mUHI8w1FqO5J5-48";
-
-function sanitizeHeaderValue(s: string): string {
-  return String(s)
-    .replace(/[\r\n\t]+/g, "")
-    .replace(/[\x00-\x1F\x7F]/g, "")
-    .replace(/[^\x20-\x7E]/g, "")
-    .trim();
-}
+// Supabase anon JWT for project iwlpqrulzkzpsiaddefq — used for Edge Function Authorization header
+const SUPABASE_ANON_JWT = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml3bHBxcnVsemt6cHNpYWRkZWZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExNDUzOTEsImV4cCI6MjA4NjcyMTM5MX0.31uIYLKq8kHZQHJp7M9XDxIvwM8mUHI8w1FqO5J5-48";
 
 /**
  * Returns safe headers for Supabase Edge Function fetch calls.
- * Ensures all header values are valid HTTP tokens to prevent
- * "Headers of RequestInit is not a valid ByteString" errors.
+ * Always uses the hardcoded Supabase anon JWT (same as client.ts) to avoid
+ * "Headers of RequestInit is not a valid ByteString" errors caused by
+ * non-JWT keys (e.g. Lovable publishable keys) in VITE_SUPABASE_PUBLISHABLE_KEY.
  */
 export function getEdgeFunctionHeaders(): Record<string, string> {
-  const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-  const raw = key != null && typeof key === "string" ? String(key) : FALLBACK_KEY;
-  const authValue = sanitizeHeaderValue(raw);
-  const headers: Record<string, string> = {
+  return {
     "Content-Type": "application/json",
+    Authorization: `Bearer ${SUPABASE_ANON_JWT}`,
   };
-  if (authValue && authValue.length >= 30) {
-    headers.Authorization = `Bearer ${authValue}`;
-  }
-  return headers;
 }
 
 /** Sanitize and validate URL - prevents "not a valid ByteString" errors */

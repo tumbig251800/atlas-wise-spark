@@ -46,16 +46,31 @@ export default function Consultant() {
   const sendingRef = useRef(false);
   
   // Context filter state - prevents Data Leakage
+  // Start with empty filter; auto-set to first available data once loaded
   const [contextFilter, setContextFilter] = useState<DiagnosticFilter>({
-    subject: "คณิตศาสตร์",
-    gradeLevel: "ป.4",
-    classroom: "1",
+    subject: "",
+    gradeLevel: "",
+    classroom: "",
   });
+  const [filterInitialized, setFilterInitialized] = useState(false);
 
   const { allLogs, filterOptions, isLoading: dashboardLoading } = useDashboardData(loadPersistedFilters());
   const { diagnosticEvents, colorCounts, activeStrikes, isLoading: diagnosticLoading } = useDiagnosticData(contextFilter);
 
   const dataLoading = dashboardLoading || diagnosticLoading;
+
+  // Auto-initialize filter to first available subject/grade/classroom once data loads
+  useEffect(() => {
+    if (!filterInitialized && !dashboardLoading && allLogs.length > 0) {
+      const first = allLogs[0];
+      setContextFilter({
+        subject: first.subject,
+        gradeLevel: first.grade_level,
+        classroom: String(first.classroom),
+      });
+      setFilterInitialized(true);
+    }
+  }, [filterInitialized, dashboardLoading, allLogs]);
   
   // Filter logs by context to prevent Data Leakage
   const filteredLogs = allLogs.filter(log => {
@@ -282,6 +297,9 @@ export default function Consultant() {
                 ))}
               </SelectContent>
             </Select>
+            <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-md whitespace-nowrap">
+              {filteredLogs.length} คาบ
+            </span>
           </div>
         </div>
 

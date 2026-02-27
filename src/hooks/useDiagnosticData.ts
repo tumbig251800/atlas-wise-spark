@@ -35,8 +35,12 @@ export interface DiagnosticFilter {
 export function useDiagnosticData(filter?: DiagnosticFilter) {
   const { user } = useAuth();
 
+  const filterKey = filter
+    ? `${filter.subject ?? ""}|${filter.gradeLevel ?? ""}|${filter.classroom ?? ""}`
+    : "all";
+
   const eventsQuery = useQuery({
-    queryKey: ["diagnostic-events", user?.id],
+    queryKey: ["diagnostic-events", user?.id, filterKey],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("diagnostic_events")
@@ -49,7 +53,7 @@ export function useDiagnosticData(filter?: DiagnosticFilter) {
   });
 
   const strikesQuery = useQuery({
-    queryKey: ["strike-counters", user?.id],
+    queryKey: ["strike-counters", user?.id, filterKey],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("strike_counter")
@@ -62,7 +66,7 @@ export function useDiagnosticData(filter?: DiagnosticFilter) {
   });
 
   const pivotEventsQuery = useQuery({
-    queryKey: ["pivot-events", user?.id],
+    queryKey: ["pivot-events", user?.id, filterKey],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("pivot_events")
@@ -92,14 +96,21 @@ export function useDiagnosticData(filter?: DiagnosticFilter) {
   const strikes = filter
     ? allStrikes.filter((s) => {
         const matchSubject = !filter.subject || s.subject === filter.subject;
-        return matchSubject;
+        // scope_id encodes grade/classroom e.g. "ป.4/1"
+        const scopeStr = s.scope_id ?? "";
+        const matchGrade = !filter.gradeLevel || scopeStr.includes(filter.gradeLevel);
+        const matchClass = !filter.classroom || scopeStr.includes(`/${filter.classroom}`);
+        return matchSubject && matchGrade && matchClass;
       })
     : allStrikes;
 
   const pivotEvents = filter
     ? allPivotEvents.filter((p) => {
         const matchSubject = !filter.subject || p.subject === filter.subject;
-        return matchSubject;
+        const classStr = p.class_id ?? "";
+        const matchGrade = !filter.gradeLevel || classStr.includes(filter.gradeLevel);
+        const matchClass = !filter.classroom || classStr.includes(`/${filter.classroom}`);
+        return matchSubject && matchGrade && matchClass;
       })
     : allPivotEvents;
 
