@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { useDashboardData, loadPersistedFilters } from "@/hooks/useDashboardData";
 import { useDiagnosticData, type DiagnosticFilter } from "@/hooks/useDiagnosticData";
 import { buildStrictAnswerTH, type DecisionObject } from "@/lib/atlasStrictNarrator";
-import { getEdgeFunctionHeaders, getAiChatUrl, getAiExamGenUrl } from "@/lib/edgeFunctionFetch";
+import { getEdgeFunctionHeaders, getAiChatUrl, getAiExamGenUrl, getAiExamGenHeaders } from "@/lib/edgeFunctionFetch";
 
 type Msg = { id: string; role: "user" | "assistant"; content: string };
 
@@ -307,7 +307,7 @@ export default function Consultant() {
     try {
       const res = await fetch(url, {
         method: "POST",
-        headers: getEdgeFunctionHeaders(),
+        headers: getAiExamGenHeaders(),
         body: JSON.stringify({ gradeLevel, classroom, subject, unit: selectedUnit, context }),
       });
 

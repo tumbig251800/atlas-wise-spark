@@ -55,8 +55,19 @@ export function getAiLessonPlanUrl(): string {
   return base ? `${base}/functions/v1/ai-lesson-plan` : "";
 }
 
+// ai-exam-gen is deployed on project ebyelctqcdhjmqujeskx (atlas_prod)
+const EXAM_GEN_URL = "https://ebyelctqcdhjmqujeskx.supabase.co/functions/v1/ai-exam-gen";
+const EXAM_GEN_ANON_JWT = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVieWVsY3RxY2Roam1xdWplc2t4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0NjMzNTEsImV4cCI6MjA4NzAzOTM1MX0.jfG25PkINF9IocuaiMuRp643JwVM8sB6JcEZZcGhP-k";
+
 /** Full URL for ai-exam-gen Edge Function */
 export function getAiExamGenUrl(): string {
-  const base = getBaseUrl();
-  return base ? `${base}/functions/v1/ai-exam-gen` : "";
+  return EXAM_GEN_URL;
+}
+
+/** Headers specifically for ai-exam-gen (different project) */
+export function getAiExamGenHeaders(): Record<string, string> {
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${EXAM_GEN_ANON_JWT}`,
+  };
 }
