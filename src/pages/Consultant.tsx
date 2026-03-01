@@ -51,6 +51,8 @@ export default function Consultant() {
   const [examContent, setExamContent] = useState("");
   const [examLoading, setExamLoading] = useState(false);
   const [examCopied, setExamCopied] = useState(false);
+  const [selectedUnit, setSelectedUnit] = useState("");
+  const [examStep, setExamStep] = useState<"select" | "generating">("select");
   const examBottomRef = useRef<HTMLDivElement>(null);
   
   // Context filter state - prevents Data Leakage
@@ -254,14 +256,31 @@ export default function Consultant() {
     }
   };
 
-  const generateExam = async () => {
+  const openExamDialog = () => {
     if (filteredLogs.length === 0) {
       toast.error("ไม่มีข้อมูลการสอนในตัวกรองนี้ กรุณาเลือกวิชา/ชั้น/ห้องก่อน");
       return;
     }
     setExamContent("");
     setExamCopied(false);
+    setExamStep("select");
+    setSelectedUnit("");
     setExamDialogOpen(true);
+  };
+
+  const generateExam = async () => {
+    if (filteredLogs.length === 0) {
+      toast.error("ไม่มีข้อมูลการสอนในตัวกรองนี้ กรุณาเลือกวิชา/ชั้น/ห้องก่อน");
+      return;
+    }
+    if (!selectedUnit) {
+      toast.error("กรุณาเลือกหน่วยการเรียนรู้ก่อน");
+      return;
+    }
+
+    setExamContent("");
+    setExamCopied(false);
+    setExamStep("generating");
     setExamLoading(true);
 
     const url = getAiExamGenUrl();
@@ -275,15 +294,13 @@ export default function Consultant() {
     const gradeLevel = contextFilter.gradeLevel || filteredLogs[0]?.grade_level || "";
     const classroom = contextFilter.classroom || filteredLogs[0]?.classroom || "";
 
-    // Build context same as chat (reuse buildContextWithCitation logic inline)
-    const contextLines = filteredLogs.slice(0, 30).map((log, i) => {
-      const topics = Array.isArray(log.topics_covered)
-        ? log.topics_covered.join(", ")
-        : String(log.topics_covered ?? "");
-      const gaps = Array.isArray(log.gap_summary)
-        ? log.gap_summary.join(", ")
-        : String(log.gap_summary ?? "");
-      return `[REF-${i + 1}] ${log.teaching_date} | ${log.subject} ${log.grade_level}/${log.classroom} | หัวข้อ: ${topics} | Gap: ${gaps}`;
+    // Filter logs to selected unit only
+    const unitLogs = filteredLogs.filter(l => l.learning_unit === selectedUnit);
+    const logsForContext = unitLogs.length > 0 ? unitLogs : filteredLogs;
+
+    // Build context using real teaching_logs fields (not JSONB topics_covered)
+    const contextLines = logsForContext.slice(0, 30).map((log, i) => {
+      return `[REF-${i + 1}] ${log.teaching_date} | หน่วย: ${log.learning_unit || "ไม่ระบุ"} | หัวข้อ: ${log.topic || "ไม่ระบุ"} | Mastery: ${log.mastery_score}/5 | Gap: ${log.major_gap || "ไม่ระบุ"} | Issue: ${log.key_issue || "-"}`;
     });
     const context = contextLines.join("\n");
 
@@ -291,7 +308,7 @@ export default function Consultant() {
       const res = await fetch(url, {
         method: "POST",
         headers: getEdgeFunctionHeaders(),
-        body: JSON.stringify({ gradeLevel, classroom, subject, context }),
+        body: JSON.stringify({ gradeLevel, classroom, subject, unit: selectedUnit, context }),
       });
 
       if (!res.ok || !res.body) {
@@ -350,7 +367,7 @@ export default function Consultant() {
             <Button
               variant="outline"
               size="sm"
-              onClick={generateExam}
+              onClick={openExamDialog}
               disabled={examLoading || dataLoading || filteredLogs.length === 0}
               className="gap-1.5 text-xs"
             >
@@ -475,47 +492,113 @@ export default function Consultant() {
         </form>
       </div>
       {/* Exam Generation Dialog */}
-      <Dialog open={examDialogOpen} onOpenChange={setExamDialogOpen}>
+      <Dialog open={examDialogOpen} onOpenChange={(open) => {
+        if (!open && examLoading) return; // ห้ามปิดขณะ generating
+        setExamDialogOpen(open);
+      }}>
         <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
           <DialogHeader>
             <div className="flex items-center justify-between">
               <DialogTitle className="flex items-center gap-2">
                 <FileQuestion className="h-5 w-5" />
-                ข้อสอบ AI — {contextFilter.subject || filteredLogs[0]?.subject || ""}
-                {" "}ชั้น {contextFilter.gradeLevel || filteredLogs[0]?.grade_level || ""}/
-                {contextFilter.classroom || filteredLogs[0]?.classroom || ""}
-              </DialogTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={copyExam}
-                disabled={!examContent || examLoading}
-                className="gap-1.5 mr-6"
-              >
-                {examCopied ? (
-                  <Check className="h-4 w-4 text-green-500" />
-                ) : (
-                  <Copy className="h-4 w-4" />
+                {examStep === "select" ? "เลือกหน่วยการเรียนรู้" : (
+                  <>
+                    ข้อสอบ AI — {selectedUnit}
+                    <span className="text-xs font-normal text-muted-foreground ml-1">
+                      ({contextFilter.subject} ป.{contextFilter.gradeLevel?.replace("ป.", "")}/{contextFilter.classroom})
+                    </span>
+                  </>
                 )}
-                {examCopied ? "คัดลอกแล้ว" : "คัดลอก"}
-              </Button>
+              </DialogTitle>
+              {examStep === "generating" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={copyExam}
+                  disabled={!examContent || examLoading}
+                  className="gap-1.5 mr-6"
+                >
+                  {examCopied ? (
+                    <Check className="h-4 w-4 text-green-500" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
+                  {examCopied ? "คัดลอกแล้ว" : "คัดลอก"}
+                </Button>
+              )}
             </div>
           </DialogHeader>
 
-          <ScrollArea className="flex-1 mt-2 pr-2">
-            {examLoading && !examContent && (
-              <div className="flex items-center justify-center py-20 gap-2 text-muted-foreground">
-                <Loader2 className="h-5 w-5 animate-spin" />
-                <span>พีทกำลังสร้างข้อสอบจาก {filteredLogs.length} คาบ...</span>
+          {/* Step 1: เลือกหน่วย */}
+          {examStep === "select" && (() => {
+            const unitOptions = [...new Set(
+              filteredLogs.map(l => l.learning_unit).filter(Boolean)
+            )].sort();
+            return (
+              <div className="flex flex-col gap-4 py-4">
+                <p className="text-sm text-muted-foreground">
+                  เลือกหน่วยการเรียนรู้ที่ต้องการออกข้อสอบ
+                  <span className="ml-1 text-xs bg-muted px-1.5 py-0.5 rounded">
+                    {filteredLogs.length} คาบ
+                  </span>
+                </p>
+                <Select value={selectedUnit} onValueChange={setSelectedUnit}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="-- เลือกหน่วยการเรียนรู้ --" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {unitOptions.map(u => {
+                      const count = filteredLogs.filter(l => l.learning_unit === u).length;
+                      return (
+                        <SelectItem key={u} value={u!}>
+                          {u} <span className="text-muted-foreground text-xs">({count} คาบ)</span>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+                {selectedUnit && (
+                  <div className="text-xs text-muted-foreground bg-muted rounded p-2">
+                    หัวข้อที่สอนในหน่วยนี้:{" "}
+                    {filteredLogs
+                      .filter(l => l.learning_unit === selectedUnit)
+                      .map(l => l.topic)
+                      .filter(Boolean)
+                      .join(", ")}
+                  </div>
+                )}
+                <Button
+                  onClick={generateExam}
+                  disabled={!selectedUnit}
+                  className="w-full gap-2"
+                >
+                  <FileQuestion className="h-4 w-4" />
+                  สร้างข้อสอบจากหน่วยนี้
+                </Button>
               </div>
-            )}
-            {examContent && (
-              <div className="prose prose-sm prose-invert max-w-none text-sm">
-                <ReactMarkdown>{examContent}</ReactMarkdown>
-              </div>
-            )}
-            <div ref={examBottomRef} />
-          </ScrollArea>
+            );
+          })()}
+
+          {/* Step 2: แสดงข้อสอบ */}
+          {examStep === "generating" && (
+            <ScrollArea className="flex-1 mt-2 pr-2">
+              {examLoading && !examContent && (
+                <div className="flex items-center justify-center py-20 gap-2 text-muted-foreground">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <span>
+                    พีทกำลังสร้างข้อสอบ {selectedUnit} จาก{" "}
+                    {filteredLogs.filter(l => l.learning_unit === selectedUnit).length} คาบ...
+                  </span>
+                </div>
+              )}
+              {examContent && (
+                <div className="prose prose-sm prose-invert max-w-none text-sm">
+                  <ReactMarkdown>{examContent}</ReactMarkdown>
+                </div>
+              )}
+              <div ref={examBottomRef} />
+            </ScrollArea>
+          )}
         </DialogContent>
       </Dialog>
     </AppLayout>

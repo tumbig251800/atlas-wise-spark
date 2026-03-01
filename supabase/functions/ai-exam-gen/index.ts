@@ -42,7 +42,7 @@ serve(async (req) => {
   }
 
   try {
-    const { gradeLevel, classroom, subject, topic, context, numQuestions } = await req.json();
+    const { gradeLevel, classroom, subject, unit, topic, context, numQuestions } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
@@ -50,14 +50,16 @@ serve(async (req) => {
 
     const userContent = `ข้อมูลบริบท:
 ชั้น: ${gradeLevel} ห้อง: ${classroom} วิชา: ${subject}
-หัวข้อหลัก: ${topic || "ตามบันทึกการสอน"}
+หน่วยการเรียนรู้ที่ต้องออกข้อสอบ: ${unit || topic || "ตามบันทึกการสอน"}
 จำนวนข้อสอบที่ต้องการ: ${questionCount} ข้อ
 
-ข้อมูลจาก Teaching Logs (ใช้เป็นฐานสร้างข้อสอบ):
+ข้อมูลจาก Teaching Logs เฉพาะหน่วยนี้ (ใช้เป็นฐานสร้างข้อสอบ):
 ${context}
 
-สำคัญ: สร้างข้อสอบเฉพาะวิชา ${subject} สำหรับชั้น ${gradeLevel}/${classroom} เท่านั้น
-อ้างอิง [REF-X] ทุกข้อ ห้ามมโนหัวข้อที่ไม่เคยสอน`;
+กฎสำคัญ:
+- สร้างข้อสอบเฉพาะหน่วย "${unit || "ตามบันทึกการสอน"}" วิชา ${subject} ชั้น ${gradeLevel}/${classroom} เท่านั้น
+- อ้างอิง [REF-X] ทุกข้อ ห้ามมโนหัวข้อที่ไม่มีใน Teaching Logs
+- ออกข้อสอบให้ครอบคลุม Gap ที่พบในบันทึก (K-Gap, P-Gap, A-Gap)`;
 
     const response = await fetch(
       "https://ai.gateway.lovable.dev/v1/chat/completions",
