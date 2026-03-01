@@ -66,8 +66,10 @@ export function getAiExamGenUrl(): string {
 
 /** Headers specifically for ai-exam-gen (different project) */
 export function getAiExamGenHeaders(): Record<string, string> {
+  // Sanitize JWT to ASCII-only to prevent "not a valid ByteString" error
+  const safeJwt = EXAM_GEN_ANON_JWT.replace(/[^\x20-\x7E]/g, "").trim();
   return {
     "Content-Type": "application/json",
-    Authorization: `Bearer ${EXAM_GEN_ANON_JWT}`,
+    Authorization: `Bearer ${safeJwt}`,
   };
 }
