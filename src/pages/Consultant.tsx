@@ -5,12 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Send, Loader2, Filter } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Send, Loader2, Filter, FileQuestion, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 import { useDashboardData, loadPersistedFilters } from "@/hooks/useDashboardData";
 import { useDiagnosticData, type DiagnosticFilter } from "@/hooks/useDiagnosticData";
 import { buildStrictAnswerTH, type DecisionObject } from "@/lib/atlasStrictNarrator";
-import { getEdgeFunctionHeaders, getAiChatUrl } from "@/lib/edgeFunctionFetch";
+import { getEdgeFunctionHeaders, getAiChatUrl, getAiExamGenUrl } from "@/lib/edgeFunctionFetch";
 
 type Msg = { id: string; role: "user" | "assistant"; content: string };
 
@@ -44,6 +45,13 @@ export default function Consultant() {
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const sendingRef = useRef(false);
+
+  // Exam generation state
+  const [examDialogOpen, setExamDialogOpen] = useState(false);
+  const [examContent, setExamContent] = useState("");
+  const [examLoading, setExamLoading] = useState(false);
+  const [examCopied, setExamCopied] = useState(false);
+  const examBottomRef = useRef<HTMLDivElement>(null);
   
   // Context filter state - prevents Data Leakage
   // Start with empty filter; auto-set to first available data once loaded
@@ -246,12 +254,115 @@ export default function Consultant() {
     }
   };
 
+  const generateExam = async () => {
+    if (filteredLogs.length === 0) {
+      toast.error("ไม่มีข้อมูลการสอนในตัวกรองนี้ กรุณาเลือกวิชา/ชั้น/ห้องก่อน");
+      return;
+    }
+    setExamContent("");
+    setExamCopied(false);
+    setExamDialogOpen(true);
+    setExamLoading(true);
+
+    const url = getAiExamGenUrl();
+    if (!url) {
+      toast.error("ไม่พบ URL ของ Edge Function");
+      setExamLoading(false);
+      return;
+    }
+
+    const subject = contextFilter.subject || filteredLogs[0]?.subject || "";
+    const gradeLevel = contextFilter.gradeLevel || filteredLogs[0]?.grade_level || "";
+    const classroom = contextFilter.classroom || filteredLogs[0]?.classroom || "";
+
+    // Build context same as chat (reuse buildContextWithCitation logic inline)
+    const contextLines = filteredLogs.slice(0, 30).map((log, i) => {
+      const topics = Array.isArray(log.topics_covered)
+        ? log.topics_covered.join(", ")
+        : String(log.topics_covered ?? "");
+      const gaps = Array.isArray(log.gap_summary)
+        ? log.gap_summary.join(", ")
+        : String(log.gap_summary ?? "");
+      return `[REF-${i + 1}] ${log.teaching_date} | ${log.subject} ${log.grade_level}/${log.classroom} | หัวข้อ: ${topics} | Gap: ${gaps}`;
+    });
+    const context = contextLines.join("\n");
+
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: getEdgeFunctionHeaders(),
+        body: JSON.stringify({ gradeLevel, classroom, subject, context }),
+      });
+
+      if (!res.ok || !res.body) {
+        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        toast.error(err.error || "เกิดข้อผิดพลาดในการสร้างข้อสอบ");
+        setExamLoading(false);
+        return;
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const data = line.slice(6).trim();
+          if (data === "[DONE]") continue;
+          try {
+            const parsed = JSON.parse(data);
+            const delta = parsed.choices?.[0]?.delta?.content ?? "";
+            if (delta) {
+              setExamContent((prev) => prev + delta);
+              setTimeout(() => examBottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+            }
+          } catch {}
+        }
+      }
+    } catch (e) {
+      console.error("Exam gen error:", e);
+      toast.error("เกิดข้อผิดพลาดในการเชื่อมต่อ AI");
+    } finally {
+      setExamLoading(false);
+    }
+  };
+
+  const copyExam = async () => {
+    if (!examContent) return;
+    await navigator.clipboard.writeText(examContent);
+    setExamCopied(true);
+    toast.success("คัดลอกข้อสอบแล้ว");
+    setTimeout(() => setExamCopied(false), 2000);
+  };
+
   return (
     <AppLayout>
       <div className="flex flex-col h-[calc(100vh-7rem)]">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold">🤖 AI ที่ปรึกษา — พีท ร่างทอง</h1>
-          
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold">🤖 AI ที่ปรึกษา — พีท ร่างทอง</h1>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={generateExam}
+              disabled={examLoading || dataLoading || filteredLogs.length === 0}
+              className="gap-1.5 text-xs"
+            >
+              {examLoading ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <FileQuestion className="h-3.5 w-3.5" />
+              )}
+              สร้างข้อสอบ
+            </Button>
+          </div>
+
           {/* Context Filter UI - Prevents Data Leakage */}
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-muted-foreground" />
@@ -363,6 +474,50 @@ export default function Consultant() {
           </Button>
         </form>
       </div>
+      {/* Exam Generation Dialog */}
+      <Dialog open={examDialogOpen} onOpenChange={setExamDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <DialogTitle className="flex items-center gap-2">
+                <FileQuestion className="h-5 w-5" />
+                ข้อสอบ AI — {contextFilter.subject || filteredLogs[0]?.subject || ""}
+                {" "}ชั้น {contextFilter.gradeLevel || filteredLogs[0]?.grade_level || ""}/
+                {contextFilter.classroom || filteredLogs[0]?.classroom || ""}
+              </DialogTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={copyExam}
+                disabled={!examContent || examLoading}
+                className="gap-1.5 mr-6"
+              >
+                {examCopied ? (
+                  <Check className="h-4 w-4 text-green-500" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
+                {examCopied ? "คัดลอกแล้ว" : "คัดลอก"}
+              </Button>
+            </div>
+          </DialogHeader>
+
+          <ScrollArea className="flex-1 mt-2 pr-2">
+            {examLoading && !examContent && (
+              <div className="flex items-center justify-center py-20 gap-2 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                <span>พีทกำลังสร้างข้อสอบจาก {filteredLogs.length} คาบ...</span>
+              </div>
+            )}
+            {examContent && (
+              <div className="prose prose-sm prose-invert max-w-none text-sm">
+                <ReactMarkdown>{examContent}</ReactMarkdown>
+              </div>
+            )}
+            <div ref={examBottomRef} />
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }

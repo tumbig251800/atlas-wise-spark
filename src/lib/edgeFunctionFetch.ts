@@ -54,3 +54,9 @@ export function getAiLessonPlanUrl(): string {
   const base = getBaseUrl();
   return base ? `${base}/functions/v1/ai-lesson-plan` : "";
 }
+
+/** Full URL for ai-exam-gen Edge Function */
+export function getAiExamGenUrl(): string {
+  const base = getBaseUrl();
+  return base ? `${base}/functions/v1/ai-exam-gen` : "";
+}
