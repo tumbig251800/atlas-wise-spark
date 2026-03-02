@@ -19,6 +19,7 @@ export type Database = {
           id: string
           teacher_id: string
           student_id: string
+          student_name: string | null
           subject: string
           grade_level: string
           classroom: string
@@ -34,6 +35,7 @@ export type Database = {
           id?: string
           teacher_id: string
           student_id: string
+          student_name?: string | null
           subject: string
           grade_level: string
           classroom: string
@@ -49,6 +51,7 @@ export type Database = {
           id?: string
           teacher_id?: string
           student_id?: string
+          student_name?: string | null
           subject?: string
           grade_level?: string
           classroom?: string

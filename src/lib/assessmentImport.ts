@@ -6,6 +6,7 @@
 
 export interface ParsedAssessmentRow {
   student_id: string;
+  student_name: string | null;
   score: number;
   total_score: number;
   subject: string;
@@ -23,6 +24,7 @@ export interface AssessmentParseResult {
 
 const ASSESSMENT_HEADER_MAP: Record<string, string[]> = {
   student_id: ["student_id", "รหัสนักเรียน", "เลขที่", "id นักเรียน", "student id", "เลขประจำตัว"],
+  student_name: ["student_name", "ชื่อนักเรียน", "ชื่อ-สกุล", "ชื่อ สกุล", "name", "ชื่อ"],
   score: ["score", "คะแนน", "คะแนนที่ได้", "raw score", "คะแนนสอบ"],
   total_score: ["total", "total_score", "คะแนนเต็ม", "full score", "max score", "คะแนนรวม"],
   subject: ["subject", "วิชา", "วิชาที่สอน"],
@@ -141,6 +143,7 @@ export function parseAssessmentCSV(text: string): AssessmentParseResult {
 
     rows.push({
       student_id,
+      student_name: get("student_name") || null,
       score,
       total_score,
       subject: subject || "",

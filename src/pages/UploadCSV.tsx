@@ -306,6 +306,7 @@ function AssessmentTab() {
       const { error } = await supabase.from("unit_assessments").insert({
         teacher_id: user.id,
         student_id: row.student_id,
+        student_name: row.student_name,
         subject: row.subject || "",
         grade_level: row.grade_level || "",
         classroom: row.classroom || "",
