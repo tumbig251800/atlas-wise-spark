@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 import { parseCSVFile, ensureISODate, type ParsedCSVRow } from "@/lib/csvImport";
 import { parseAssessmentCSV, type ParsedAssessmentRow } from "@/lib/assessmentImport";
 import { Upload, FileText, AlertCircle, CheckCircle2, Loader2, Pencil, ClipboardList } from "lucide-react";
@@ -284,9 +285,10 @@ function AssessmentTab() {
     let ok = 0;
 
     for (const row of parsed.rows) {
-      // Duplicate check: student_id + subject + grade_level + classroom + academic_term + unit_name
       const termToUse = row.academic_term || academicTerm || null;
-      const { data: existing } = await supabase
+
+      // Duplicate check via supabase client (JWT handled automatically)
+      const { data: existing, error: checkErr } = await supabase
         .from("unit_assessments")
         .select("id")
         .eq("teacher_id", user.id)
@@ -296,14 +298,19 @@ function AssessmentTab() {
         .eq("classroom", row.classroom || "")
         .eq("academic_term", termToUse ?? "")
         .eq("unit_name", row.unit_name ?? "")
-        .maybeSingle();
+        .limit(1);
 
-      if (existing) {
+      if (checkErr) {
+        errs.push(`นักเรียน ${row.student_id}: ${checkErr.message}`);
+        continue;
+      }
+      if (Array.isArray(existing) && existing.length > 0) {
         errs.push(`ข้ามนักเรียน ${row.student_id} หน่วย "${row.unit_name}": มีข้อมูลนี้อยู่แล้ว`);
         continue;
       }
 
-      const { error } = await supabase.from("unit_assessments").insert({
+      // Insert via supabase client (JWT handled automatically)
+      const insertPayload: Database["public"]["Tables"]["unit_assessments"]["Insert"] = {
         teacher_id: user.id,
         student_id: row.student_id,
         student_name: row.student_name,
@@ -314,13 +321,17 @@ function AssessmentTab() {
         unit_name: row.unit_name,
         score: row.score,
         total_score: row.total_score,
-        assessed_date: row.assessed_date,
-      });
+        assessed_date: row.assessed_date ?? undefined,
+      };
 
-      if (!error) {
+      const { error: insertErr } = await supabase
+        .from("unit_assessments")
+        .insert(insertPayload);
+
+      if (!insertErr) {
         ok++;
       } else {
-        errs.push(`นักเรียน ${row.student_id}: ${error.message}`);
+        errs.push(`นักเรียน ${row.student_id}: ${insertErr.message}`);
       }
     }
 

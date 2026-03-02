@@ -2,9 +2,9 @@
  * Sanitize string for use in HTTP headers - prevents "not a valid ByteString" errors.
  * Keeps only printable ASCII (0x20-0x7E) to avoid control chars and invalid Unicode.
  */
-const FALLBACK_SUPABASE_URL = "https://iwlpqrulzkzpsiaddefq.supabase.co";
-// Supabase anon JWT for project iwlpqrulzkzpsiaddefq — used for Edge Function Authorization header
-const SUPABASE_ANON_JWT = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml3bHBxcnVsemt6cHNpYWRkZWZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExNDUzOTEsImV4cCI6MjA4NjcyMTM5MX0.31uIYLKq8kHZQHJp7M9XDxIvwM8mUHI8w1FqO5J5-48";
+// atlas_prod project (ebyelctqcdhjmqujeskx) — single source of truth for all Supabase calls
+const FALLBACK_SUPABASE_URL = "https://ebyelctqcdhjmqujeskx.supabase.co";
+const SUPABASE_ANON_JWT = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVieWVsY3RxY2Roam1xdWplc2t4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0NjMzNTEsImV4cCI6MjA4NzAzOTM1MX0.jfG25PkINF9IocuaiMuRp643JwVM8sB6JcEZZcGhP-k";
 
 /**
  * Returns safe headers for Supabase Edge Function fetch calls.
@@ -55,21 +55,12 @@ export function getAiLessonPlanUrl(): string {
   return base ? `${base}/functions/v1/ai-lesson-plan` : "";
 }
 
-// ai-exam-gen is deployed on project ebyelctqcdhjmqujeskx (atlas_prod)
-const EXAM_GEN_URL = "https://ebyelctqcdhjmqujeskx.supabase.co/functions/v1/ai-exam-gen";
-const EXAM_GEN_ANON_JWT = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVieWVsY3RxY2Roam1xdWplc2t4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0NjMzNTEsImV4cCI6MjA4NzAzOTM1MX0.jfG25PkINF9IocuaiMuRp643JwVM8sB6JcEZZcGhP-k";
-
-/** Full URL for ai-exam-gen Edge Function */
+/** Full URL for ai-exam-gen Edge Function (same project as all other functions) */
 export function getAiExamGenUrl(): string {
-  return EXAM_GEN_URL;
+  return `${getBaseUrl()}/functions/v1/ai-exam-gen`;
 }
 
-/** Headers specifically for ai-exam-gen (different project) */
+/** Headers for ai-exam-gen — same project, use shared headers */
 export function getAiExamGenHeaders(): Record<string, string> {
-  // Sanitize JWT to ASCII-only to prevent "not a valid ByteString" error
-  const safeJwt = EXAM_GEN_ANON_JWT.replace(/[^\x20-\x7E]/g, "").trim();
-  return {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${safeJwt}`,
-  };
+  return getEdgeFunctionHeaders();
 }
