@@ -13,7 +13,8 @@ serve(async (req) => {
 
   try {
     const { planType, topic, gradeLevel, classroom, subject, hours, context, addonType, includeWorksheets } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const rawKey = Deno.env.get("LOVABLE_API_KEY") ?? "";
+    const LOVABLE_API_KEY = rawKey.replace(/[^\x20-\x7E]/g, "").trim();
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     let systemPrompt: string;
