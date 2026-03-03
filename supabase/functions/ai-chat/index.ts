@@ -143,7 +143,9 @@ serve(async (req) => {
 
   try {
     const { messages, context } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const rawKey = Deno.env.get("LOVABLE_API_KEY") ?? "";
+    // Strip non-ASCII / control chars to prevent "not a valid ByteString" errors
+    const LOVABLE_API_KEY = rawKey.replace(/[^\x20-\x7E]/g, "").trim();
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     const contextPreamble = `ก่อนตอบ: ตรวจสอบว่า [ACTIVE FILTER] และ [REF-X] มีเฉพาะวิชาและห้องที่ผู้ใช้เลือกเท่านั้น ห้ามอ้างอิงหรือกล่าวถึงวิชาที่ไม่มีใน context เด็ดขาด`;
