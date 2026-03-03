@@ -12,6 +12,7 @@ import type { Database } from "@/integrations/supabase/types";
 const db = supabase as any;
 import { parseCSVFile, ensureISODate, type ParsedCSVRow } from "@/lib/csvImport";
 import { parseAssessmentCSV, type ParsedAssessmentRow } from "@/lib/assessmentImport";
+import { TemplateDownloader } from "@/components/TemplateDownloader";
 import { Upload, FileText, AlertCircle, CheckCircle2, Loader2, Pencil, ClipboardList } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Label } from "@/components/ui/label";
@@ -353,12 +354,13 @@ function AssessmentTab() {
   const canUpload = parsed && parsed.rows.length > 0 && !uploading;
 
   return (
-    <div className="glass-card p-6 space-y-4">
-      <p className="text-sm text-muted-foreground">
-        อัปโหลดคะแนนสอบหลังหน่วยการเรียนรู้ เพื่อเปรียบเทียบกับบันทึกการสอนใน Smart Report
-      </p>
+    <div className="space-y-6">
+      <div className="glass-card p-6 space-y-4">
+        <p className="text-sm text-muted-foreground">
+          อัปโหลดคะแนนสอบหลังหน่วยการเรียนรู้ เพื่อเปรียบเทียบกับบันทึกการสอนใน Smart Report
+        </p>
 
-      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
         <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleFileChange} />
         <Button type="button" variant="outline" className="gap-2" onClick={() => fileInputRef.current?.click()}>
           <Upload className="h-4 w-4" />
@@ -435,6 +437,9 @@ function AssessmentTab() {
           คอลัมน์บังคับ: <strong>รหัสนักเรียน</strong> และ <strong>คะแนน</strong> — คอลัมน์อื่นเว้นว่างได้
         </p>
       </div>
+    </div>
+
+      <TemplateDownloader />
     </div>
   );
 }

@@ -329,6 +329,84 @@ export type Database = {
         }
         Relationships: []
       }
+      unit_assessments: {
+        Row: {
+          id: string
+          teacher_id: string
+          student_id: string
+          student_name: string | null
+          subject: string
+          grade_level: string
+          classroom: string
+          academic_term: string | null
+          unit_name: string | null
+          score: number
+          total_score: number
+          assessed_date: string | null
+          teaching_log_ref: string | null
+          created_at: string
+          a1_score: number | null
+          a2_score: number | null
+          a3_score: number | null
+          a4_score: number | null
+          a5_score: number | null
+          a6_score: number | null
+          competency_note: string | null
+          assessed_by: string | null
+          competency_assessed_date: string | null
+        }
+        Insert: {
+          id?: string
+          teacher_id: string
+          student_id: string
+          student_name?: string | null
+          subject: string
+          grade_level: string
+          classroom: string
+          academic_term?: string | null
+          unit_name?: string | null
+          score: number
+          total_score: number
+          assessed_date?: string | null
+          teaching_log_ref?: string | null
+          created_at?: string
+          a1_score?: number | null
+          a2_score?: number | null
+          a3_score?: number | null
+          a4_score?: number | null
+          a5_score?: number | null
+          a6_score?: number | null
+          competency_note?: string | null
+          assessed_by?: string | null
+          competency_assessed_date?: string | null
+        }
+        Update: {
+          id?: string
+          teacher_id?: string
+          student_id?: string
+          student_name?: string | null
+          subject?: string
+          grade_level?: string
+          classroom?: string
+          academic_term?: string | null
+          unit_name?: string | null
+          score?: number
+          total_score?: number
+          assessed_date?: string | null
+          teaching_log_ref?: string | null
+          created_at?: string
+          a1_score?: number | null
+          a2_score?: number | null
+          a3_score?: number | null
+          a4_score?: number | null
+          a5_score?: number | null
+          a6_score?: number | null
+          competency_note?: string | null
+          assessed_by?: string | null
+          competency_assessed_date?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string

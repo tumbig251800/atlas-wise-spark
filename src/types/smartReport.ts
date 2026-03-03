@@ -35,6 +35,15 @@ export interface UnitAssessmentRaw {
   classroom: string;
   academic_term: string | null;
   assessed_date: string | null;
+  a1_score?: number | null;
+  a2_score?: number | null;
+  a3_score?: number | null;
+  a4_score?: number | null;
+  a5_score?: number | null;
+  a6_score?: number | null;
+  competency_note?: string | null;
+  assessed_by?: string | null;
+  competency_assessed_date?: string | null;
 }
 
 /** Aggregated teaching data per unit */

@@ -16,7 +16,7 @@ const TEACHING_LOG_COLS =
   "id,learning_unit,next_strategy,major_gap,mastery_score,remedial_ids,teaching_date,subject,grade_level,classroom,academic_term,topic,key_issue,total_students,teacher_id";
 
 const ASSESSMENT_COLS =
-  "id,student_id,student_name,unit_name,score,total_score,subject,grade_level,classroom,academic_term,assessed_date";
+  "id,student_id,student_name,unit_name,score,total_score,subject,grade_level,classroom,academic_term,assessed_date,a1_score,a2_score,a3_score,a4_score,a5_score,a6_score,competency_note,assessed_by,competency_assessed_date";
 
 /**
  * Fetch teaching logs filtered by SmartReportFilter.
