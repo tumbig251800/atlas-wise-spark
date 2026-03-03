@@ -9,6 +9,9 @@ import type {
   UnitAssessmentRaw,
 } from "@/types/smartReport";
 
+// unit_assessments exists on atlas_prod but not in Lovable Cloud auto-generated types
+const db = supabase as any;
+
 const TEACHING_LOG_COLS =
   "id,learning_unit,next_strategy,major_gap,mastery_score,remedial_ids,teaching_date,subject,grade_level,classroom,academic_term,topic,key_issue,total_students,teacher_id";
 
@@ -45,7 +48,7 @@ export async function fetchTeachingLogs(
 export async function fetchUnitAssessments(
   filter: SmartReportFilter
 ): Promise<UnitAssessmentRaw[]> {
-  let q = supabase
+  let q = db
     .from("unit_assessments")
     .select(ASSESSMENT_COLS)
     .order("assessed_date", { ascending: true });
@@ -74,7 +77,7 @@ export interface SmartReportFilterOptions {
 export async function fetchFilterOptions(): Promise<SmartReportFilterOptions> {
   const [logsRes, assessRes] = await Promise.all([
     supabase.from("teaching_logs").select("subject,grade_level,classroom,academic_term"),
-    supabase.from("unit_assessments").select("subject,grade_level,classroom,academic_term"),
+    db.from("unit_assessments").select("subject,grade_level,classroom,academic_term"),
   ]);
   if (logsRes.error) throw logsRes.error;
   if (assessRes.error) throw assessRes.error;
