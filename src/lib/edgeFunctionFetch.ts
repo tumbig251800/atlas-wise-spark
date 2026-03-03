@@ -4,18 +4,24 @@
  */
 // atlas_prod project (ebyelctqcdhjmqujeskx) — single source of truth for all Supabase calls
 const FALLBACK_SUPABASE_URL = "https://ebyelctqcdhjmqujeskx.supabase.co";
-const SUPABASE_ANON_JWT = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVieWVsY3RxY2Roam1xdWplc2t4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0NjMzNTEsImV4cCI6MjA4NzAzOTM1MX0.jfG25PkINF9IocuaiMuRp643JwVM8sB6JcEZZcGhP-k";
+const SUPABASE_ANON_JWT =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVieWVsY3RxY2Roam1xdWplc2t4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0NjMzNTEsImV4cCI6MjA4NzAzOTM1MX0.jfG25PkINF9IocuaiMuRp643JwVM8sB6JcEZZcGhP-k";
+
+/** Strip non-ASCII and control chars — Fetch API requires valid ByteString for header values */
+function toByteString(s: string): string {
+  return String(s).replace(/[^\x20-\x7E]/g, "");
+}
 
 /**
  * Returns safe headers for Supabase Edge Function fetch calls.
- * Always uses the hardcoded Supabase anon JWT (same as client.ts) to avoid
- * "Headers of RequestInit is not a valid ByteString" errors caused by
- * non-JWT keys (e.g. Lovable publishable keys) in VITE_SUPABASE_PUBLISHABLE_KEY.
+ * All values are sanitized to valid ByteString to prevent "Headers of RequestInit
+ * is not a valid ByteString" errors (e.g. from Lovable publishable keys or env).
  */
 export function getEdgeFunctionHeaders(): Record<string, string> {
+  const auth = toByteString(SUPABASE_ANON_JWT);
   return {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${SUPABASE_ANON_JWT}`,
+    "Content-Type": toByteString("application/json"),
+    Authorization: toByteString(`Bearer ${auth}`),
   };
 }
 
@@ -32,10 +38,13 @@ function sanitizeAndValidateUrl(raw: string): string {
   }
 }
 
-/** Base URL for Edge Functions - must be valid absolute URL */
+/** Base URL for Edge Functions — always use atlas_prod (ebyelctqcdhjmqujeskx) to match atlasSupabase */
 function getBaseUrl(): string {
   const v = import.meta.env.VITE_SUPABASE_URL;
-  return sanitizeAndValidateUrl(v ?? "") || FALLBACK_SUPABASE_URL;
+  const fromEnv = sanitizeAndValidateUrl(v ?? "");
+  // Prefer atlas_prod URL; fallback if env points elsewhere (e.g. Lovable Cloud project)
+  if (fromEnv && fromEnv.includes("ebyelctqcdhjmqujeskx")) return fromEnv;
+  return FALLBACK_SUPABASE_URL;
 }
 
 /** Base URL for Edge Functions */
