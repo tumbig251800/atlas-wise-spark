@@ -7,6 +7,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/atlasSupabase";
 import type { Database } from "@/integrations/supabase/types";
+
+// unit_assessments exists on atlas_prod but not in Lovable Cloud auto-generated types
+const db = supabase as any;
 import { parseCSVFile, ensureISODate, type ParsedCSVRow } from "@/lib/csvImport";
 import { parseAssessmentCSV, type ParsedAssessmentRow } from "@/lib/assessmentImport";
 import { Upload, FileText, AlertCircle, CheckCircle2, Loader2, Pencil, ClipboardList } from "lucide-react";
@@ -292,7 +295,7 @@ function AssessmentTab() {
       const termToUse = row.academic_term || academicTerm || null;
 
       // Duplicate check via supabase client (JWT handled automatically)
-      const { data: existing, error: checkErr } = await supabase
+      const { data: existing, error: checkErr } = await db
         .from("unit_assessments")
         .select("id")
         .eq("teacher_id", user.id)
@@ -314,7 +317,7 @@ function AssessmentTab() {
       }
 
       // Insert via supabase client (JWT handled automatically)
-      const insertPayload: Database["public"]["Tables"]["unit_assessments"]["Insert"] = {
+      const insertPayload: any = {
         teacher_id: user.id,
         student_id: row.student_id,
         student_name: row.student_name,
@@ -328,7 +331,7 @@ function AssessmentTab() {
         assessed_date: row.assessed_date ?? undefined,
       };
 
-      const { error: insertErr } = await supabase
+      const { error: insertErr } = await db
         .from("unit_assessments")
         .insert(insertPayload);
 
