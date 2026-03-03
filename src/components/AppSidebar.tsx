@@ -13,10 +13,11 @@ import {
   SidebarFooter,
   SidebarHeader,
 } from "@/components/ui/sidebar";
-import { Brain, ClipboardList, BarChart3, Upload, MessageSquare, Building2, LogOut, Settings, History, BookOpen, FileBarChart } from "lucide-react";
+import { Brain, ClipboardList, BarChart3, Upload, MessageSquare, Building2, LogOut, Settings, History, BookOpen, FileBarChart, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const teacherMenuItems = [
+  { title: "หน้าแรก", url: "/", icon: Home },
   { title: "บันทึกหลังสอน", url: "/log", icon: ClipboardList },
   { title: "ประวัติการสอน", url: "/history", icon: History },
   { title: "สร้างแผนการสอน", url: "/lesson-plan", icon: BookOpen },
@@ -26,6 +27,7 @@ const teacherMenuItems = [
 ];
 
 const directorMenuItems = [
+  { title: "หน้าแรก", url: "/", icon: Home },
   { title: "แดชบอร์ด", url: "/dashboard", icon: BarChart3 },
   { title: "ภาพรวมผู้บริหาร", url: "/executive", icon: Building2 },
   { title: "บันทึกหลังสอน", url: "/log", icon: ClipboardList },
