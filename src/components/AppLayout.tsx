@@ -14,6 +14,7 @@ const pageNameMap: Record<string, string> = {
   "/consultant": "AI Consultant (หน้าที่ปรึกษา AI)",
   "/history": "History (ประวัติการบันทึก)",
   "/lesson-plan": "Lesson Plan (แผนการสอน)",
+  "/smart-report": "Smart Report (รายงานสมรรถนะ)",
 };
 
 const THAI_MONTHS = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];

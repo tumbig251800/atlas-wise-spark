@@ -125,6 +125,9 @@ function TeachingLogTab() {
       queryClient.invalidateQueries({ queryKey: ["exec-logs"] });
       queryClient.invalidateQueries({ queryKey: ["diagnostic-events"] });
       queryClient.invalidateQueries({ queryKey: ["strike-counters"] });
+      queryClient.invalidateQueries({ queryKey: ["smart-logs"] });
+      queryClient.invalidateQueries({ queryKey: ["smart-assessments"] });
+      queryClient.invalidateQueries({ queryKey: ["smart-report-options"] });
     }
   }, [user, parsed, queryClient, teacherNameOverride, academicTerm]);
 
@@ -247,6 +250,7 @@ function TeachingLogTab() {
 
 function AssessmentTab() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [file, setFile] = useState<File | null>(null);
   const [parsed, setParsed] = useState<{ rows: ParsedAssessmentRow[]; errors: string[] } | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -337,7 +341,11 @@ function AssessmentTab() {
 
     setResult({ ok, err: errs });
     setUploading(false);
-  }, [user, parsed, academicTerm]);
+    if (ok > 0) {
+      queryClient.invalidateQueries({ queryKey: ["smart-assessments"] });
+      queryClient.invalidateQueries({ queryKey: ["smart-report-options"] });
+    }
+  }, [user, parsed, academicTerm, queryClient]);
 
   const canUpload = parsed && parsed.rows.length > 0 && !uploading;
 

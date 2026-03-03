@@ -13,13 +13,14 @@ import {
   SidebarFooter,
   SidebarHeader,
 } from "@/components/ui/sidebar";
-import { Brain, ClipboardList, BarChart3, Upload, MessageSquare, Building2, LogOut, Settings, History, BookOpen } from "lucide-react";
+import { Brain, ClipboardList, BarChart3, Upload, MessageSquare, Building2, LogOut, Settings, History, BookOpen, FileBarChart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const teacherMenuItems = [
   { title: "บันทึกหลังสอน", url: "/log", icon: ClipboardList },
   { title: "ประวัติการสอน", url: "/history", icon: History },
   { title: "สร้างแผนการสอน", url: "/lesson-plan", icon: BookOpen },
+  { title: "รายงานสมรรถนะ", url: "/smart-report", icon: FileBarChart },
   { title: "อัปโหลด CSV", url: "/upload", icon: Upload },
   { title: "AI ที่ปรึกษา", url: "/consultant", icon: MessageSquare },
 ];
@@ -30,6 +31,7 @@ const directorMenuItems = [
   { title: "บันทึกหลังสอน", url: "/log", icon: ClipboardList },
   { title: "ประวัติการสอน", url: "/history", icon: History },
   { title: "สร้างแผนการสอน", url: "/lesson-plan", icon: BookOpen },
+  { title: "รายงานสมรรถนะ", url: "/smart-report", icon: FileBarChart },
   { title: "อัปโหลด CSV", url: "/upload", icon: Upload },
   { title: "AI ที่ปรึกษา", url: "/consultant", icon: MessageSquare },
   { title: "Admin Settings", url: "/admin", icon: Settings },

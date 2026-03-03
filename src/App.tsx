@@ -15,6 +15,7 @@ import Consultant from "./pages/Consultant";
 import AdminSettings from "./pages/AdminSettings";
 import History from "./pages/History";
 import LessonPlan from "./pages/LessonPlan";
+import SmartReportView from "./pages/SmartReportView";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -90,6 +91,14 @@ const App = () => (
               element={
                 <ProtectedRoute allowedRoles={["teacher", "director"]}>
                   <LessonPlan />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/smart-report"
+              element={
+                <ProtectedRoute allowedRoles={["teacher", "director"]}>
+                  <SmartReportView />
                 </ProtectedRoute>
               }
             />
