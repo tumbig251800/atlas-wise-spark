@@ -2,10 +2,11 @@
  * Sanitize string for use in HTTP headers - prevents "not a valid ByteString" errors.
  * Keeps only printable ASCII (0x20-0x7E) to avoid control chars and invalid Unicode.
  */
-// atlas_prod project (ebyelctqcdhjmqujeskx) — single source of truth for all Supabase calls
-const FALLBACK_SUPABASE_URL = "https://ebyelctqcdhjmqujeskx.supabase.co";
+// Edge Functions are auto-deployed to Lovable Cloud (iwlpqrulzkzpsiaddefq)
+// Database lives on atlas_prod (ebyelctqcdhjmqujeskx) — but edge functions run here
+const LOVABLE_CLOUD_URL = "https://iwlpqrulzkzpsiaddefq.supabase.co";
 const SUPABASE_ANON_JWT =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVieWVsY3RxY2Roam1xdWplc2t4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0NjMzNTEsImV4cCI6MjA4NzAzOTM1MX0.jfG25PkINF9IocuaiMuRp643JwVM8sB6JcEZZcGhP-k";
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml3bHBxcnVsemt6cHNpYWRkZWZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExNDUzOTEsImV4cCI6MjA4NjcyMTM5MX0.31uIYLKq8kHZQHJp7M9XDxIvwM8mUHI8w1FqO5J5-48";
 
 /** Strip non-ASCII and control chars — Fetch API requires valid ByteString for header values */
 function toByteString(s: string): string {
@@ -38,13 +39,9 @@ function sanitizeAndValidateUrl(raw: string): string {
   }
 }
 
-/** Base URL for Edge Functions — always use atlas_prod (ebyelctqcdhjmqujeskx) to match atlasSupabase */
+/** Base URL for Edge Functions — use Lovable Cloud where functions auto-deploy */
 function getBaseUrl(): string {
-  const v = import.meta.env.VITE_SUPABASE_URL;
-  const fromEnv = sanitizeAndValidateUrl(v ?? "");
-  // Prefer atlas_prod URL; fallback if env points elsewhere (e.g. Lovable Cloud project)
-  if (fromEnv && fromEnv.includes("ebyelctqcdhjmqujeskx")) return fromEnv;
-  return FALLBACK_SUPABASE_URL;
+  return LOVABLE_CLOUD_URL;
 }
 
 /** Base URL for Edge Functions */
