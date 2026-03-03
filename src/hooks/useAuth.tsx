@@ -1,5 +1,5 @@
 import { useState, useEffect, createContext, useContext, type ReactNode } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/atlasSupabase";
 import { getUserRole, type AppRole } from "@/lib/auth";
 import type { User, Session } from "@supabase/supabase-js";
 

@@ -2,7 +2,7 @@
  * Phase C: Smart Report queries
  * Fetches teaching_logs and unit_assessments with filter
  */
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/atlasSupabase";
 import type {
   SmartReportFilter,
   TeachingLogRaw,

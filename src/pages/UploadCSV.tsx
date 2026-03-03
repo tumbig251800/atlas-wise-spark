@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/atlasSupabase";
 import type { Database } from "@/integrations/supabase/types";
 import { parseCSVFile, ensureISODate, type ParsedCSVRow } from "@/lib/csvImport";
 import { parseAssessmentCSV, type ParsedAssessmentRow } from "@/lib/assessmentImport";

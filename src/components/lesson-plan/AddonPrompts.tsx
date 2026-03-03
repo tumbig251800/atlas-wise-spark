@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Headphones, Presentation, ImageIcon, Loader2, Copy, Check } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/atlasSupabase";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
 import { getEdgeFunctionHeaders, getAiLessonPlanUrl } from "@/lib/edgeFunctionFetch";

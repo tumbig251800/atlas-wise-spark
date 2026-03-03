@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/atlasSupabase";
 import type { TeachingLog } from "@/hooks/useDashboardData";
 import ReactMarkdown from "react-markdown";
 

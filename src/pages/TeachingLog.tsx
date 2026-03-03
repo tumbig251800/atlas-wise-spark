@@ -9,7 +9,7 @@ import { Step4Action } from "@/components/teaching-log/Step4Action";
 import { PreSubmitSummary } from "@/components/teaching-log/PreSubmitSummary";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/atlasSupabase";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, ArrowRight, Save, Loader2 } from "lucide-react";
 

@@ -5,7 +5,7 @@ import { LessonPlanResult } from "@/components/lesson-plan/LessonPlanResult";
 import { AddonPrompts } from "@/components/lesson-plan/AddonPrompts";
 import { ExportDocButton } from "@/components/lesson-plan/ExportDocButton";
 import { CopyWorksheetButton } from "@/components/lesson-plan/CopyWorksheetButton";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/atlasSupabase";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { getEdgeFunctionHeaders, getAiLessonPlanUrl } from "@/lib/edgeFunctionFetch";
