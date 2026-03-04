@@ -1,14 +1,24 @@
 /**
- * Phase D Stage 1: Generate blank 'All-in-One' competency template
- * Unified headers: Academic Score (10) + Competency (A1–A6)
- * Manual entry mode: empty rows for teachers to copy-paste student lists
+ * Phase D Stage 1 + 2026: Generate blank 'All-in-One' competency template
+ * Unified headers: Academic Score + 8 capabilities (หลักสูตร 2569)
  */
 import * as XLSX from "xlsx";
 import type { CompetencyTemplateRow } from "@/types/competency";
 
 const BLANK_ROW_COUNT = 50;
 
-/** Teacher-logical order. Matches unit_assessments columns for Stage 2 upload. No teacher_id/assessed_by (set from Auth). */
+const CAPABILITY_HEADERS_2026 = [
+  "reading_score",
+  "writing_score",
+  "calculating_score",
+  "sci_tech_score",
+  "social_civic_score",
+  "economy_finance_score",
+  "health_score",
+  "art_culture_score",
+];
+
+/** Teacher-logical order. Matches unit_assessments columns for Stage 2 upload. */
 export const COMPETENCY_TEMPLATE_HEADERS = [
   "student_id",
   "student_name",
@@ -20,21 +30,19 @@ export const COMPETENCY_TEMPLATE_HEADERS = [
   "score",
   "total_score",
   "assessed_date",
-  "a1_score",
-  "a2_score",
-  "a3_score",
-  "a4_score",
-  "a5_score",
-  "a6_score",
+  ...CAPABILITY_HEADERS_2026,
   "competency_assessed_date",
   "competency_note",
 ];
 
 /**
- * Generate blank template rows. No fetch — teachers fill manually.
+ * Generate blank template rows. Teachers fill manually.
  * Stage 2: if competency_assessed_date blank, use assessed_date or upload date.
  */
 export function generateBlankCompetencyTemplate(): CompetencyTemplateRow[] {
+  const blankCap = Object.fromEntries(
+    CAPABILITY_HEADERS_2026.map((h) => [h, ""])
+  ) as Record<string, string>;
   return Array.from({ length: BLANK_ROW_COUNT }, () => ({
     student_id: "",
     student_name: "",
@@ -46,12 +54,7 @@ export function generateBlankCompetencyTemplate(): CompetencyTemplateRow[] {
     score: "",
     total_score: "",
     assessed_date: "",
-    a1_score: "",
-    a2_score: "",
-    a3_score: "",
-    a4_score: "",
-    a5_score: "",
-    a6_score: "",
+    ...blankCap,
     competency_assessed_date: "",
     competency_note: "",
   }));

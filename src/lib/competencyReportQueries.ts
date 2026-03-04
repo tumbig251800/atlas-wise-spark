@@ -1,16 +1,23 @@
 /**
- * Phase D Stage 3: Competency Report data
+ * Phase D Stage 3 + 2026: Competency Report data
  * Fetch student list and aggregated competency + academic for spider chart
+ * Uses 8 capabilities (2026 Curriculum) with Latest Score aggregation
  */
 import { supabase } from "@/lib/atlasSupabase";
 import type { SmartReportFilter } from "@/types/smartReport";
 import type { UnitAssessmentRaw } from "@/types/smartReport";
-import type { CompetencyKey } from "@/lib/competencyConstants";
+import {
+  CAPABILITY_KEYS_2026,
+  type CapabilityKey2026,
+} from "@/lib/capabilityConstants2026";
 
 const db = supabase as any;
 
+const CAP_COLS =
+  "reading_score,writing_score,calculating_score,sci_tech_score,social_civic_score,economy_finance_score,health_score,art_culture_score";
 const ASSESSMENT_COLS =
-  "id,student_id,student_name,unit_name,score,total_score,subject,grade_level,classroom,academic_term,assessed_date,a1_score,a2_score,a3_score,a4_score,a5_score,a6_score";
+  "id,student_id,student_name,unit_name,score,total_score,subject,grade_level,classroom,academic_term,assessed_date,competency_assessed_date," +
+  CAP_COLS;
 
 export interface StudentOption {
   student_id: string;
@@ -20,7 +27,7 @@ export interface StudentOption {
 }
 
 export interface StudentCompetencyData {
-  avgCompetency: Record<CompetencyKey, number>;
+  avgCompetency: Record<CapabilityKey2026, number>;
   academicSummary: {
     avgScorePct: number;
     totalUnits: number;
@@ -30,13 +37,11 @@ export interface StudentCompetencyData {
   units: { unit_name: string | null; score: number; total_score: number }[];
 }
 
-const COMP_KEYS: CompetencyKey[] = ["a1", "a2", "a3", "a4", "a5", "a6"];
-
 function buildQuery(filter: SmartReportFilter, teacherId: string) {
   let q = db
     .from("unit_assessments")
     .select(ASSESSMENT_COLS)
-    .not("a1_score", "is", null);
+    .not("reading_score", "is", null);
 
   if (teacherId) q = q.eq("teacher_id", teacherId);
   if (filter.subject) q = q.eq("subject", filter.subject);
@@ -44,11 +49,11 @@ function buildQuery(filter: SmartReportFilter, teacherId: string) {
   if (filter.classroom) q = q.eq("classroom", filter.classroom);
   if (filter.academicTerm) q = q.eq("academic_term", filter.academicTerm);
 
-  return q.order("unit_name", { ascending: true });
+  return q.order("assessed_date", { ascending: false }).order("competency_assessed_date", { ascending: false });
 }
 
 /**
- * Fetch distinct students who have competency data (a1_score filled).
+ * Fetch distinct students who have 2026 capability data (reading_score filled).
  */
 export async function fetchStudentList(
   filter: SmartReportFilter,
@@ -74,13 +79,15 @@ export async function fetchStudentList(
     });
   }
 
-  result.sort((a, b) => (a.student_name || a.student_id).localeCompare(b.student_name || b.student_id));
+  result.sort((a, b) =>
+    (a.student_name || a.student_id).localeCompare(b.student_name || b.student_id)
+  );
   return result;
 }
 
 /**
  * Fetch and aggregate competency + academic for a student.
- * Average A1-A6 across all units; academic = sum(score)/sum(total_score).
+ * Uses Latest Score per capability (most recent assessment date).
  */
 export async function fetchStudentCompetency(
   studentId: string,
@@ -94,12 +101,27 @@ export async function fetchStudentCompetency(
   const rows = (data ?? []) as UnitAssessmentRaw[];
   if (rows.length === 0) return null;
 
-  const sums: Record<CompetencyKey, number> = {
-    a1: 0, a2: 0, a3: 0, a4: 0, a5: 0, a6: 0,
+  const latestCompetency: Record<CapabilityKey2026, number> = {
+    reading: 0,
+    writing: 0,
+    calculating: 0,
+    sci_tech: 0,
+    social_civic: 0,
+    economy_finance: 0,
+    health: 0,
+    art_culture: 0,
   };
-  const counts: Record<CompetencyKey, number> = {
-    a1: 0, a2: 0, a3: 0, a4: 0, a5: 0, a6: 0,
-  };
+
+  for (const k of CAPABILITY_KEYS_2026) {
+    const col = `${k}_score` as keyof UnitAssessmentRaw;
+    for (const r of rows) {
+      const v = r[col];
+      if (typeof v === "number" && v >= 1 && v <= 4) {
+        latestCompetency[k] = Math.round(v * 10) / 10;
+        break;
+      }
+    }
+  }
 
   let sumScore = 0;
   let sumTotal = 0;
@@ -113,28 +135,13 @@ export async function fetchStudentCompetency(
       score: r.score ?? 0,
       total_score: r.total_score ?? 10,
     });
-
-    for (const k of COMP_KEYS) {
-      const key = `${k}_score` as keyof UnitAssessmentRaw;
-      const v = r[key];
-      if (typeof v === "number" && v >= 1 && v <= 4) {
-        sums[k] += v;
-        counts[k]++;
-      }
-    }
   }
 
-  const avgCompetency = {} as Record<CompetencyKey, number>;
-  for (const k of COMP_KEYS) {
-    avgCompetency[k] = counts[k] > 0
-      ? Math.round((sums[k] / counts[k]) * 10) / 10
-      : 0;
-  }
-
-  const avgScorePct = sumTotal > 0 ? Math.round((sumScore / sumTotal) * 1000) / 10 : 0;
+  const avgScorePct =
+    sumTotal > 0 ? Math.round((sumScore / sumTotal) * 1000) / 10 : 0;
 
   return {
-    avgCompetency,
+    avgCompetency: latestCompetency,
     academicSummary: {
       avgScorePct,
       totalUnits: rows.length,

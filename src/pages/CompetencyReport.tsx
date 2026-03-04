@@ -69,7 +69,7 @@ export default function CompetencyReport() {
         <div>
           <h1 className="text-2xl font-bold">รายงานสมรรถนะรายบุคคล</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            กราฟเรดาร์สมรรถนะ A1–A6 และสรุปผลการเรียนของนักเรียน
+            กราฟเรดาร์สมรรถนะ 8 ด้าน (หลักสูตร 2569) และสรุปผลการเรียนของนักเรียน
           </p>
         </div>
 
@@ -108,9 +108,9 @@ export default function CompetencyReport() {
           <div className="grid gap-6 lg:grid-cols-[1fr,340px]">
             <Card className="print:shadow-none">
               <CardHeader>
-                <CardTitle className="text-base">กราฟสมรรถนะ A1–A6</CardTitle>
+                <CardTitle className="text-base">กราฟสมรรถนะ 8 ด้าน</CardTitle>
                 <p className="text-xs text-muted-foreground">
-                  คะแนนเฉลี่ยจากหน่วยการเรียนรู้ทั้งหมด (1 = เริ่มต้น, 4 = เชี่ยวชาญ)
+                  คะแนนล่าสุดจากหน่วยการเรียนรู้ (1 = เริ่มต้น, 4 = เชี่ยวชาญ)
                 </p>
               </CardHeader>
               <CardContent>

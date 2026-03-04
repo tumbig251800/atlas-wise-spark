@@ -1,12 +1,15 @@
 /**
- * Phase D Stage 2: Parse and upsert All-in-One competency template (CSV/XLSX)
- * Uses COMPETENCY_TEMPLATE_HEADERS. Partial update; auth and date fallback.
+ * Phase D Stage 2 + 2026: Parse and upsert All-in-One competency template (CSV/XLSX)
+ * Uses 8 capabilities (หลักสูตร 2569). Partial update; auth and date fallback.
  */
 import * as XLSX from "xlsx";
 import { COMPETENCY_TEMPLATE_HEADERS } from "@/lib/competencyTemplate";
+import { CAPABILITY_KEYS_2026 } from "@/lib/capabilityConstants2026";
 import { supabase } from "@/lib/atlasSupabase";
 
 const db = supabase as any;
+
+const CAP_COLS = CAPABILITY_KEYS_2026.map((k) => `${k}_score`);
 
 export interface ParsedAllInOneRow {
   student_id: string;
@@ -19,12 +22,14 @@ export interface ParsedAllInOneRow {
   score: string | number;
   total_score: string | number;
   assessed_date: string;
-  a1_score: string | number;
-  a2_score: string | number;
-  a3_score: string | number;
-  a4_score: string | number;
-  a5_score: string | number;
-  a6_score: string | number;
+  reading_score: string | number;
+  writing_score: string | number;
+  calculating_score: string | number;
+  sci_tech_score: string | number;
+  social_civic_score: string | number;
+  economy_finance_score: string | number;
+  health_score: string | number;
+  art_culture_score: string | number;
   competency_assessed_date: string;
   competency_note: string;
 }
@@ -105,7 +110,7 @@ export function parseAllInOneCSV(text: string): AllInOneParseResult {
 
   const headerLine = parseCSVLine(lines[0]);
   const colIndex = new Map<string, number>();
-  COMPETENCY_TEMPLATE_HEADERS.forEach((h, i) => {
+  COMPETENCY_TEMPLATE_HEADERS.forEach((h) => {
     const idx = headerLine.findIndex((cell) => cell.trim().toLowerCase() === h.toLowerCase());
     if (idx >= 0) colIndex.set(h, idx);
   });
@@ -117,7 +122,7 @@ export function parseAllInOneCSV(text: string): AllInOneParseResult {
     const cols = parseCSVLine(lines[i]);
     const student_id = get(cols, "student_id");
     const unit_name = get(cols, "unit_name");
-    if (!student_id && !unit_name) continue; // skip empty row
+    if (!student_id && !unit_name) continue;
     if (!student_id) {
       errors.push(`แถว ${i + 1}: ไม่มีรหัสนักเรียน`);
       continue;
@@ -127,25 +132,28 @@ export function parseAllInOneCSV(text: string): AllInOneParseResult {
       continue;
     }
 
+    const getFrom = (k: string) => get(cols, k);
     rows.push({
       student_id,
-      student_name: get(cols, "student_name"),
-      subject: get(cols, "subject"),
+      student_name: getFrom("student_name"),
+      subject: getFrom("subject"),
       unit_name,
-      grade_level: get(cols, "grade_level"),
-      classroom: get(cols, "classroom"),
-      academic_term: get(cols, "academic_term"),
-      score: get(cols, "score") || "",
-      total_score: get(cols, "total_score") || "",
-      assessed_date: get(cols, "assessed_date"),
-      a1_score: get(cols, "a1_score") || "",
-      a2_score: get(cols, "a2_score") || "",
-      a3_score: get(cols, "a3_score") || "",
-      a4_score: get(cols, "a4_score") || "",
-      a5_score: get(cols, "a5_score") || "",
-      a6_score: get(cols, "a6_score") || "",
-      competency_assessed_date: get(cols, "competency_assessed_date"),
-      competency_note: get(cols, "competency_note"),
+      grade_level: getFrom("grade_level"),
+      classroom: getFrom("classroom"),
+      academic_term: getFrom("academic_term"),
+      score: getFrom("score") || "",
+      total_score: getFrom("total_score") || "",
+      assessed_date: getFrom("assessed_date"),
+      reading_score: getFrom("reading_score") || "",
+      writing_score: getFrom("writing_score") || "",
+      calculating_score: getFrom("calculating_score") || "",
+      sci_tech_score: getFrom("sci_tech_score") || "",
+      social_civic_score: getFrom("social_civic_score") || "",
+      economy_finance_score: getFrom("economy_finance_score") || "",
+      health_score: getFrom("health_score") || "",
+      art_culture_score: getFrom("art_culture_score") || "",
+      competency_assessed_date: getFrom("competency_assessed_date"),
+      competency_note: getFrom("competency_note"),
     });
   }
 
@@ -207,12 +215,14 @@ export function parseAllInOneXLSX(file: File): Promise<AllInOneParseResult> {
             score: get(row, "score") || "",
             total_score: get(row, "total_score") || "",
             assessed_date: get(row, "assessed_date"),
-            a1_score: get(row, "a1_score") || "",
-            a2_score: get(row, "a2_score") || "",
-            a3_score: get(row, "a3_score") || "",
-            a4_score: get(row, "a4_score") || "",
-            a5_score: get(row, "a5_score") || "",
-            a6_score: get(row, "a6_score") || "",
+            reading_score: get(row, "reading_score") || "",
+            writing_score: get(row, "writing_score") || "",
+            calculating_score: get(row, "calculating_score") || "",
+            sci_tech_score: get(row, "sci_tech_score") || "",
+            social_civic_score: get(row, "social_civic_score") || "",
+            economy_finance_score: get(row, "economy_finance_score") || "",
+            health_score: get(row, "health_score") || "",
+            art_culture_score: get(row, "art_culture_score") || "",
             competency_assessed_date: get(row, "competency_assessed_date"),
             competency_note: get(row, "competency_note"),
           });
@@ -226,7 +236,7 @@ export function parseAllInOneXLSX(file: File): Promise<AllInOneParseResult> {
   });
 }
 
-/** Validate row: score 0-10 (or 0 to total_score), a1-a6 in 1-4. Returns first error or null. */
+/** Validate row: score 0-10, capabilities 1-4. Returns first error or null. */
 export function validateAllInOneRow(row: ParsedAllInOneRow, rowIndex: number): string | null {
   const total = toNum(row.total_score) ?? 10;
   const score = toNum(row.score);
@@ -235,9 +245,8 @@ export function validateAllInOneRow(row: ParsedAllInOneRow, rowIndex: number): s
     if (total < 0 || total > 100) return `แถว ${rowIndex + 1}: คะแนนเต็มต้องอยู่ระหว่าง 0-100`;
     if (score > total) return `แถว ${rowIndex + 1}: คะแนนต้องไม่เกินคะแนนเต็ม`;
   }
-  const compKeys = ["a1_score", "a2_score", "a3_score", "a4_score", "a5_score", "a6_score"] as const;
-  for (const k of compKeys) {
-    const v = toNum(row[k]);
+  for (const k of CAP_COLS) {
+    const v = toNum((row as Record<string, string | number>)[k]);
     if (v !== null && (v < 1 || v > 4 || Math.floor(v) !== v)) {
       return `แถว ${rowIndex + 1}: ${k} ต้องเป็นจำนวนเต็ม 1-4`;
     }
@@ -251,13 +260,16 @@ function resolveCompetencyDate(row: ParsedAllInOneRow): string | null {
   return d || new Date().toISOString().slice(0, 10);
 }
 
-/** Upsert one row: match by teacher_id, student_id, subject, grade_level, classroom, academic_term, unit_name. Partial update. */
+const SELECT_COLS =
+  "id,student_name,score,total_score,assessed_date,competency_note,competency_assessed_date," +
+  CAP_COLS.join(",");
+
+/** Upsert one row: match by teacher_id, student_id, subject, grade_level, classroom, academic_term, unit_name. */
 export async function upsertAllInOne(
   rows: ParsedAllInOneRow[],
   teacherId: string
 ): Promise<UpsertResult> {
   const result: UpsertResult = { created: 0, updated: 0, errors: [] };
-  const today = new Date().toISOString().slice(0, 10);
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -275,7 +287,7 @@ export async function upsertAllInOne(
     try {
       const { data: existing, error: findErr } = await db
         .from("unit_assessments")
-        .select("id, student_name, score, total_score, assessed_date, a1_score, a2_score, a3_score, a4_score, a5_score, a6_score, competency_note, competency_assessed_date")
+        .select(SELECT_COLS)
         .eq("teacher_id", teacherId)
         .eq("student_id", row.student_id)
         .eq("subject", subject)
@@ -304,22 +316,23 @@ export async function upsertAllInOne(
         if (totalNum !== null) upd.total_score = totalNum;
         const ad = toISODate(row.assessed_date);
         if (ad) upd.assessed_date = ad;
-        for (const k of ["a1_score", "a2_score", "a3_score", "a4_score", "a5_score", "a6_score"] as const) {
-          const v = toNum(row[k]);
+        for (const k of CAP_COLS) {
+          const v = toNum((row as Record<string, string | number>)[k]);
           if (v !== null && v >= 1 && v <= 4) upd[k] = v;
         }
         if (row.competency_note !== "") upd.competency_note = row.competency_note;
 
-        const { error: updateErr } = await db.from("unit_assessments").update(upd).eq("id", existing.id);
+        const { error: updateErr } = await db
+          .from("unit_assessments")
+          .update(upd)
+          .eq("id", existing.id);
         if (updateErr) {
           result.errors.push(`แถว ${i + 1} (${row.student_id}): ${updateErr.message}`);
         } else {
           result.updated++;
         }
       } else {
-        const scoreNum = toNum(row.score);
-        const totalNum = toNum(row.total_score);
-        const insertPayload = {
+        const insertPayload: Record<string, unknown> = {
           teacher_id: teacherId,
           assessed_by: teacherId,
           student_id: row.student_id,
@@ -329,26 +342,20 @@ export async function upsertAllInOne(
           classroom,
           academic_term: academic_term || null,
           unit_name: row.unit_name,
-          score: scoreNum ?? 0,
-          total_score: totalNum ?? 10,
+          score: toNum(row.score) ?? 0,
+          total_score: toNum(row.total_score) ?? 10,
           assessed_date: toISODate(row.assessed_date) || null,
           competency_assessed_date: competencyDate,
           competency_note: row.competency_note || null,
         };
-        const a1 = toNum(row.a1_score);
-        const a2 = toNum(row.a2_score);
-        const a3 = toNum(row.a3_score);
-        const a4 = toNum(row.a4_score);
-        const a5 = toNum(row.a5_score);
-        const a6 = toNum(row.a6_score);
-        if (a1 !== null && a1 >= 1 && a1 <= 4) (insertPayload as any).a1_score = a1;
-        if (a2 !== null && a2 >= 1 && a2 <= 4) (insertPayload as any).a2_score = a2;
-        if (a3 !== null && a3 >= 1 && a3 <= 4) (insertPayload as any).a3_score = a3;
-        if (a4 !== null && a4 >= 1 && a4 <= 4) (insertPayload as any).a4_score = a4;
-        if (a5 !== null && a5 >= 1 && a5 <= 4) (insertPayload as any).a5_score = a5;
-        if (a6 !== null && a6 >= 1 && a6 <= 4) (insertPayload as any).a6_score = a6;
+        for (const k of CAP_COLS) {
+          const v = toNum((row as Record<string, string | number>)[k]);
+          if (v !== null && v >= 1 && v <= 4) insertPayload[k] = v;
+        }
 
-        const { error: insertErr } = await db.from("unit_assessments").insert(insertPayload);
+        const { error: insertErr } = await db
+          .from("unit_assessments")
+          .insert(insertPayload);
         if (insertErr) {
           result.errors.push(`แถว ${i + 1} (${row.student_id}): ${insertErr.message}`);
         } else {
@@ -356,7 +363,9 @@ export async function upsertAllInOne(
         }
       }
     } catch (e) {
-      result.errors.push(`แถว ${i + 1}: ${e instanceof Error ? e.message : "ข้อผิดพลาดไม่ทราบสาเหตุ"}`);
+      result.errors.push(
+        `แถว ${i + 1}: ${e instanceof Error ? e.message : "ข้อผิดพลาดไม่ทราบสาเหตุ"}`
+      );
     }
   }
 

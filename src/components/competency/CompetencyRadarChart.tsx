@@ -1,5 +1,5 @@
 /**
- * Phase D Stage 3: Competency radar chart (A1-A6)
+ * Phase D Stage 3 + 2026: Competency radar chart (8 capabilities)
  */
 import {
   RadarChart,
@@ -10,15 +10,17 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from "recharts";
-import { COMPETENCY_LABELS, RUBRIC_LABELS } from "@/lib/competencyConstants";
-import type { CompetencyKey } from "@/lib/competencyConstants";
+import { RUBRIC_LABELS } from "@/lib/competencyConstants";
+import {
+  CAPABILITY_LABELS_2026,
+  CAPABILITY_KEYS_2026,
+  type CapabilityKey2026,
+} from "@/lib/capabilityConstants2026";
 import type { StudentCompetencyData } from "@/lib/competencyReportQueries";
 
-const COMP_KEYS: CompetencyKey[] = ["a1", "a2", "a3", "a4", "a5", "a6"];
-
 function toRadarData(avgCompetency: StudentCompetencyData["avgCompetency"]) {
-  return COMP_KEYS.map((k) => ({
-    subject: COMPETENCY_LABELS[k],
+  return CAPABILITY_KEYS_2026.map((k) => ({
+    subject: CAPABILITY_LABELS_2026[k],
     key: k,
     value: avgCompetency[k] || 0,
     fullMark: 4,
@@ -50,7 +52,7 @@ export function CompetencyRadarChart({ data, className = "" }: CompetencyRadarCh
           <PolarGrid stroke="hsl(var(--border))" />
           <PolarAngleAxis
             dataKey="subject"
-            tick={{ fill: "hsl(var(--foreground))", fontSize: 11 }}
+            tick={{ fill: "hsl(var(--foreground))", fontSize: 10 }}
             tickLine={false}
           />
           <PolarRadiusAxis
@@ -73,7 +75,8 @@ export function CompetencyRadarChart({ data, className = "" }: CompetencyRadarCh
               const p = payload[0]?.payload;
               if (!p) return null;
               const level = p.value as number;
-              const label = RUBRIC_LABELS[Math.round(level) as 1 | 2 | 3 | 4] ?? level;
+              const label =
+                RUBRIC_LABELS[Math.round(level) as 1 | 2 | 3 | 4] ?? level;
               return (
                 <div className="rounded-md border bg-background px-3 py-2 shadow-md">
                   <p className="font-medium">{p.subject}</p>

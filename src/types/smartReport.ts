@@ -41,6 +41,14 @@ export interface UnitAssessmentRaw {
   a4_score?: number | null;
   a5_score?: number | null;
   a6_score?: number | null;
+  reading_score?: number | null;
+  writing_score?: number | null;
+  calculating_score?: number | null;
+  sci_tech_score?: number | null;
+  social_civic_score?: number | null;
+  economy_finance_score?: number | null;
+  health_score?: number | null;
+  art_culture_score?: number | null;
   competency_note?: string | null;
   assessed_by?: string | null;
   competency_assessed_date?: string | null;

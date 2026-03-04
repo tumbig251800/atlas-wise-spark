@@ -1,8 +1,7 @@
 /**
- * Phase D: Competency tracking types
+ * Phase D + 2026: Competency tracking types
  */
-
-import type { CompetencyKey } from "@/lib/competencyConstants";
+import type { CapabilityKey2026 } from "@/lib/capabilityConstants2026";
 
 export type CompetencyScore = 1 | 2 | 3 | 4;
 
@@ -17,12 +16,14 @@ export interface CompetencyTemplateRow {
   score?: number | "";
   total_score?: number | "";
   assessed_date?: string;
-  a1_score?: CompetencyScore | "";
-  a2_score?: CompetencyScore | "";
-  a3_score?: CompetencyScore | "";
-  a4_score?: CompetencyScore | "";
-  a5_score?: CompetencyScore | "";
-  a6_score?: CompetencyScore | "";
+  reading_score?: CompetencyScore | "";
+  writing_score?: CompetencyScore | "";
+  calculating_score?: CompetencyScore | "";
+  sci_tech_score?: CompetencyScore | "";
+  social_civic_score?: CompetencyScore | "";
+  economy_finance_score?: CompetencyScore | "";
+  health_score?: CompetencyScore | "";
+  art_culture_score?: CompetencyScore | "";
   competency_assessed_date?: string;
   competency_note?: string;
 }
