@@ -16,6 +16,7 @@ import AdminSettings from "./pages/AdminSettings";
 import History from "./pages/History";
 import LessonPlan from "./pages/LessonPlan";
 import SmartReportView from "./pages/SmartReportView";
+import CompetencyReport from "./pages/CompetencyReport";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -99,6 +100,14 @@ const App = () => (
               element={
                 <ProtectedRoute allowedRoles={["teacher", "director"]}>
                   <SmartReportView />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/competency-report"
+              element={
+                <ProtectedRoute allowedRoles={["teacher", "director"]}>
+                  <CompetencyReport />
                 </ProtectedRoute>
               }
             />
