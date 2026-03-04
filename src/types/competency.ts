@@ -23,6 +23,7 @@ export interface CompetencyTemplateRow {
   a4_score?: CompetencyScore | "";
   a5_score?: CompetencyScore | "";
   a6_score?: CompetencyScore | "";
+  competency_assessed_date?: string;
   competency_note?: string;
 }
 

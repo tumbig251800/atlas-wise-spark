@@ -8,11 +8,12 @@ import type { CompetencyTemplateRow } from "@/types/competency";
 
 const BLANK_ROW_COUNT = 50;
 
-const HEADERS = [
+/** Teacher-logical order. Matches unit_assessments columns for Stage 2 upload. No teacher_id/assessed_by (set from Auth). */
+export const COMPETENCY_TEMPLATE_HEADERS = [
   "student_id",
   "student_name",
-  "unit_name",
   "subject",
+  "unit_name",
   "grade_level",
   "classroom",
   "academic_term",
@@ -25,18 +26,20 @@ const HEADERS = [
   "a4_score",
   "a5_score",
   "a6_score",
+  "competency_assessed_date",
   "competency_note",
 ];
 
 /**
  * Generate blank template rows. No fetch — teachers fill manually.
+ * Stage 2: if competency_assessed_date blank, use assessed_date or upload date.
  */
 export function generateBlankCompetencyTemplate(): CompetencyTemplateRow[] {
   return Array.from({ length: BLANK_ROW_COUNT }, () => ({
     student_id: "",
     student_name: "",
-    unit_name: "",
     subject: "",
+    unit_name: "",
     grade_level: "",
     classroom: "",
     academic_term: "",
@@ -49,12 +52,13 @@ export function generateBlankCompetencyTemplate(): CompetencyTemplateRow[] {
     a4_score: "",
     a5_score: "",
     a6_score: "",
+    competency_assessed_date: "",
     competency_note: "",
   }));
 }
 
 function rowsToSheet(rows: CompetencyTemplateRow[]): XLSX.WorkSheet {
-  const headerRow = HEADERS;
+  const headerRow = COMPETENCY_TEMPLATE_HEADERS;
   const dataRows = rows.map((r) =>
     headerRow.map((h) => {
       const v = (r as Record<string, unknown>)[h];

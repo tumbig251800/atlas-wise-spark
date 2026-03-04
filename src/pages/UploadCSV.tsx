@@ -13,6 +13,7 @@ const db = supabase as any;
 import { parseCSVFile, ensureISODate, type ParsedCSVRow } from "@/lib/csvImport";
 import { parseAssessmentCSV, type ParsedAssessmentRow } from "@/lib/assessmentImport";
 import { TemplateDownloader } from "@/components/TemplateDownloader";
+import { AllInOneImporter } from "@/components/AllInOneImporter";
 import { Upload, FileText, AlertCircle, CheckCircle2, Loader2, Pencil, ClipboardList } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Label } from "@/components/ui/label";
@@ -440,6 +441,7 @@ function AssessmentTab() {
     </div>
 
       <TemplateDownloader />
+      <AllInOneImporter />
     </div>
   );
 }
