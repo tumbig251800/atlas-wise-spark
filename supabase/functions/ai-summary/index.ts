@@ -33,60 +33,50 @@ serve(async (req) => {
   }
 
   try {
-    const { logs_summary, mode } = await req.json();
-    const rawKey = Deno.env.get("LOVABLE_API_KEY") ?? "";
-    const LOVABLE_API_KEY = rawKey.replace(/[^\x20-\x7E]/g, "").trim();
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const body = await req.json().catch(() => ({}));
+    const logs_summary = body?.logs_summary ?? "ไม่มีข้อมูล";
+    const mode = body?.mode ?? "default";
+    const rawKey = Deno.env.get("GEMINI_API_KEY") ?? "";
+    const GEMINI_API_KEY = rawKey.replace(/[^\x20-\x7E]/g, "").trim();
+    if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not configured");
 
     const systemContent = mode === "executive" ? executivePrompt : defaultPrompt;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
 
-    const response = await fetch(
-      "https://ai.gateway.lovable.dev/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages: [
-            { role: "system", content: systemContent },
-            { role: "user", content: `สรุปข้อมูลการสอนต่อไปนี้:\n${logs_summary}` },
-          ],
-        }),
-      }
-    );
+    const response = await fetch(geminiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: systemContent }] },
+        contents: [{ role: "user", parts: [{ text: `สรุปข้อมูลการสอนต่อไปนี้:\n${logs_summary}` }] }],
+        generationConfig: { temperature: 0 },
+      }),
+    });
 
     if (!response.ok) {
+      const t = await response.text();
+      console.error("Gemini summary error:", response.status, t);
       if (response.status === 429) {
         return new Response(
           JSON.stringify({ error: "คำขอมากเกินไป กรุณารอสักครู่" }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      if (response.status === 402) {
+      if (response.status === 400 || response.status === 403) {
         return new Response(
-          JSON.stringify({ error: "เครดิต AI หมด" }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      if (response.status === 401 || response.status === 403) {
-        return new Response(
-          JSON.stringify({ error: "API Key ไม่ถูกต้องหรือหมดอายุ กรุณาตรวจสอบ LOVABLE_API_KEY ใน Supabase" }),
+          JSON.stringify({ error: "GEMINI_API_KEY ไม่ถูกต้อง กรุณาตรวจสอบใน Supabase Edge Functions → Secrets" }),
           { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      const t = await response.text();
-      console.error("AI summary error:", response.status, t);
       return new Response(
-        JSON.stringify({ error: `AI gateway error (${response.status}). ดู Supabase Logs สำหรับรายละเอียด` }),
+        JSON.stringify({ error: `Gemini error (${response.status}). ดู Supabase Logs สำหรับรายละเอียด` }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     const data = await response.json();
-    const summary = data.choices?.[0]?.message?.content ?? "ไม่สามารถสร้างสรุปได้";
+    const summary =
+      data.candidates?.[0]?.content?.parts?.[0]?.text ?? "ไม่สามารถสร้างสรุปได้";
 
     return new Response(JSON.stringify({ summary }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

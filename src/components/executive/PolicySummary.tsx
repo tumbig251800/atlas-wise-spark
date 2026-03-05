@@ -43,11 +43,16 @@ Mastery ตามชั้น: ${Object.entries(gradeSummary).map(([g, v]) => `$
       const { data, error } = await supabase.functions.invoke("ai-summary", {
         body: { logs_summary: logsSummary, mode: "executive" },
       });
-      if (error) throw error;
-      setSummary(data.summary || "ไม่สามารถสร้างสรุปได้");
+      if (error) {
+        const msg = (data as { error?: string })?.error ?? error?.message ?? "เกิดข้อผิดพลาดในการสร้างสรุป";
+        setSummary(`❌ ${msg}`);
+        return;
+      }
+      setSummary(data?.summary || "ไม่สามารถสร้างสรุปได้");
     } catch (e) {
-      console.error(e);
-      setSummary("เกิดข้อผิดพลาดในการสร้างสรุป");
+      console.error("PolicySummary error:", e);
+      const msg = e instanceof Error ? e.message : "เกิดข้อผิดพลาดในการสร้างสรุป";
+      setSummary(`❌ ${msg}`);
     } finally {
       setLoading(false);
     }

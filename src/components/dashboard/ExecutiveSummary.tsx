@@ -82,8 +82,8 @@ export function ExecutiveSummary({ logs, colorCounts, activeStrikeCount }: Execu
       const { data, error } = await supabase.functions.invoke("ai-summary", {
         body: { logs_summary: summaryText },
       });
-      if (error) throw error;
-      return data.summary as string;
+      if (error) throw new Error((data as { error?: string })?.error ?? error?.message);
+      return (data as { summary?: string }).summary ?? "ไม่สามารถสร้างสรุปได้";
     },
     enabled: logs.length > 0,
     staleTime: 5 * 60 * 1000, // cache 5 mins

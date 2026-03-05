@@ -30,7 +30,7 @@ function buildContextWithCitation(
   const sessionDetails = logs.slice(-10).map((l, index) => {
     const refId = `[REF-${index + 1}]`;
     const remedialCount = (l.remedial_ids || "").split(",").filter(x => x.trim() && x !== "[None]" && x !== "[N/A]").length;
-    return `${refId} วันที่: ${l.teaching_date} | วิชา: ${l.subject} | ห้อง: ${l.grade_level}/${l.classroom} | หัวข้อ: ${l.topic || "ไม่ระบุ"} | Mastery: ${l.mastery_score}/5 | Gap: ${l.major_gap} | Remedial: ${remedialCount}/${l.total_students || 0} | Issue: ${l.key_issue || "ไม่ระบุ"}`;
+    return `${refId} วันที่: ${l.teaching_date} | วิชา: ${l.subject} | ห้อง: ${l.grade_level}/${l.classroom} | หัวข้อ: ${l.topic || "ไม่ระบุ"} | Mastery: ${l.mastery_score}/5 | Gap: ${l.major_gap} | Remedial: ${remedialCount}/${l.total_students || 0} | Strategy: ${l.next_strategy || "ไม่ระบุ"} | Issue: ${l.key_issue || "ไม่ระบุ"}`;
   }).join("\n");
 
   const avgMastery = (logs.reduce((s, l) => s + l.mastery_score, 0) / logs.length).toFixed(1);

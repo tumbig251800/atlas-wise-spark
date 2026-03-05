@@ -47,7 +47,7 @@ function FilterSelect({
         <SelectTrigger className="bg-secondary/50 border-border h-9">
           <SelectValue placeholder={`เลือก${label}`} />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="z-[200]" collisionPadding={8}>
           <SelectItem value="all">ทั้งหมด</SelectItem>
           {options.filter(Boolean).map((opt) => (
             <SelectItem key={opt} value={opt}>

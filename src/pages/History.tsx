@@ -253,12 +253,28 @@ export default function History() {
               </Card>
             ) : (
               <>
-                <HistoryFilters
-                  filters={filters}
-                  setFilters={setFilters}
-                  options={filterOptions}
-                  isDirector={isDirector}
-                />
+                <div className="sticky top-0 z-10 py-2 mb-2 bg-background/95 backdrop-blur-sm border-b border-border/50">
+                  <HistoryFilters
+                    filters={filters}
+                    setFilters={setFilters}
+                    options={filterOptions}
+                    isDirector={isDirector}
+                  />
+                </div>
+                {filteredLogs.length === 0 ? (
+                  <Card>
+                    <CardContent className="flex flex-col items-center py-12 text-muted-foreground gap-3">
+                      <p>ไม่พบข้อมูลตรงกับ filter นี้</p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setFilters({ subject: "", gradeLevel: "", classroom: "", teacherName: "" })}
+                      >
+                        รีเซ็ต filter
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ) : (
                 <div className="space-y-3">
                   {filteredLogs.map((log) => {
                   const gap = gapConfig[log.major_gap] ?? gapConfig.success;
@@ -362,6 +378,7 @@ export default function History() {
                   );
                 })}
                 </div>
+                )}
               </>
             )}
           </div>

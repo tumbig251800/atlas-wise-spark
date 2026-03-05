@@ -96,7 +96,9 @@ export function useDiagnosticData(filter?: DiagnosticFilter) {
   const strikes = filter
     ? allStrikes.filter((s) => {
         const matchSubject = !filter.subject || s.subject === filter.subject;
-        // scope_id encodes grade/classroom e.g. "ป.4/1"
+        // scope="class": scope_id is "grade/classroom" e.g. "ป.4/1"
+        // scope="student": scope_id is student_id — no grade/class in strike_counter, filter by subject only
+        if (s.scope === "student") return matchSubject;
         const scopeStr = s.scope_id ?? "";
         const matchGrade = !filter.gradeLevel || scopeStr.includes(filter.gradeLevel);
         const matchClass = !filter.classroom || scopeStr.includes(`/${filter.classroom}`);
