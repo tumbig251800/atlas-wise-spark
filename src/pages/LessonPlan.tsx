@@ -1,5 +1,8 @@
 import { useState, useCallback, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { LessonPlanForm, type LessonPlanConfig } from "@/components/lesson-plan/LessonPlanForm";
 import { LessonPlanResult } from "@/components/lesson-plan/LessonPlanResult";
 import { AddonPrompts } from "@/components/lesson-plan/AddonPrompts";
@@ -28,10 +31,13 @@ export default function LessonPlan() {
   const [gradeLevels, setGradeLevels] = useState<string[]>([]);
   const [classrooms, setClassrooms] = useState<string[]>([]);
   const [subjects, setSubjects] = useState<string[]>([]);
+  const [optionsLoading, setOptionsLoading] = useState(true);
+  const navigate = useNavigate();
 
   // Load filter options on mount
   useEffect(() => {
     (async () => {
+      setOptionsLoading(true);
       const { data } = await supabase
         .from("teaching_logs")
         .select("grade_level, classroom, subject");
@@ -40,6 +46,7 @@ export default function LessonPlan() {
         setClassrooms([...new Set(data.map((d) => d.classroom))].sort());
         setSubjects([...new Set(data.map((d) => d.subject))].sort());
       }
+      setOptionsLoading(false);
     })();
   }, []);
 
@@ -141,6 +148,22 @@ export default function LessonPlan() {
       setLoading(false);
     }
   }, [config]);
+
+  if (!optionsLoading && gradeLevels.length === 0) {
+    return (
+      <AppLayout>
+        <div className="flex flex-col items-center justify-center min-h-[50vh] gap-6">
+          <Card className="max-w-md w-full">
+            <CardContent className="flex flex-col items-center py-12 text-center">
+              <p className="text-lg font-medium text-foreground mb-1">ยังไม่มีข้อมูลการสอน</p>
+              <p className="text-sm text-muted-foreground mb-6">กรุณาบันทึกหลังสอนก่อน</p>
+              <Button onClick={() => navigate("/log")}>บันทึกหลังสอน</Button>
+            </CardContent>
+          </Card>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>

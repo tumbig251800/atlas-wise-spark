@@ -62,8 +62,28 @@ if (existsSync(envPath)) {
   }
 }
 
-// 2. Test ai-chat endpoint
+// 2. Test Health Check endpoints (Phase 0)
 const base = env.VITE_SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
+if (base && base.startsWith("http")) {
+  const functions = ["ai-chat", "ai-lesson-plan", "atlas-diagnostic"];
+  console.log("\nทดสอบ Health Check...");
+  for (const fn of functions) {
+    try {
+      const res = await fetch(`${base.replace(/\/$/, "")}/functions/v1/${fn}/health`, {
+        method: "GET",
+      });
+      if (res.ok) {
+        ok(`${fn}/health → 200`);
+      } else {
+        fail(`${fn}/health → HTTP ${res.status}`);
+      }
+    } catch (e) {
+      fail(`${fn}/health → ${e.message || String(e)}`);
+    }
+  }
+}
+
+// 3. Test ai-chat endpoint
 const anonKey = env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || "";
 
 if (base && base.startsWith("http")) {
@@ -101,7 +121,7 @@ if (base && base.startsWith("http")) {
     fail("ไม่สามารถเชื่อมต่อ ai-chat: " + (e.message || String(e)));
   }
 } else {
-  console.log("\n(ข้ามการทดสอบ ai-chat — ไม่มี VITE_SUPABASE_URL)");
+  console.log("\n(ข้ามการทดสอบ ai-chat และ health — ไม่มี VITE_SUPABASE_URL)");
 }
 
 // Summary

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/atlasSupabase";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -28,6 +28,11 @@ import { History as HistoryIcon, Eye, BookOpen, Trash2, Loader2, UserCog } from 
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { ReassignTeacherDialog } from "@/components/history/ReassignTeacherDialog";
+import {
+  HistoryFilters,
+  type HistoryFiltersState,
+  type HistoryFilterOptions,
+} from "@/components/history/HistoryFilters";
 import type { Tables } from "@/integrations/supabase/types";
 
 type TeachingLog = Tables<"teaching_logs">;
@@ -58,6 +63,12 @@ function formatDate(dateStr: string) {
 
 export default function History() {
   const [logs, setLogs] = useState<TeachingLog[]>([]);
+  const [filters, setFilters] = useState<HistoryFiltersState>({
+    subject: "",
+    gradeLevel: "",
+    classroom: "",
+    teacherName: "",
+  });
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<TeachingLog | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -171,6 +182,24 @@ export default function History() {
     }
   };
 
+  const filterOptions: HistoryFilterOptions = useMemo(() => {
+    const subjects = [...new Set(logs.map((l) => l.subject))].filter(Boolean).sort();
+    const gradeLevels = [...new Set(logs.map((l) => l.grade_level))].filter(Boolean).sort();
+    const classrooms = [...new Set(logs.map((l) => String(l.classroom ?? "")))].filter(Boolean).sort();
+    const teacherNames = [...new Set(logs.map((l) => l.teacher_name).filter(Boolean) as string[])].sort();
+    return { subjects, gradeLevels, classrooms, teacherNames };
+  }, [logs]);
+
+  const filteredLogs = useMemo(() => {
+    return logs.filter((l) => {
+      if (filters.subject && l.subject !== filters.subject) return false;
+      if (filters.gradeLevel && l.grade_level !== filters.gradeLevel) return false;
+      if (filters.classroom && String(l.classroom ?? "") !== filters.classroom) return false;
+      if (filters.teacherName && l.teacher_name !== filters.teacherName) return false;
+      return true;
+    });
+  }, [logs, filters]);
+
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full bg-background">
@@ -223,8 +252,15 @@ export default function History() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-3">
-                {logs.map((log) => {
+              <>
+                <HistoryFilters
+                  filters={filters}
+                  setFilters={setFilters}
+                  options={filterOptions}
+                  isDirector={isDirector}
+                />
+                <div className="space-y-3">
+                  {filteredLogs.map((log) => {
                   const gap = gapConfig[log.major_gap] ?? gapConfig.success;
                   const isDeleting = deletingId === log.id;
                   return (
@@ -325,7 +361,8 @@ export default function History() {
                     </Card>
                   );
                 })}
-              </div>
+                </div>
+              </>
             )}
           </div>
 

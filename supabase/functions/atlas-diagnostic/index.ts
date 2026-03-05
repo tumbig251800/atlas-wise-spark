@@ -172,6 +172,14 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const url = new URL(req.url);
+  if (req.method === "GET" && (url.pathname.endsWith("/health") || url.pathname === "/health")) {
+    return new Response(
+      JSON.stringify({ status: "ok", function: "atlas-diagnostic", ts: Date.now() }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
   try {
     const { logId, remedialStatuses } = await req.json() as {
       logId: string;

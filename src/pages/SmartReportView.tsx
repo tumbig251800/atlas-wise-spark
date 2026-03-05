@@ -1,5 +1,8 @@
 import { useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ReportFilters } from "@/components/smart-report/ReportFilters";
 import { SummaryStatsBar } from "@/components/smart-report/SummaryStatsBar";
@@ -35,6 +38,7 @@ function persistFilters(f: SmartReportFilter) {
 }
 
 export default function SmartReportView() {
+  const navigate = useNavigate();
   const [filters, setFiltersState] = useState<SmartReportFilter>(loadPersistedFilters);
 
   const setFilters = useCallback((f: SmartReportFilter) => {
@@ -43,6 +47,37 @@ export default function SmartReportView() {
   }, []);
 
   const { report, logs, filterOptions, isLoading, error } = useSmartReport(filters);
+
+  const hasNoData =
+    !isLoading &&
+    !error &&
+    filterOptions.subjects.length === 0 &&
+    filterOptions.gradeLevels.length === 0;
+
+  if (hasNoData) {
+    return (
+      <AppLayout>
+        <div className="flex flex-col items-center justify-center min-h-[50vh] gap-6">
+          <Card className="max-w-md w-full">
+            <CardContent className="flex flex-col items-center py-12 text-center">
+              <p className="text-lg font-medium text-foreground mb-1">
+                ยังไม่มีข้อมูลการสอนหรือสมรรถนะ
+              </p>
+              <p className="text-sm text-muted-foreground mb-6">
+                บันทึกหลังสอนหรืออัปโหลด CSV ก่อน
+              </p>
+              <div className="flex gap-3">
+                <Button onClick={() => navigate("/log")}>บันทึกหลังสอน</Button>
+                <Button variant="outline" onClick={() => navigate("/upload")}>
+                  อัปโหลด CSV
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>

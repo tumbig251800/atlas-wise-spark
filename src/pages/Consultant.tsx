@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import { AppLayout } from "@/components/AppLayout";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -11,6 +13,7 @@ import { toast } from "sonner";
 import { useDashboardData, loadPersistedFilters } from "@/hooks/useDashboardData";
 import { useDiagnosticData, type DiagnosticFilter } from "@/hooks/useDiagnosticData";
 import { buildStrictAnswerTH, type DecisionObject } from "@/lib/atlasStrictNarrator";
+import { validateContextBeforeAI } from "@/lib/contextValidator";
 import { getEdgeFunctionHeaders, getAiChatUrl, getAiExamGenUrl, getAiExamGenHeaders } from "@/lib/edgeFunctionFetch";
 
 type Msg = { id: string; role: "user" | "assistant"; content: string };
@@ -40,6 +43,7 @@ ${sessionDetails}`;
 }
 
 export default function Consultant() {
+  const navigate = useNavigate();
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -135,8 +139,15 @@ export default function Consultant() {
 ระดับชั้น: ${contextFilter.gradeLevel || "ทั้งหมด"}
 ห้อง: ${contextFilter.classroom || "ทั้งหมด"}
 ⚠️ AI ต้องตอบเฉพาะข้อมูลที่อยู่ใน [REF-X] เท่านั้น ห้ามนำข้อมูลวิชาอื่นมาปน`;
-  
-  const context = baseContext + diagnosticSummary + strictContext + scopeAssertion + filterInfo;
+
+  // Phase 6: Context validation — append warnings if any
+  const validation = validateContextBeforeAI(filteredLogs);
+  const validationNote =
+    validation.warnings.length > 0
+      ? `\n\n## [CONTEXT WARNINGS]\n${validation.warnings.join("\n")} — กรุณาระมัดระวังเมื่ออ้างอิงตัวเลข`
+      : "";
+
+  const context = baseContext + diagnosticSummary + strictContext + scopeAssertion + filterInfo + validationNote;
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -357,6 +368,22 @@ export default function Consultant() {
     toast.success("คัดลอกข้อสอบแล้ว");
     setTimeout(() => setExamCopied(false), 2000);
   };
+
+  if (!dashboardLoading && allLogs.length === 0) {
+    return (
+      <AppLayout>
+        <div className="flex flex-col items-center justify-center min-h-[50vh] gap-6">
+          <Card className="max-w-md w-full">
+            <CardContent className="flex flex-col items-center py-12 text-center">
+              <p className="text-lg font-medium text-foreground mb-1">ยังไม่มีข้อมูลการสอน</p>
+              <p className="text-sm text-muted-foreground mb-6">เริ่มต้นด้วยการบันทึกหลังสอนก่อนนะคะ</p>
+              <Button onClick={() => navigate("/log")}>บันทึกหลังสอน</Button>
+            </CardContent>
+          </Card>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>

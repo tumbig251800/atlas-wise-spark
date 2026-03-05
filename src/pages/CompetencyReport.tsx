@@ -2,7 +2,9 @@
  * Phase D Stage 3: Individual competency report (spider/radar chart)
  */
 import { useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
+import { Button } from "@/components/ui/button";
 import { ReportFilters } from "@/components/smart-report/ReportFilters";
 import { CompetencyRadarChart } from "@/components/competency/CompetencyRadarChart";
 import { StudentSelector } from "@/components/competency/StudentSelector";
@@ -40,6 +42,7 @@ function persistFilters(f: SmartReportFilter) {
 }
 
 export default function CompetencyReport() {
+  const navigate = useNavigate();
   const [filters, setFiltersState] = useState<SmartReportFilter>(loadPersistedFilters);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
 
@@ -62,6 +65,24 @@ export default function CompetencyReport() {
     classrooms: [],
     academicTerms: [],
   };
+
+  if (!optsLoading && options.subjects.length === 0) {
+    return (
+      <AppLayout>
+        <div className="flex flex-col items-center justify-center min-h-[50vh] gap-6">
+          <Card className="max-w-md w-full">
+            <CardContent className="flex flex-col items-center py-12 text-center">
+              <p className="text-lg font-medium text-foreground mb-1">ยังไม่มีข้อมูลสมรรถนะ</p>
+              <p className="text-sm text-muted-foreground mb-6">
+                อัปโหลดคะแนนประเมินจากแท็บ อัปโหลด CSV → คะแนนประเมิน ก่อน
+              </p>
+              <Button onClick={() => navigate("/upload")}>ไปอัปโหลด CSV</Button>
+            </CardContent>
+          </Card>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
