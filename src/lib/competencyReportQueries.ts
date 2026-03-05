@@ -5,6 +5,7 @@
  */
 import { supabase } from "@/lib/atlasSupabase";
 import type { SmartReportFilter } from "@/types/smartReport";
+import type { SmartReportFilterOptions } from "@/lib/smartReportQueries";
 import type { UnitAssessmentRaw } from "@/types/smartReport";
 import {
   CAPABILITY_KEYS_2026,
@@ -50,6 +51,41 @@ function buildQuery(filter: SmartReportFilter, teacherId: string) {
   if (filter.academicTerm) q = q.eq("academic_term", filter.academicTerm);
 
   return q.order("assessed_date", { ascending: false }).order("competency_assessed_date", { ascending: false });
+}
+
+/**
+ * Fetch filter options from unit_assessments with competency data only.
+ * ใช้เฉพาะข้อมูลสมรรถนะ เพื่อไม่ให้วิชาจาก teaching_logs ปนกัน
+ */
+export async function fetchCompetencyFilterOptions(
+  teacherId: string
+): Promise<SmartReportFilterOptions> {
+  const { data, error } = await db
+    .from("unit_assessments")
+    .select("subject,grade_level,classroom,academic_term")
+    .eq("teacher_id", teacherId)
+    .not("reading_score", "is", null);
+
+  if (error) throw error;
+
+  const s = new Set<string>();
+  const g = new Set<string>();
+  const c = new Set<string>();
+  const t = new Set<string>();
+
+  for (const r of data ?? []) {
+    if (r.subject) s.add(r.subject);
+    if (r.grade_level) g.add(r.grade_level);
+    if (r.classroom) c.add(String(r.classroom));
+    if (r.academic_term) t.add(r.academic_term);
+  }
+
+  return {
+    subjects: [...s].sort(),
+    gradeLevels: [...g].sort(),
+    classrooms: [...c].sort(),
+    academicTerms: [...t].sort(),
+  };
 }
 
 /**

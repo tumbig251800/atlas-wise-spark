@@ -236,13 +236,13 @@ export function parseAllInOneXLSX(file: File): Promise<AllInOneParseResult> {
   });
 }
 
-/** Validate row: score 0-10, capabilities 1-4. Returns first error or null. */
+/** Validate row: score 0–total, total 0–1000, capabilities 1-4. Returns first error or null. */
 export function validateAllInOneRow(row: ParsedAllInOneRow, rowIndex: number): string | null {
   const total = toNum(row.total_score) ?? 10;
   const score = toNum(row.score);
   if (score !== null) {
-    if (score < 0 || score > 10) return `แถว ${rowIndex + 1}: คะแนนวิชาต้องอยู่ระหว่าง 0-10`;
-    if (total < 0 || total > 100) return `แถว ${rowIndex + 1}: คะแนนเต็มต้องอยู่ระหว่าง 0-100`;
+    if (score < 0) return `แถว ${rowIndex + 1}: คะแนนวิชาต้องไม่เป็นค่าลบ`;
+    if (total < 0 || total > 1000) return `แถว ${rowIndex + 1}: คะแนนเต็มต้องอยู่ระหว่าง 0-1000`;
     if (score > total) return `แถว ${rowIndex + 1}: คะแนนต้องไม่เกินคะแนนเต็ม`;
   }
   for (const k of CAP_COLS) {

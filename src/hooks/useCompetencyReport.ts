@@ -3,10 +3,10 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
-import { fetchFilterOptions } from "@/lib/smartReportQueries";
 import {
   fetchStudentList,
   fetchStudentCompetency,
+  fetchCompetencyFilterOptions,
   type StudentOption,
   type StudentCompetencyData,
 } from "@/lib/competencyReportQueries";
@@ -42,8 +42,8 @@ export function useCompetencyFilterOptions() {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ["smart-report-options"],
-    queryFn: fetchFilterOptions,
+    queryKey: ["competency-filter-options", user?.id],
+    queryFn: () => fetchCompetencyFilterOptions(user!.id),
     enabled: !!user,
   });
 }

@@ -61,23 +61,86 @@ export default function History() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<TeachingLog | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [clearingAll, setClearingAll] = useState(false);
   const [reassignLog, setReassignLog] = useState<TeachingLog | null>(null);
   const { toast } = useToast();
-  const { role } = useAuth();
+  const { user, role } = useAuth();
   const isDirector = role === "director";
 
   useEffect(() => {
     const fetchLogs = async () => {
-      const { data, error } = await supabase
-        .from("teaching_logs")
-        .select("*")
-        .order("teaching_date", { ascending: false });
-
+      if (!user && !isDirector) {
+        setLoading(false);
+        return;
+      }
+      let q = supabase.from("teaching_logs").select("*").order("teaching_date", { ascending: false });
+      if (user && !isDirector) {
+        q = q.eq("teacher_id", user.id);
+      }
+      const { data, error } = await q;
       if (!error && data) setLogs(data);
       setLoading(false);
     };
     fetchLogs();
-  }, []);
+  }, [user?.id, isDirector]);
+
+  const handleClearAll = async () => {
+    if (!user) return;
+    setClearingAll(true);
+    try {
+      let q = supabase.from("teaching_logs").select("id");
+      if (!isDirector) q = q.eq("teacher_id", user.id);
+      const { data: logRows } = await q;
+      const ids = (logRows ?? []).map((l) => l.id);
+      if (ids.length === 0) {
+        toast({ title: "ไม่มีข้อมูล", description: "ไม่มีประวัติการสอนให้ลบ" });
+        setClearingAll(false);
+        return;
+      }
+      // ลบ pivot_events ก่อน (FK ไม่มี CASCADE) — ใส่ teacher_id เพื่อให้ผ่าน RLS
+      let pivotQ = supabase.from("pivot_events").delete().in("trigger_session_id", ids);
+      if (!isDirector) pivotQ = pivotQ.eq("teacher_id", user.id);
+      const { error: errPivot } = await pivotQ;
+      if (errPivot) throw new Error(`ลบ pivot_events ไม่สำเร็จ: ${errPivot.message}`);
+
+      // ลบ strike_counter
+      if (isDirector) {
+        const { error: errStrike } = await supabase.from("strike_counter").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+        if (errStrike) throw new Error(`ลบ strike_counter ไม่สำเร็จ: ${errStrike.message}`);
+      } else {
+        const { error: errStrike } = await supabase.from("strike_counter").delete().eq("teacher_id", user.id);
+        if (errStrike) throw new Error(`ลบ strike_counter ไม่สำเร็จ: ${errStrike.message}`);
+      }
+
+      // ลบ teaching_logs (CASCADE จะลบ diagnostic_events, remedial_tracking)
+      let deleted: { id: string }[] = [];
+      if (isDirector) {
+        const res = await supabase.from("teaching_logs").delete().neq("id", "00000000-0000-0000-0000-000000000000").select("id");
+        if (res.error) throw new Error(`ลบ teaching_logs ไม่สำเร็จ: ${res.error.message}`);
+        deleted = res.data ?? [];
+      } else {
+        const res = await supabase.from("teaching_logs").delete().eq("teacher_id", user.id).select("id");
+        if (res.error) throw new Error(`ลบ teaching_logs ไม่สำเร็จ: ${res.error.message}`);
+        deleted = res.data ?? [];
+      }
+      if (deleted.length === 0) {
+        throw new Error(
+          "ลบได้ 0 รายการ — สิทธิ์ RLS อาจไม่อนุญาต หรือ teacher_id ไม่ตรงกับผู้ล็อกอิน (ตรวจสอบ Supabase)"
+        );
+      }
+      setLogs([]);
+      toast({ title: "ล้างสำเร็จ", description: `ลบประวัติการสอน ${deleted.length} รายการแล้ว` });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "ไม่สามารถลบได้ กรุณาลองใหม่อีกครั้ง";
+      toast({
+        title: "ลบไม่สำเร็จ",
+        description: msg,
+        variant: "destructive",
+      });
+    } finally {
+      setClearingAll(false);
+    }
+  };
 
   const handleDelete = async (log: TeachingLog) => {
     setDeletingId(log.id);
@@ -114,9 +177,38 @@ export default function History() {
         <AppSidebar />
         <main className="flex-1 p-4 md:p-8 overflow-auto">
           <div className="max-w-3xl mx-auto">
-            <div className="flex items-center gap-3 mb-6">
-              <HistoryIcon className="h-6 w-6 text-primary" />
-              <h1 className="text-2xl font-bold text-foreground">ประวัติการสอน</h1>
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+              <div className="flex items-center gap-3">
+                <HistoryIcon className="h-6 w-6 text-primary" />
+                <h1 className="text-2xl font-bold text-foreground">ประวัติการสอน</h1>
+              </div>
+              {logs.length > 0 && user && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-2 text-destructive hover:text-destructive" disabled={clearingAll}>
+                      {clearingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                      ล้างทั้งหมด
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>ยืนยันการล้างประวัติ</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        จะลบประวัติการสอนของคุณทั้งหมด ({logs.length} รายการ) พร้อมข้อมูลวินิจฉัยและซ่อมเสริมที่เกี่ยวข้อง ไม่สามารถกู้คืนได้
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleClearAll}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        ล้างทั้งหมด
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
             </div>
 
             {loading ? (

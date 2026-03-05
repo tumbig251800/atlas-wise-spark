@@ -29,7 +29,7 @@ export function TemplateDownloader() {
     <div className="glass-card p-4 space-y-3">
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Download className="h-4 w-4" />
-        <span>ดาวน์โหลดแม่แบบ All-in-One (คะแนนวิชา + สมรรถนะ A1–A6) — กรอกหรือวางรายชื่อนักเรียนเอง</span>
+        <span>ดาวน์โหลดแม่แบบ All-in-One (คะแนนวิชา + สมรรถนะ 8 ด้าน หลักสูตร 2569) — กรอกหรือวางรายชื่อนักเรียนเอง</span>
       </div>
       <div className="flex flex-wrap gap-2">
         <Button

@@ -94,10 +94,16 @@ export default function CompetencyReport() {
         </div>
 
         {!selectedStudentId ? (
-          <div className="flex min-h-[320px] items-center justify-center rounded-lg border border-dashed border-muted-foreground/30 bg-muted/20">
+          <div className="flex min-h-[320px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/30 bg-muted/20 p-6">
             <p className="text-sm text-muted-foreground">
               เลือกตัวกรองและนักเรียนเพื่อดูกราฟสมรรถนะ
             </p>
+            {students.length === 0 && !studentsLoading && (
+              <p className="text-xs text-muted-foreground max-w-md text-center">
+                ไม่พบนักเรียน — เลือกตัวกรอง (วิชา ระดับชั้น ห้อง เทอม) ให้ตรงกับข้อมูล
+                หรืออัปโหลดไฟล์ All-in-One ที่หน้า อัปโหลด CSV → แท็บ คะแนนประเมิน
+              </p>
+            )}
           </div>
         ) : dataLoading ? (
           <div className="space-y-4">
@@ -108,7 +114,13 @@ export default function CompetencyReport() {
           <div className="grid gap-6 lg:grid-cols-[1fr,340px]">
             <Card className="print:shadow-none">
               <CardHeader>
-                <CardTitle className="text-base">กราฟสมรรถนะ 8 ด้าน</CardTitle>
+                <CardTitle className="text-base">
+                  กราฟสมรรถนะ 8 ด้าน
+                  {(() => {
+                    const s = students.find((x) => x.student_id === selectedStudentId);
+                    return s ? ` — ${s.student_name ?? s.student_id}` : "";
+                  })()}
+                </CardTitle>
                 <p className="text-xs text-muted-foreground">
                   คะแนนล่าสุดจากหน่วยการเรียนรู้ (1 = เริ่มต้น, 4 = เชี่ยวชาญ)
                 </p>
