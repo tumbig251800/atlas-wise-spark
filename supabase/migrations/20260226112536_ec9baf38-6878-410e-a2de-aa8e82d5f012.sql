@@ -1,1 +1,1 @@
-ALTER TABLE public.teaching_logs ADD COLUMN academic_term text DEFAULT NULL;
+ALTER TABLE public.teaching_logs ADD COLUMN IF NOT EXISTS academic_term text DEFAULT NULL;

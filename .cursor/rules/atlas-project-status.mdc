@@ -39,10 +39,25 @@ ATLAS = Adaptive Teaching & Learning Analytics System
 - `src/pages/Consultant.tsx` - Filter UI + buildContextWithCitation
 - `supabase/functions/ai-chat/index.ts` - Strict citation rules
 
+## Phase 1.2: Verify RLS Migration (2026-03-06) ✓
+- [x] scripts/verify-rls-migration.sql
+- [x] docs/RLS-VERIFICATION.md
+- [x] db push เสร็จ — RLS migrations ครบ
+
+## Phase 1.3: Shared FilterSelect Component (2026-03-06) ✓
+- [x] src/components/shared/FilterSelect.tsx
+- [x] DashboardFilters, ReportFilters, ExecutiveFilters, Consultant
+
+## Phase 1.4: Health Check Endpoints (2026-03-06) ✓
+- [x] ai-summary, ai-exam-gen — เพิ่ม GET /health
+- [x] check-setup.mjs — ทดสอบทั้ง 5 functions
+- [x] ai-exam-gen — เพิ่ม verify_jwt=false ใน config.toml
+
 ## Next Steps (When Resuming)
-1. Deploy Edge Functions to Supabase: `supabase functions deploy`
-2. Test พีท with filter: Select คณิตศาสตร์ ป.4/1 and verify no ศิลปะ data appears
-3. Phase 4 (Optional): Validation Layer to prevent AI number hallucination
+1. Deploy Edge Functions: `supabase functions deploy`
+2. Push pending migrations: `npx supabase db push` (ถ้าค้าง)
+3. Test พีท with filter: Select คณิตศาสตร์ ป.4/1 → verify no ศิลปะ data
+4. Phase 4 (Optional): Validation Layer to prevent AI number hallucination
 
 ## Important Commands
 ```bash

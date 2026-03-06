@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.atlas-diagnostic]
 verify_jwt = false
+
+[functions.ai-exam-gen]
+verify_jwt = false

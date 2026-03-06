@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FilterSelect } from "@/components/shared/FilterSelect";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Send, Loader2, Filter, FileQuestion, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
@@ -409,50 +410,38 @@ export default function Consultant() {
 
           {/* Context Filter UI - Prevents Data Leakage */}
           <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <Select
-              value={contextFilter.subject || "__all__"}
-              onValueChange={(v) => setContextFilter(prev => ({ ...prev, subject: v === "__all__" ? undefined : v }))}
-            >
-              <SelectTrigger className="w-[120px] h-8 text-xs">
-                <SelectValue placeholder="วิชา" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">ทุกวิชา</SelectItem>
-                {filterOptions.subjects.filter(Boolean).map(s => (
-                  <SelectItem key={s} value={s}>{s}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={contextFilter.gradeLevel || "__all__"}
-              onValueChange={(v) => setContextFilter(prev => ({ ...prev, gradeLevel: v === "__all__" ? undefined : v }))}
-            >
-              <SelectTrigger className="w-[80px] h-8 text-xs">
-                <SelectValue placeholder="ชั้น" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">ทุกชั้น</SelectItem>
-                {filterOptions.gradeLevels.filter(Boolean).map(g => (
-                  <SelectItem key={g} value={g}>{g}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={contextFilter.classroom || "__all__"}
-              onValueChange={(v) => setContextFilter(prev => ({ ...prev, classroom: v === "__all__" ? undefined : v }))}
-            >
-              <SelectTrigger className="w-[70px] h-8 text-xs">
-                <SelectValue placeholder="ห้อง" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">ทุกห้อง</SelectItem>
-                {filterOptions.classrooms.filter(Boolean).map(c => (
-                  <SelectItem key={c} value={c}>{c}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-md whitespace-nowrap">
+            <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
+            <FilterSelect
+              label="วิชา"
+              value={contextFilter.subject ?? ""}
+              options={filterOptions.subjects}
+              onChange={(v) => setContextFilter(prev => ({ ...prev, subject: v }))}
+              allLabel="ทุกวิชา"
+              compact
+              className="min-w-0"
+              triggerClassName="w-[120px]"
+            />
+            <FilterSelect
+              label="ชั้น"
+              value={contextFilter.gradeLevel ?? ""}
+              options={filterOptions.gradeLevels}
+              onChange={(v) => setContextFilter(prev => ({ ...prev, gradeLevel: v }))}
+              allLabel="ทุกชั้น"
+              compact
+              className="min-w-0"
+              triggerClassName="w-[80px]"
+            />
+            <FilterSelect
+              label="ห้อง"
+              value={contextFilter.classroom ?? ""}
+              options={filterOptions.classrooms}
+              onChange={(v) => setContextFilter(prev => ({ ...prev, classroom: v }))}
+              allLabel="ทุกห้อง"
+              compact
+              className="min-w-0"
+              triggerClassName="w-[70px]"
+            />
+            <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-md whitespace-nowrap shrink-0">
               {filteredLogs.length} คาบ
             </span>
           </div>

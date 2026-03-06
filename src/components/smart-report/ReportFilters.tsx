@@ -1,11 +1,5 @@
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { FilterSelect } from "@/components/shared/FilterSelect";
 import { RotateCcw, Filter } from "lucide-react";
 import type { SmartReportFilter } from "@/types/smartReport";
 import type { SmartReportFilterOptions } from "@/lib/smartReportQueries";
@@ -14,37 +8,6 @@ interface Props {
   filters: SmartReportFilter;
   setFilters: (f: SmartReportFilter) => void;
   options: SmartReportFilterOptions;
-}
-
-function FilterSelect({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  options: string[];
-  onChange: (v: string) => void;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5 min-w-[140px]">
-      <span className="text-xs text-muted-foreground">{label}</span>
-      <Select value={value || "all"} onValueChange={(v) => onChange(v === "all" ? "" : v)}>
-        <SelectTrigger className="bg-secondary/50 border-border">
-          <SelectValue placeholder={`เลือก${label}`} />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">ทั้งหมด</SelectItem>
-          {options.filter(Boolean).map((opt) => (
-            <SelectItem key={opt} value={opt}>
-              {opt}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
 }
 
 export function ReportFilters({ filters, setFilters, options }: Props) {

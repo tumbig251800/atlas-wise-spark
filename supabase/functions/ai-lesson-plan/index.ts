@@ -21,9 +21,9 @@ serve(async (req) => {
 
   try {
     const { planType, topic, gradeLevel, classroom, subject, hours, context, addonType, includeWorksheets } = await req.json();
-    const rawKey = Deno.env.get("LOVABLE_API_KEY") ?? "";
-    const LOVABLE_API_KEY = rawKey.replace(/[^\x20-\x7E]/g, "").trim();
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const rawKey = Deno.env.get("GEMINI_API_KEY") ?? "";
+    const GEMINI_API_KEY = rawKey.replace(/[^\x20-\x7E]/g, "").trim();
+    if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not configured");
 
     let systemPrompt: string;
 
@@ -195,26 +195,20 @@ serve(async (req) => {
       ? topic
       : `ข้อมูลบริบท:\nชั้น: ${gradeLevel} ห้อง: ${classroom} วิชา: ${subject}\nหัวข้อ: ${topic}\nประเภทแผน: ${planType === "weekly" ? "รายสัปดาห์" : "รายชั่วโมง"}\n\nข้อมูลจาก Teaching Logs ล่าสุด:\n${context}\n\nสำคัญ: สร้างเนื้อหาเฉพาะวิชา ${subject} เรื่อง ${topic} สำหรับชั้น ${gradeLevel} ห้อง ${classroom} เท่านั้น ห้ามปนเนื้อหาวิชาอื่นโดยเด็ดขาด`;
 
-    const response = await fetch(
-      "https://ai.gateway.lovable.dev/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userContent },
-          ],
-          stream: true,
-        }),
-      }
-    );
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}`;
+    const response = await fetch(geminiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ role: "user", parts: [{ text: userContent }] }],
+        generationConfig: { temperature: 0 },
+      }),
+    });
 
     if (!response.ok) {
+      const t = await response.text();
+      console.error("Gemini lesson plan error:", response.status, t);
       if (response.status === 429) {
         return new Response(JSON.stringify({ error: "คำขอมากเกินไป กรุณารอสักครู่" }), {
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -225,19 +219,56 @@ serve(async (req) => {
           status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (response.status === 401 || response.status === 403) {
-        return new Response(JSON.stringify({ error: "API Key ไม่ถูกต้องหรือหมดอายุ กรุณาตรวจสอบ LOVABLE_API_KEY ใน Supabase" }), {
+      if (response.status === 400 || response.status === 403) {
+        return new Response(JSON.stringify({ error: "GEMINI_API_KEY ไม่ถูกต้อง กรุณาตรวจสอบใน Supabase" }), {
           status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      const t = await response.text();
-      console.error("AI lesson plan error:", response.status, t);
-      return new Response(JSON.stringify({ error: `AI gateway error (${response.status}). ดู Supabase Logs สำหรับรายละเอียด` }), {
+      return new Response(JSON.stringify({ error: `Gemini error (${response.status}). ดู Supabase Logs สำหรับรายละเอียด` }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    return new Response(response.body, {
+    // Transform Gemini SSE → OpenAI-compatible SSE for frontend
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        const reader = response.body!.getReader();
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+              controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+              break;
+            }
+            const chunk = decoder.decode(value);
+            const lines = chunk.split("\n");
+            for (const line of lines) {
+              if (!line.startsWith("data: ")) continue;
+              const jsonStr = line.slice(6).trim();
+              if (!jsonStr || jsonStr === "[DONE]") continue;
+              try {
+                const parsed = JSON.parse(jsonStr);
+                const text = parsed?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+                if (text) {
+                  const openAiChunk = { choices: [{ delta: { content: text } }] };
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify(openAiChunk)}\n\n`));
+                }
+              } catch {
+                // skip malformed chunks
+              }
+            }
+          }
+        } catch (e) {
+          console.error("ai-lesson-plan stream error:", e);
+        } finally {
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(stream, {
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
     });
   } catch (e) {

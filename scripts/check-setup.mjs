@@ -65,7 +65,7 @@ if (existsSync(envPath)) {
 // 2. Test Health Check endpoints (Phase 0)
 const base = env.VITE_SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
 if (base && base.startsWith("http")) {
-  const functions = ["ai-chat", "ai-lesson-plan", "atlas-diagnostic"];
+  const functions = ["ai-chat", "ai-lesson-plan", "ai-summary", "ai-exam-gen", "atlas-diagnostic"];
   console.log("\nทดสอบ Health Check...");
   for (const fn of functions) {
     try {
