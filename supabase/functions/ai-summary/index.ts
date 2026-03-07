@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { validateSummary } from "../_shared/summaryValidator.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -86,9 +87,20 @@ serve(async (req) => {
     const summary =
       data.candidates?.[0]?.content?.parts?.[0]?.text ?? "ไม่สามารถสร้างสรุปได้";
 
-    return new Response(JSON.stringify({ summary }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    const validation = validateSummary(logs_summary, summary);
+
+    return new Response(
+      JSON.stringify({
+        summary,
+        validation: {
+          level: validation.level,
+          flaggedCount: validation.flaggedCount,
+          totalNumbers: validation.totalOutputNumbers,
+          disclaimer: validation.disclaimer,
+        },
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   } catch (e) {
     console.error("summary error:", e);
     return new Response(

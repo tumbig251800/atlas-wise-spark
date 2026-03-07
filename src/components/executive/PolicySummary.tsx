@@ -4,6 +4,8 @@ import { Sparkles, Loader2 } from "lucide-react";
 import { getEdgeFunctionHeaders, getAiSummaryUrl } from "@/lib/edgeFunctionFetch";
 import type { TeachingLog } from "@/hooks/useDashboardData";
 import ReactMarkdown from "react-markdown";
+import { ValidationDisclaimer } from "@/components/shared/ValidationDisclaimer";
+import type { SummaryValidation } from "@/types/validation";
 
 interface Props {
   logs: TeachingLog[];
@@ -12,11 +14,13 @@ interface Props {
 export function PolicySummary({ logs }: Props) {
   const [summary, setSummary] = useState("");
   const [loading, setLoading] = useState(false);
+  const [validation, setValidation] = useState<SummaryValidation | null>(null);
 
   const generate = async () => {
     if (!logs.length) return;
     setLoading(true);
     setSummary("");
+    setValidation(null);
 
     const gapCounts: Record<string, number> = {};
     logs.forEach((l) => { gapCounts[l.major_gap] = (gapCounts[l.major_gap] || 0) + 1; });
@@ -52,6 +56,7 @@ Mastery ตามชั้น: ${Object.entries(gradeSummary).map(([g, v]) => `$
         return;
       }
       setSummary((data as { summary?: string })?.summary || "ไม่สามารถสร้างสรุปได้");
+      setValidation((data as { validation?: SummaryValidation })?.validation ?? null);
     } catch (e) {
       console.error("PolicySummary error:", e);
       const msg = e instanceof Error ? e.message : "เกิดข้อผิดพลาดในการสร้างสรุป";
@@ -76,6 +81,7 @@ Mastery ตามชั้น: ${Object.entries(gradeSummary).map(([g, v]) => `$
       {summary ? (
         <div className="prose prose-invert prose-sm max-w-none text-foreground">
           <ReactMarkdown>{summary}</ReactMarkdown>
+          <ValidationDisclaimer validation={validation} />
         </div>
       ) : (
         <p className="text-muted-foreground text-sm">กดปุ่ม "วิเคราะห์" เพื่อให้ AI สรุปสถานการณ์ระดับโรงเรียน</p>
