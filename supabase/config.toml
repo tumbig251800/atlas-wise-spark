@@ -1,4 +1,4 @@
-project_id = "iwlpqrulzkzpsiaddefq"
+project_id = "ebyelctqcdhjmqujeskx"
 
 # Phase 2.2: verify_jwt=true — ป้องกันการเรียกโดยไม่มี JWT (401 ถ้าไม่มี Authorization)
 [functions.ai-chat]

@@ -164,7 +164,7 @@ export default function Executive() {
           </div>
         ) : (
           <div className="space-y-6">
-            <ReferralQueue events={filteredDiagnosticEvents} />
+            <ReferralQueue events={filteredDiagnosticEvents} logs={filteredLogs} />
             <StrikeEscalationView strikes={filteredStrikes} />
             <SystemGapReport events={filteredDiagnosticEvents} logs={filteredLogs} />
           </div>

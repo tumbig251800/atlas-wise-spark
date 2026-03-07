@@ -3,15 +3,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import type { DiagnosticEvent } from "@/hooks/useDiagnosticData";
+import type { TeachingLog } from "@/hooks/useDashboardData";
 
 interface Props {
   events: DiagnosticEvent[];
+  logs: TeachingLog[];
 }
 
-export function ReferralQueue({ events }: Props) {
+export function ReferralQueue({ events, logs }: Props) {
+  const dateMap = new Map(logs.map((l) => [l.id, l.teaching_date]));
   const referrals = events
     .filter((e) => e.gap_type === "a2-gap")
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    .sort((a, b) => {
+      const dateA = dateMap.get(a.teaching_log_id) ?? a.created_at;
+      const dateB = dateMap.get(b.teaching_log_id) ?? b.created_at;
+      return new Date(dateB).getTime() - new Date(dateA).getTime();
+    });
 
   return (
     <Card className="glass-card">
@@ -47,7 +54,9 @@ export function ReferralQueue({ events }: Props) {
                     <Badge variant="destructive">P{e.priority_level || 1}</Badge>
                   </TableCell>
                   <TableCell className="text-muted-foreground text-xs">
-                    {new Date(e.created_at).toLocaleDateString("th-TH")}
+                    {dateMap.get(e.teaching_log_id)
+                      ? new Date(dateMap.get(e.teaching_log_id)!).toLocaleDateString("th-TH")
+                      : new Date(e.created_at).toLocaleDateString("th-TH")}
                   </TableCell>
                 </TableRow>
               ))}

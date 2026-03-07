@@ -53,16 +53,24 @@ ATLAS = Adaptive Teaching & Learning Analytics System
 - [x] check-setup.mjs — ทดสอบทั้ง 5 functions
 - [x] ai-exam-gen — เพิ่ม verify_jwt=false ใน config.toml
 
-## Phase 2: Quality & Testing (2026-03-07)
-- [x] scripts/test-negative.mjs — ทดสอบ 4.2 Auth ขาด (ไม่มี JWT → 401)
+## Phase 2: Quality & Testing (2026-03-07) ✓
+- [x] scripts/test-negative.mjs — ทดสอบ 5 functions (ไม่มี JWT → 401)
 - [x] npm run test:negative
-- [ ] Phase 2.2 (Optional): verify_jwt=true สำหรับ production → ทดสอบ 401
+- [x] Phase 2.2: verify_jwt=true สำหรับทั้ง 5 functions
+
+## Phase 4.1: Validation Layer (2026-03-07) ✓
+- [x] numberExtractor.ts + summaryValidator.ts
+- [x] ai-summary: validateSummary() + return validation field
+- [x] PolicySummary, ExecutiveSummary: ValidationDisclaimer
+- [x] Regex: เพิ่ม pattern "ประมาณ/ราว/กว่า" ใน numberExtractor
+
+## Phase: teaching_date แทน created_at (2026-03-07) ✓
+- [x] SystemGapReport — แสดง teaching_date (มีอยู่แล้ว)
+- [x] ReferralQueue — แสดง + sort ตาม teaching_date
 
 ## Next Steps (When Resuming)
-1. Deploy Edge Functions: `supabase functions deploy`
-2. Push pending migrations: `npx supabase db push` (ถ้าค้าง)
-3. Test พีท with filter: Select คณิตศาสตร์ ป.4/1 → verify no ศิลปะ data
-4. Phase 4 (Optional): Validation Layer to prevent AI number hallucination
+1. Deploy ai-summary: `npx supabase functions deploy ai-summary` (ต้อง login ก่อน; อาจได้ 403)
+2. Phase 4.2 (Optional): ai-chat Citation Presence Check
 
 ## Important Commands
 ```bash

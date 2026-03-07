@@ -18,6 +18,7 @@ export function extractNumbersWithContext(text: string): NumberWithContext[] {
 
   const patterns: RegExp[] = [
     /(\d+(?:\.\d+)?)\s*%/g,
+    /(?:ประมาณ|ราว|กว่า|เกือบ|เกิน|ต่ำกว่า|สูงกว่า)\s*(\d+(?:\.\d+)?)\s*%?/g,
     /\b(\d+)\s*\/\s*(\d+)\b/g,
     /(\d+)\s*(?:คน|คาบ|ชั้น|ห้อง|วิชา|ครู|นักเรียน|ข้อ|ครั้ง)/g,
     /(\d+)\s*[-–]\s*(\d+)/g,
