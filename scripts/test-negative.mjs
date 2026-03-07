@@ -93,6 +93,63 @@ try {
   err(`ai-lesson-plan ไม่มี JWT → ${e.message}`);
 }
 
+// 4.2c — ai-summary ไม่มี JWT
+console.log("\n4.2c Auth ขาด — ai-summary โดยไม่มี JWT...");
+try {
+  const res = await fetch(`${base}/functions/v1/ai-summary`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ logs_summary: "test" }),
+  });
+  if (res.status === 401) {
+    pass("ai-summary ไม่มี JWT → 401 (ผ่าน)");
+  } else {
+    err(`ai-summary ไม่มี JWT → HTTP ${res.status} (คาดหวัง 401)`);
+  }
+} catch (e) {
+  err(`ai-summary ไม่มี JWT → ${e.message}`);
+}
+
+// 4.2d — ai-exam-gen ไม่มี JWT
+console.log("\n4.2d Auth ขาด — ai-exam-gen โดยไม่มี JWT...");
+try {
+  const res = await fetch(`${base}/functions/v1/ai-exam-gen`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      gradeLevel: "ป.4",
+      classroom: "1",
+      subject: "คณิตศาสตร์",
+      topic: "เศษส่วน",
+      context: "",
+    }),
+  });
+  if (res.status === 401) {
+    pass("ai-exam-gen ไม่มี JWT → 401 (ผ่าน)");
+  } else {
+    err(`ai-exam-gen ไม่มี JWT → HTTP ${res.status} (คาดหวัง 401)`);
+  }
+} catch (e) {
+  err(`ai-exam-gen ไม่มี JWT → ${e.message}`);
+}
+
+// 4.2e — atlas-diagnostic ไม่มี JWT
+console.log("\n4.2e Auth ขาด — atlas-diagnostic โดยไม่มี JWT...");
+try {
+  const res = await fetch(`${base}/functions/v1/atlas-diagnostic`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ logId: "00000000-0000-0000-0000-000000000000", remedialStatuses: [] }),
+  });
+  if (res.status === 401) {
+    pass("atlas-diagnostic ไม่มี JWT → 401 (ผ่าน)");
+  } else {
+    err(`atlas-diagnostic ไม่มี JWT → HTTP ${res.status} (คาดหวัง 401)`);
+  }
+} catch (e) {
+  err(`atlas-diagnostic ไม่มี JWT → ${e.message}`);
+}
+
 console.log("\n\x1b[1mสรุป:\x1b[0m");
 console.log("  ผ่าน:", ok.length);
 console.log("  ไม่ผ่าน:", fail.length);
