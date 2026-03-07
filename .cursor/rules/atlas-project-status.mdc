@@ -53,6 +53,11 @@ ATLAS = Adaptive Teaching & Learning Analytics System
 - [x] check-setup.mjs — ทดสอบทั้ง 5 functions
 - [x] ai-exam-gen — เพิ่ม verify_jwt=false ใน config.toml
 
+## Phase 2: Quality & Testing (2026-03-07)
+- [x] scripts/test-negative.mjs — ทดสอบ 4.2 Auth ขาด (ไม่มี JWT → 401)
+- [x] npm run test:negative
+- [ ] Phase 2.2 (Optional): verify_jwt=true สำหรับ production → ทดสอบ 401
+
 ## Next Steps (When Resuming)
 1. Deploy Edge Functions: `supabase functions deploy`
 2. Push pending migrations: `npx supabase db push` (ถ้าค้าง)
