@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Loader2 } from "lucide-react";
-import { supabase } from "@/lib/atlasSupabase";
+import { getEdgeFunctionHeaders, getAiSummaryUrl } from "@/lib/edgeFunctionFetch";
 import type { TeachingLog } from "@/hooks/useDashboardData";
 import ReactMarkdown from "react-markdown";
 
@@ -40,15 +40,18 @@ Mastery ตามชั้น: ${Object.entries(gradeSummary).map(([g, v]) => `$
     `.trim();
 
     try {
-      const { data, error } = await supabase.functions.invoke("ai-summary", {
-        body: { logs_summary: logsSummary, mode: "executive" },
+      const res = await fetch(getAiSummaryUrl(), {
+        method: "POST",
+        headers: getEdgeFunctionHeaders(),
+        body: JSON.stringify({ logs_summary: logsSummary, mode: "executive" }),
       });
-      if (error) {
-        const msg = (data as { error?: string })?.error ?? error?.message ?? "เกิดข้อผิดพลาดในการสร้างสรุป";
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = (data as { error?: string })?.error ?? `HTTP ${res.status}`;
         setSummary(`❌ ${msg}`);
         return;
       }
-      setSummary(data?.summary || "ไม่สามารถสร้างสรุปได้");
+      setSummary((data as { summary?: string })?.summary || "ไม่สามารถสร้างสรุปได้");
     } catch (e) {
       console.error("PolicySummary error:", e);
       const msg = e instanceof Error ? e.message : "เกิดข้อผิดพลาดในการสร้างสรุป";

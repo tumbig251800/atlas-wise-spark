@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/lib/atlasSupabase";
+import { getEdgeFunctionHeaders, getAiSummaryUrl } from "@/lib/edgeFunctionFetch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sparkles } from "lucide-react";
 import type { TeachingLog } from "@/hooks/useDashboardData";
@@ -79,10 +79,13 @@ export function ExecutiveSummary({ logs, colorCounts, activeStrikeCount }: Execu
   const { data: summary, isLoading } = useQuery({
     queryKey: ["executive-summary", summaryText],
     queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke("ai-summary", {
-        body: { logs_summary: summaryText },
+      const res = await fetch(getAiSummaryUrl(), {
+        method: "POST",
+        headers: getEdgeFunctionHeaders(),
+        body: JSON.stringify({ logs_summary: summaryText }),
       });
-      if (error) throw new Error((data as { error?: string })?.error ?? error?.message);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((data as { error?: string })?.error ?? `HTTP ${res.status}`);
       return (data as { summary?: string }).summary ?? "ไม่สามารถสร้างสรุปได้";
     },
     enabled: logs.length > 0,

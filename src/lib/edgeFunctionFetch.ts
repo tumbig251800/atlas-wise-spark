@@ -48,6 +48,11 @@ export function getAiExamGenUrl(): string {
   return `${getBaseUrl()}/functions/v1/ai-exam-gen`;
 }
 
+/** Full URL for ai-summary Edge Function */
+export function getAiSummaryUrl(): string {
+  return `${getBaseUrl()}/functions/v1/ai-summary`;
+}
+
 /** Headers for ai-exam-gen */
 export function getAiExamGenHeaders(): Record<string, string> {
   return getEdgeFunctionHeaders();
