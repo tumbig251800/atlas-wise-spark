@@ -4,6 +4,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Sparkles } from "lucide-react";
 import type { TeachingLog } from "@/hooks/useDashboardData";
 import type { DiagnosticColorCounts } from "@/hooks/useDiagnosticData";
+import { ValidationDisclaimer } from "@/components/shared/ValidationDisclaimer";
+import type { SummaryValidation } from "@/types/validation";
 
 interface ExecutiveSummaryProps {
   logs: TeachingLog[];
@@ -76,7 +78,7 @@ ${sessionDetails}`;
 export function ExecutiveSummary({ logs, colorCounts, activeStrikeCount }: ExecutiveSummaryProps) {
   const summaryText = buildLogsSummary(logs, colorCounts, activeStrikeCount);
 
-  const { data: summary, isLoading } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["executive-summary", summaryText],
     queryFn: async () => {
       const res = await fetch(getAiSummaryUrl(), {
@@ -84,9 +86,12 @@ export function ExecutiveSummary({ logs, colorCounts, activeStrikeCount }: Execu
         headers: getEdgeFunctionHeaders(),
         body: JSON.stringify({ logs_summary: summaryText }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error((data as { error?: string })?.error ?? `HTTP ${res.status}`);
-      return (data as { summary?: string }).summary ?? "ไม่สามารถสร้างสรุปได้";
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((json as { error?: string })?.error ?? `HTTP ${res.status}`);
+      return {
+        summary: (json as { summary?: string }).summary ?? "ไม่สามารถสร้างสรุปได้",
+        validation: (json as { validation?: SummaryValidation }).validation ?? null,
+      };
     },
     enabled: logs.length > 0,
     staleTime: 5 * 60 * 1000, // cache 5 mins
@@ -106,9 +111,12 @@ export function ExecutiveSummary({ logs, colorCounts, activeStrikeCount }: Execu
           <Skeleton className="h-4 w-3/4" />
         </div>
       ) : (
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          {summary || "กำลังวิเคราะห์..."}
-        </p>
+        <div>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            {data?.summary || "กำลังวิเคราะห์..."}
+          </p>
+          <ValidationDisclaimer validation={data?.validation ?? null} />
+        </div>
       )}
     </div>
   );
