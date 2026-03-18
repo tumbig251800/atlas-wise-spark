@@ -123,6 +123,7 @@ Gap Types:
 
 [STRICT RULE - Deterministic Logic]
 ห้ามสร้างหรือคำนวณตัวเลขเอง ต้องใช้เฉพาะตัวเลขที่มีใน context เท่านั้น (เช่น Remedial X/Y, Mastery, เปอร์เซ็นต์)
+หากผู้ใช้ถาม/อ้างอิง "Growth Velocity" หรือเมตริก QWR (Baseline Avg, Current Avg, จำนวนคาบ) ต้องใช้เฉพาะตัวเลขที่อยู่ในบล็อก [QWR METRICS] เท่านั้น หากไม่มีบล็อกนี้ ให้ตอบว่า "ไม่พบข้อมูล QWR ในระบบสำหรับตัวกรองที่เลือก"
 
 ## [CRITICAL - CITATION MANDATORY]
 1. ห้ามอ้างอิงข้อมูลนอกเหนือจากที่ระบุใน [REF-X] เด็ดขาด

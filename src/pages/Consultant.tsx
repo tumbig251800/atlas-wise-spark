@@ -19,8 +19,35 @@ import { getEdgeFunctionHeaders, getAiChatUrl, getAiExamGenUrl, getAiExamGenHead
 
 type Msg = { id: string; role: "user" | "assistant"; content: string };
 
+type SSEChunk = { choices?: Array<{ delta?: { content?: string } }> };
+type DecisionEventLike = { decision_object?: unknown; student_id?: string | null };
+
 function genMsgId() {
   return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function mean(arr: number[]) {
+  if (!arr.length) return 0;
+  return arr.reduce((s, v) => s + v, 0) / arr.length;
+}
+
+function buildQwrMetricsBlock(logs: { mastery_score: number }[]): string {
+  // Align with Dashboard QWRTrendChart.tsx:
+  // baseline = first 20% sessions, current = last 20% sessions (logs are ordered by teaching_date asc).
+  if (logs.length < 5) {
+    return `\n\n## [QWR METRICS]\nข้อมูลยังไม่เพียงพอ (ต้องมีอย่างน้อย 5 คาบ)`;
+  }
+
+  const n = logs.length;
+  const baselineSlice = logs.slice(0, Math.ceil(n * 0.2));
+  const currentSlice = logs.slice(Math.floor(n * 0.8));
+
+  const baselineAvg = mean(baselineSlice.map((l) => l.mastery_score));
+  const currentAvg = mean(currentSlice.map((l) => l.mastery_score));
+  const velocity = currentAvg - baselineAvg;
+  const velocityPct = ((velocity / 5) * 100).toFixed(1);
+
+  return `\n\n## [QWR METRICS]\nGrowth Velocity: ${velocityPct}%\nBaseline Avg: ${baselineAvg.toFixed(2)}\nCurrent Avg: ${currentAvg.toFixed(2)}\nจำนวนคาบ: ${n}\n\n[STRICT]\n- หากกล่าวถึง Growth Velocity / Baseline / Current ต้องอ้างอิงจากบล็อก [QWR METRICS] นี้เท่านั้น\n- ห้ามสร้างตัวเลข QWR เองเด็ดขาด`;
 }
 
 function buildContextWithCitation(
@@ -77,7 +104,9 @@ export default function Consultant() {
   // Auto-initialize filter to first available subject/grade/classroom once data loads
   useEffect(() => {
     if (!filterInitialized && !dashboardLoading && allLogs.length > 0) {
-      const first = allLogs[0];
+      // allLogs is ordered ascending by teaching_date in useDashboardData.
+      // Prefer the most recent session to avoid initializing to a stale class/subject.
+      const first = allLogs[allLogs.length - 1];
       setContextFilter({
         subject: first.subject,
         gradeLevel: first.grade_level,
@@ -97,6 +126,7 @@ export default function Consultant() {
   
   // Build context with citation format
   const baseContext = buildContextWithCitation(filteredLogs);
+  const qwrMetrics = buildQwrMetricsBlock(filteredLogs);
 
   // Diagnostic summary (colorCounts + activeStrikes) — ตรงกับ ChatSidebar
   let diagnosticSummary = "";
@@ -109,11 +139,11 @@ export default function Consultant() {
 
   // Inject strict narrator context from latest FILTERED decision_object
   let strictContext = "";
-  const latestDecision = (diagnosticEvents ?? []).find(
-    (de: any) => de.decision_object && !de.student_id
+  const latestDecision = (diagnosticEvents as unknown as DecisionEventLike[] | undefined)?.find(
+    (de) => !!de.decision_object && !de.student_id
   );
-  if (latestDecision && (latestDecision as any).decision_object) {
-    const d = (latestDecision as any).decision_object as DecisionObject;
+  if (latestDecision?.decision_object) {
+    const d = latestDecision.decision_object as DecisionObject;
     const strict = buildStrictAnswerTH({
       date: "latest",
       classId: d.class_id,
@@ -148,7 +178,7 @@ export default function Consultant() {
       ? `\n\n## [CONTEXT WARNINGS]\n${validation.warnings.join("\n")} — กรุณาระมัดระวังเมื่ออ้างอิงตัวเลข`
       : "";
 
-  const context = baseContext + diagnosticSummary + strictContext + scopeAssertion + filterInfo + validationNote;
+  const context = baseContext + qwrMetrics + diagnosticSummary + strictContext + scopeAssertion + filterInfo + validationNote;
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -161,6 +191,22 @@ export default function Consultant() {
     if (!text || isLoading || sendingRef.current) return;
     if (dataLoading) {
       toast.info("กำลังโหลดข้อมูล... กรุณารอสักครู่");
+      return;
+    }
+
+    // Prevent accidental leakage: do not allow sending while filter is not ready.
+    if (
+      !filterInitialized ||
+      !contextFilter.subject ||
+      !contextFilter.gradeLevel ||
+      !contextFilter.classroom
+    ) {
+      toast.info("กรุณาเลือก วิชา/ชั้น/ห้อง ให้ครบก่อนถามพีท");
+      return;
+    }
+
+    if (filteredLogs.length === 0) {
+      toast.info("ไม่พบข้อมูลการสอนที่ตรงกับตัวกรอง กรุณาปรับตัวกรองก่อน");
       return;
     }
     sendingRef.current = true;
@@ -234,8 +280,8 @@ export default function Consultant() {
           if (jsonStr === "[DONE]") { streamDone = true; break; }
 
           try {
-            const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+            const parsed = JSON.parse(jsonStr) as SSEChunk;
+            const content = parsed.choices?.[0]?.delta?.content;
             if (content) upsertAssistant(content);
           } catch {
             textBuffer = line + "\n" + textBuffer;
@@ -253,10 +299,12 @@ export default function Consultant() {
           const jsonStr = raw.slice(6).trim();
           if (jsonStr === "[DONE]") continue;
           try {
-            const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+            const parsed = JSON.parse(jsonStr) as SSEChunk;
+            const content = parsed.choices?.[0]?.delta?.content;
             if (content) upsertAssistant(content);
-          } catch {}
+          } catch {
+            // ignore malformed SSE chunk
+          }
         }
       }
     } catch (e) {
@@ -351,7 +399,9 @@ export default function Consultant() {
               setExamContent((prev) => prev + delta);
               setTimeout(() => examBottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
             }
-          } catch {}
+          } catch {
+            // ignore malformed SSE chunk
+          }
         }
       }
     } catch (e) {
