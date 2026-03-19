@@ -29,9 +29,11 @@ export function ChatSidebar({ open, onOpenChange, context }: ChatSidebarProps) {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [lastDebug, setLastDebug] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const sendingRef = useRef(false);
+  const pendingAssistantIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -43,23 +45,23 @@ export function ChatSidebar({ open, onOpenChange, context }: ChatSidebarProps) {
     sendingRef.current = true;
 
     const userMsg: Msg = { id: genId(), role: "user", content: text };
+    const pendingId = genId();
+    pendingAssistantIdRef.current = pendingId;
     setInput("");
-    setMessages((prev) => [...prev, userMsg]);
+    setMessages((prev) => [
+      ...prev,
+      userMsg,
+      { id: pendingId, role: "assistant", content: "กำลังคิด..." },
+    ]);
     setIsLoading(true);
 
-    let assistantSoFar = "";
-
-    const upsertAssistant = (chunk: string) => {
-      assistantSoFar += chunk;
-      setMessages((prev) => {
-        const last = prev[prev.length - 1];
-        if (last?.role === "assistant") {
-          return prev.map((m, i) =>
-            i === prev.length - 1 ? { ...m, content: assistantSoFar } : m
-          );
-        }
-        return [...prev, { id: genId(), role: "assistant" as const, content: assistantSoFar }];
-      });
+    const setAssistant = (content: string) => {
+      const targetId = pendingAssistantIdRef.current;
+      setMessages((prev) =>
+        prev.map((m) =>
+          targetId && m.id === targetId ? { ...m, content } : m
+        )
+      );
     };
 
     try {
@@ -70,80 +72,125 @@ export function ChatSidebar({ open, onOpenChange, context }: ChatSidebarProps) {
         setIsLoading(false);
         return;
       }
+      const requestId =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID().slice(0, 8)
+          : Math.random().toString(36).slice(2, 10);
+      // Make sure user sees a trace even if request is blocked (CORS/preflight/etc.)
+      setLastDebug(`rid=${requestId} status=starting url=${chatUrl}`);
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 30_000);
+      const headers = await getEdgeFunctionHeaders();
+      headers["x-request-id"] = requestId;
+      const authHeader = String(headers.Authorization || "");
+      const token = authHeader.toLowerCase().startsWith("bearer ")
+        ? authHeader.slice(7).trim()
+        : authHeader.trim();
+      let tokenRef: string | null = null;
+      let tokenIss: string | null = null;
+      try {
+        const parts = token.split(".");
+        if (parts.length === 3) {
+          const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+          const json = atob(b64.padEnd(Math.ceil(b64.length / 4) * 4, "="));
+          const payload = JSON.parse(json) as { ref?: string; iss?: string };
+          tokenRef = payload?.ref ?? null;
+          tokenIss = payload?.iss ?? null;
+        }
+      } catch {}
+      setLastDebug(
+        `rid=${requestId} status=starting url=${chatUrl} authLen=${token.length} ref=${tokenRef ?? "-"} iss=${tokenIss ? tokenIss.replace("https://", "").slice(0, 28) : "-"}`
+      );
       const resp = await fetch(chatUrl, {
         method: "POST",
-        headers: getEdgeFunctionHeaders(),
+        headers,
         body: JSON.stringify({
           messages: [...messages, userMsg],
           context: context || "",
         }),
+        signal: controller.signal,
       });
+      window.clearTimeout(timeoutId);
+
+      const raw = await resp.text();
+      const data = (() => {
+        try {
+          return JSON.parse(raw) as unknown;
+        } catch {
+          return {};
+        }
+      })();
+      const content =
+        (data as { content?: string }).content ??
+        (data as { error?: string }).error ??
+        `Error ${resp.status}`;
 
       if (!resp.ok) {
-        const err = await resp.json().catch(() => ({ error: "Unknown error" }));
-        toast.error(err.error || `Error ${resp.status}`);
-        sendingRef.current = false;
-        setIsLoading(false);
-        return;
+        toast.error(content);
       }
 
-      if (!resp.body) throw new Error("No response body");
-
-      const reader = resp.body.getReader();
-      const decoder = new TextDecoder();
-      let textBuffer = "";
-      let streamDone = false;
-
-      while (!streamDone) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        textBuffer += decoder.decode(value, { stream: true });
-
-        let newlineIndex: number;
-        while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
-          let line = textBuffer.slice(0, newlineIndex);
-          textBuffer = textBuffer.slice(newlineIndex + 1);
-
-          if (line.endsWith("\r")) line = line.slice(0, -1);
-          if (line.startsWith(":") || line.trim() === "") continue;
-          if (!line.startsWith("data: ")) continue;
-
-          const jsonStr = line.slice(6).trim();
-          if (jsonStr === "[DONE]") {
-            streamDone = true;
-            break;
-          }
-
+      // If gateway says Invalid JWT, force user to re-login (stale cross-project session).
+      if (resp.status === 401 && raw.includes("Invalid JWT")) {
+        const authHeader = String(headers.Authorization || "");
+        // best-effort: include token ref/iss in recovery for easier debugging
+        const tokenParts = authHeader.toLowerCase().startsWith("bearer ")
+          ? authHeader.slice(7).trim().split(".")
+          : authHeader.trim().split(".");
+        let tokenRef = "-";
+        let tokenIss = "-";
+        if (tokenParts.length === 3) {
           try {
-            const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
-            if (content) upsertAssistant(content);
-          } catch {
-            textBuffer = line + "\n" + textBuffer;
-            break;
-          }
-        }
-      }
-
-      // Final flush
-      if (textBuffer.trim()) {
-        for (let raw of textBuffer.split("\n")) {
-          if (!raw) continue;
-          if (raw.endsWith("\r")) raw = raw.slice(0, -1);
-          if (raw.startsWith(":") || raw.trim() === "") continue;
-          if (!raw.startsWith("data: ")) continue;
-          const jsonStr = raw.slice(6).trim();
-          if (jsonStr === "[DONE]") continue;
-          try {
-            const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
-            if (content) upsertAssistant(content);
+            const b64 = tokenParts[1].replace(/-/g, "+").replace(/_/g, "/");
+            const json = atob(b64.padEnd(Math.ceil(b64.length / 4) * 4, "="));
+            const payload = JSON.parse(json) as { ref?: string; iss?: string };
+            tokenRef = payload?.ref ?? "-";
+            tokenIss = payload?.iss ?? "-";
           } catch {}
         }
+        let apikeyPrefix = "-";
+        try {
+          const apikey = String(headers.apikey || "");
+          apikeyPrefix = apikey ? apikey.slice(0, 16) : "-";
+        } catch {}
+
+        try {
+          sessionStorage.setItem(
+            "atlas_auth_recover",
+            JSON.stringify({
+              reason: "edge_gateway_invalid_jwt",
+              meta: {
+                requestId,
+                url: chatUrl,
+                lastDebug,
+                raw: raw.slice(0, 200),
+                tokenRef,
+                tokenIss,
+                apikeyPrefix,
+              },
+              ts: Date.now(),
+            })
+          );
+        } catch {}
+        setAssistant(
+          "เซสชันไม่ถูกต้อง (Invalid JWT). หยุดการเด้งไป login เพื่อให้ตรวจสอบ token ได้ก่อนครับ"
+        );
+      } else {
+      setLastDebug(
+        `rid=${requestId} status=${resp.status} url=${chatUrl} raw=${raw ? raw.slice(0, 160) : "(empty)"}`
+      );
+        setAssistant(content || "ไม่สามารถรับคำตอบได้ กรุณาลองใหม่อีกครั้งครับ");
       }
     } catch (e) {
       console.error("Chat error:", e);
-      toast.error("เกิดข้อผิดพลาดในการเชื่อมต่อ AI");
+      const msg =
+        e instanceof DOMException && e.name === "AbortError"
+          ? "พีทใช้เวลานานเกินไป กรุณาลองส่งใหม่อีกครั้งครับ"
+          : e instanceof Error
+            ? e.message
+            : "เกิดข้อผิดพลาดในการเชื่อมต่อ AI";
+      toast.error(msg);
+      setLastDebug(`error=${msg}`);
+      setAssistant(msg);
     } finally {
       setIsLoading(false);
       sendingRef.current = false;
@@ -199,6 +246,12 @@ export function ChatSidebar({ open, onOpenChange, context }: ChatSidebarProps) {
             <div ref={bottomRef} />
           </div>
         </ScrollArea>
+
+        {lastDebug && (
+          <div className="border-t border-border px-3 py-2 text-[11px] text-muted-foreground">
+            {lastDebug}
+          </div>
+        )}
 
         <div className="border-t border-border p-3">
           <form

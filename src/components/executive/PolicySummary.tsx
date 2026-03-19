@@ -46,7 +46,7 @@ Mastery ตามชั้น: ${Object.entries(gradeSummary).map(([g, v]) => `$
     try {
       const res = await fetch(getAiSummaryUrl(), {
         method: "POST",
-        headers: getEdgeFunctionHeaders(),
+        headers: await getEdgeFunctionHeaders(),
         body: JSON.stringify({ logs_summary: logsSummary, mode: "executive" }),
       });
       const data = await res.json().catch(() => ({}));

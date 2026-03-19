@@ -83,7 +83,7 @@ export function ExecutiveSummary({ logs, colorCounts, activeStrikeCount }: Execu
     queryFn: async () => {
       const res = await fetch(getAiSummaryUrl(), {
         method: "POST",
-        headers: getEdgeFunctionHeaders(),
+        headers: await getEdgeFunctionHeaders(),
         body: JSON.stringify({ logs_summary: summaryText }),
       });
       const json = await res.json().catch(() => ({}));

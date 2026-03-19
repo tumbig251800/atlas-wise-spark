@@ -55,19 +55,32 @@ function buildContextWithCitation(
 ): string {
   if (logs.length === 0) return "ไม่พบข้อมูลการสอนที่ตรงกับเงื่อนไข";
   
-  const sessionDetails = logs.slice(-10).map((l, index) => {
+  const slice = logs.slice(-10);
+  const sessionDetails = slice.map((l, index) => {
     const refId = `[REF-${index + 1}]`;
     const remedialCount = (l.remedial_ids || "").split(",").filter(x => x.trim() && x !== "[None]" && x !== "[N/A]").length;
     return `${refId} วันที่: ${l.teaching_date} | วิชา: ${l.subject} | ห้อง: ${l.grade_level}/${l.classroom} | หัวข้อ: ${l.topic || "ไม่ระบุ"} | Mastery: ${l.mastery_score}/5 | Gap: ${l.major_gap} | Remedial: ${remedialCount}/${l.total_students || 0} | Strategy: ${l.next_strategy || "ไม่ระบุ"} | Issue: ${l.key_issue || "ไม่ระบุ"}`;
   }).join("\n");
 
   const avgMastery = (logs.reduce((s, l) => s + l.mastery_score, 0) / logs.length).toFixed(1);
+
+  const refList = slice.map((_, i) => `[REF-${i + 1}]`).join(", ");
+  const extractedRemedialIds = [...new Set(
+    slice
+      .flatMap((l) => (l.remedial_ids || "").split(","))
+      .map((s) => s.trim())
+      .filter((s) => s && s !== "[None]" && s !== "[N/A]")
+  )];
+  const hasTotalStudents = slice.some((l) => (l.total_students ?? 0) > 0);
+  const hasRemedialIds = extractedRemedialIds.length > 0;
+
+  const guardNote = `\n\n[GUARD RULES — enforce ทุกคำตอบ]\n- REF ที่ถูกต้องในการสนทนานี้: ${refList} (ใช้ได้เฉพาะรายการนี้เท่านั้น)\n- ห้ามสร้าง REF รูปแบบอื่น เช่น [REF-19ก.พ.] หรือ [REF-ชื่อเรื่อง]\n- Remedial IDs ที่พบใน context: ${hasRemedialIds ? extractedRemedialIds.join(", ") : "ไม่มี"}\n- total_students ใน context: ${hasTotalStudents ? "มี" : "ไม่มี — ห้ามสร้างตัวเลข X/Y หรือ %"}\n- ห้ามสร้าง student ID ขึ้นเองเด็ดขาด ถ้าไม่มี ID ใน context ให้ตอบว่า \"ไม่พบรหัสนักเรียนในข้อมูล\"`;
   
   return `## ข้อมูลการสอนที่กรองแล้ว (${logs.length} คาบ)
 Mastery เฉลี่ย: ${avgMastery}/5
 
 ### รายละเอียด (ใช้ [REF-X] อ้างอิงเสมอ):
-${sessionDetails}`;
+${sessionDetails}${guardNote}`;
 }
 
 export default function Consultant() {
@@ -189,8 +202,14 @@ export default function Consultant() {
   const send = async () => {
     const text = input.trim();
     if (!text || isLoading || sendingRef.current) return;
+
+    const pushAssistant = (content: string) => {
+      setMessages((prev) => [...prev, { id: genMsgId(), role: "assistant", content }]);
+    };
+
     if (dataLoading) {
       toast.info("กำลังโหลดข้อมูล... กรุณารอสักครู่");
+      pushAssistant("กำลังโหลดข้อมูลอยู่ครับ รอสักครู่แล้วลองส่งคำถามใหม่อีกครั้ง");
       return;
     }
 
@@ -202,11 +221,13 @@ export default function Consultant() {
       !contextFilter.classroom
     ) {
       toast.info("กรุณาเลือก วิชา/ชั้น/ห้อง ให้ครบก่อนถามพีท");
+      pushAssistant("ก่อนถามพีท กรุณาเลือก **วิชา/ชั้น/ห้อง** ให้ครบก่อนนะครับ เพื่อป้องกันข้อมูลปนกัน");
       return;
     }
 
     if (filteredLogs.length === 0) {
       toast.info("ไม่พบข้อมูลการสอนที่ตรงกับตัวกรอง กรุณาปรับตัวกรองก่อน");
+      pushAssistant("ไม่พบข้อมูลการสอนที่ตรงกับตัวกรองนี้ครับ ลองปรับ **วิชา/ชั้น/ห้อง** แล้วถามใหม่อีกครั้ง");
       return;
     }
     sendingRef.current = true;
@@ -238,78 +259,40 @@ export default function Consultant() {
         setIsLoading(false);
         return;
       }
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 30_000);
       const resp = await fetch(chatUrl, {
         method: "POST",
-        headers: getEdgeFunctionHeaders(),
+        headers: await getEdgeFunctionHeaders(),
         body: JSON.stringify({
           messages: [...messages, userMsg],
           context,
         }),
+        signal: controller.signal,
       });
+      window.clearTimeout(timeoutId);
+
+      const data = await resp.json().catch(() => ({}));
+      const content =
+        (data as { content?: string }).content ??
+        (data as { error?: string }).error ??
+        `Error ${resp.status}`;
 
       if (!resp.ok) {
-        const err = await resp.json().catch(() => ({ error: "Unknown error" }));
-        toast.error(err.error || `Error ${resp.status}`);
-        sendingRef.current = false;
-        setIsLoading(false);
-        return;
+        toast.error(content);
       }
 
-      if (!resp.body) throw new Error("No response body");
-
-      const reader = resp.body.getReader();
-      const decoder = new TextDecoder();
-      let textBuffer = "";
-      let streamDone = false;
-
-      while (!streamDone) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        textBuffer += decoder.decode(value, { stream: true });
-
-        let newlineIndex: number;
-        while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
-          let line = textBuffer.slice(0, newlineIndex);
-          textBuffer = textBuffer.slice(newlineIndex + 1);
-
-          if (line.endsWith("\r")) line = line.slice(0, -1);
-          if (line.startsWith(":") || line.trim() === "") continue;
-          if (!line.startsWith("data: ")) continue;
-
-          const jsonStr = line.slice(6).trim();
-          if (jsonStr === "[DONE]") { streamDone = true; break; }
-
-          try {
-            const parsed = JSON.parse(jsonStr) as SSEChunk;
-            const content = parsed.choices?.[0]?.delta?.content;
-            if (content) upsertAssistant(content);
-          } catch {
-            textBuffer = line + "\n" + textBuffer;
-            break;
-          }
-        }
-      }
-
-      if (textBuffer.trim()) {
-        for (let raw of textBuffer.split("\n")) {
-          if (!raw) continue;
-          if (raw.endsWith("\r")) raw = raw.slice(0, -1);
-          if (raw.startsWith(":") || raw.trim() === "") continue;
-          if (!raw.startsWith("data: ")) continue;
-          const jsonStr = raw.slice(6).trim();
-          if (jsonStr === "[DONE]") continue;
-          try {
-            const parsed = JSON.parse(jsonStr) as SSEChunk;
-            const content = parsed.choices?.[0]?.delta?.content;
-            if (content) upsertAssistant(content);
-          } catch {
-            // ignore malformed SSE chunk
-          }
-        }
-      }
+      upsertAssistant(content || "ไม่สามารถรับคำตอบได้ กรุณาลองใหม่อีกครั้งครับ");
     } catch (e) {
       console.error("Chat error:", e);
-      toast.error("เกิดข้อผิดพลาดในการเชื่อมต่อ AI");
+      const msg =
+        e instanceof DOMException && e.name === "AbortError"
+          ? "พีทใช้เวลานานเกินไป กรุณาลองส่งใหม่อีกครั้งครับ"
+          : e instanceof Error
+            ? e.message
+            : "เกิดข้อผิดพลาดในการเชื่อมต่อ AI";
+      toast.error(msg);
+      upsertAssistant(msg);
     } finally {
       setIsLoading(false);
       sendingRef.current = false;
@@ -367,7 +350,7 @@ export default function Consultant() {
     try {
       const res = await fetch(url, {
         method: "POST",
-        headers: getAiExamGenHeaders(),
+        headers: await getAiExamGenHeaders(),
         body: JSON.stringify({ gradeLevel, classroom, subject, unit: selectedUnit, context }),
       });
 

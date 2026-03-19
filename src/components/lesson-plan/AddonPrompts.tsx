@@ -32,11 +32,23 @@ export function AddonPrompts({ lessonContent }: Props) {
       }
       const resp = await fetch(chatUrl, {
         method: "POST",
-        headers: getEdgeFunctionHeaders(),
+        headers: await getEdgeFunctionHeaders(),
         body: JSON.stringify({ addonType, topic: lessonContent }),
       });
 
-      if (!resp.ok || !resp.body) throw new Error("Failed");
+      if (!resp.ok || !resp.body) {
+        const raw = await resp.text().catch(() => "");
+        const msg = (() => {
+          try {
+            const j = JSON.parse(raw) as { error?: string; message?: string };
+            return j.error || j.message || raw;
+          } catch {
+            return raw;
+          }
+        })();
+        toast.error(msg || "เกิดข้อผิดพลาดในการสร้างเนื้อหาเสริม");
+        throw new Error("Failed");
+      }
 
       const reader = resp.body.getReader();
       const decoder = new TextDecoder();

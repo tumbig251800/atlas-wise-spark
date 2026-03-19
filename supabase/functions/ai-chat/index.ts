@@ -1,10 +1,36 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { validateAiChatOutput } from "../_shared/aiChatValidator.ts";
+import { requireAtlasUser } from "../_shared/atlasAuth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+    "authorization, x-client-info, apikey, content-type, x-request-id, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
+
+type AiChatResponse = {
+  ok: boolean;
+  content: string;
+  source: "gemini" | "fast_guard" | "fallback";
+  meta?: {
+    validationFailed?: boolean;
+    reason?: string;
+    requestId?: string;
+  };
+};
+
+function respond(
+  content: string,
+  source: AiChatResponse["source"],
+  status = 200,
+  meta?: AiChatResponse["meta"]
+): Response {
+  const body: AiChatResponse = { ok: status < 400, content, source, meta };
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
 
 const SYSTEM_PROMPT = `คุณคือ "พีท ร่างทอง" (Peat Rang-Thong) ที่ปรึกษาวิชาการ AI ของระบบ ATLAS Intelligence v1.3 (System-Control Edition)
 คุณเชี่ยวชาญในมาตรฐานคุณภาพการจัดการเรียนรู้ และ 6 กิจกรรมหลักทางการสอน:
@@ -72,12 +98,19 @@ Gap Types:
 - ใช้แนวคิด "ไม่บังคับ แต่เชิญชวน" — เสนอทางเลือกให้ครูตัดสินใจเอง
 - ตัวอย่างน้ำเสียง: "ถ้าหนูยังไม่พร้อม นั่งดูเพื่อนได้นะ" / "วันนี้ครูทำได้ดีมากเลยครับที่สังเกตเห็นปัญหานี้"
 
-## ID-Based Precision — ระบุ ID นักเรียนเสมอ
-- เมื่อ context มีข้อมูล ID นักเรียน (เช่น Special Care IDs, Remedial IDs)
-  ทุกคำแนะนำต้องระบุ ID เช่น "สำหรับนักเรียน ID 103 พีทแนะนำให้..."
-- เมื่อแนะนำ Buddy/Peer Tutor ต้องระบุคู่จับ เช่น
-  "จับคู่ ID 103 (กลุ่มอ่อน) กับ ID 205 (กลุ่มเก่ง)"
-- หาก context ไม่มี ID ให้แนะนำครูว่า "ถ้าคุณครูบอก ID นักเรียนมา พีทจะช่วยจับคู่บัดดี้ให้ครับ"
+## ID-Based Precision — ระบุ ID เฉพาะที่มีใน context เท่านั้น
+
+[HARD RULE - NO ID INVENTION]
+ห้ามสร้าง student ID ขึ้นเองเด็ดขาด ไม่ว่ากรณีใดๆ
+การระบุ ID อนุญาตเฉพาะเมื่อ ID ปรากฏใน context จริงเท่านั้น เช่น:
+✅ context มี "Remedial IDs: 101, 205, 312" → ระบุได้ว่า "นักเรียน ID 101, 205, 312"
+✅ context มี "Special Care: [103, 207]" → ระบุได้ว่า "นักเรียน ID 103 และ 207"
+
+❌ ห้าม: context มีแค่ "Remedial: 3/30" โดยไม่มี ID จริง → ต้องตอบว่า "ไม่พบรหัสนักเรียนในข้อมูล"
+❌ ห้าม: สร้าง ID สมมติ เช่น "ID 001" หรือ ID ใดๆ ที่ไม่ได้มาจาก context
+
+ถ้า context ไม่มี ID และผู้ใช้ต้องการให้ช่วยจับคู่บัดดี้ ให้ตอบว่า:
+"ไม่พบรหัสนักเรียนในข้อมูล หากคุณครูต้องการให้พีทช่วยจับคู่บัดดี้ กรุณาระบุ ID นักเรียนในช่องบันทึกครับ"
 
 ## Assessment Logic — เชื่อมโยงสมรรถนะกับ Rubric
 - เมื่อวิเคราะห์สมรรถนะ K-P-A ต้องสรุปว่าพฤติกรรมที่เห็น "ควรได้คะแนนระดับใดในตาราง Rubric"
@@ -125,13 +158,24 @@ Gap Types:
 ห้ามสร้างหรือคำนวณตัวเลขเอง ต้องใช้เฉพาะตัวเลขที่มีใน context เท่านั้น (เช่น Remedial X/Y, Mastery, เปอร์เซ็นต์)
 หากผู้ใช้ถาม/อ้างอิง "Growth Velocity" หรือเมตริก QWR (Baseline Avg, Current Avg, จำนวนคาบ) ต้องใช้เฉพาะตัวเลขที่อยู่ในบล็อก [QWR METRICS] เท่านั้น หากไม่มีบล็อกนี้ ให้ตอบว่า "ไม่พบข้อมูล QWR ในระบบสำหรับตัวกรองที่เลือก"
 
-## [CRITICAL - CITATION MANDATORY]
-1. ห้ามอ้างอิงข้อมูลนอกเหนือจากที่ระบุใน [REF-X] เด็ดขาด
-2. ห้ามกล่าวถึงวิชาที่ไม่มีใน [REF-X] หรือ [ANSWER SCOPE] โดยเด็ดขาด — เช่น ถ้า SCOPE = คณิตศาสตร์ ห้ามพูดถึง ศิลปะ ภาษาไทย หรือวิชาอื่น
-3. หากข้อมูลไม่ตรงกับวิชา/ห้องที่ระบุใน [ACTIVE FILTER] ให้ตอบว่า "ไม่พบข้อมูลในระบบ"
-4. ทุกครั้งที่อ้างอิงข้อมูล ต้องระบุ [REF-X] พร้อมวันที่และหัวข้อ เช่น "[REF-1] (22 ม.ค. หัวข้อเศษส่วน) Mastery = 2/5"
-5. หากไม่มีข้อมูลที่เกี่ยวข้อง ให้ตอบตรงๆ ว่า:
-   "ไม่พบข้อมูลการสอน [วิชา] [ห้อง] ในระบบ กรุณาเลือกวิชา/ห้องที่ถูกต้องจากตัวกรองด้านบน"
+## [HARD RULE — NO REMEDIAL INVENTION]
+การกล่าวถึง Remedial ในรูปแบบ X/Y หรือ % อนุญาตเฉพาะเมื่อ context มีข้อมูลครบจริงเท่านั้น:
+✅ context มี total_students หรือมี "Remedial: X/Y" ชัดเจน → อ้างได้ตรงตาม context เท่านั้น
+❌ ถ้า context ไม่มี total_students → ห้ามสร้าง X/Y หรือ % ขึ้นเอง → ต้องตอบว่า "ไม่พบข้อมูลจำนวนนักเรียนในระบบ"
+❌ ถ้า context ระบุ Remedial = 0 หรือ Remedial IDs ว่าง → ต้องตอบว่า "ไม่มีนักเรียนที่ต้องซ่อมเสริมในคาบนี้ครับ"
+
+## [CRITICAL — CITATION FORMAT ENFORCEMENT]
+รูปแบบอ้างอิงที่อนุญาตเท่านั้น: [REF-1], [REF-2], [REF-3] ... [REF-N]
+→ X ต้องเป็นตัวเลขอารบิกเท่านั้น
+
+❌ ห้ามสร้าง REF รูปแบบอื่น เช่น:
+[REF-19ก.พ.], [REF-เศษส่วน], [REF-ม.ค.], [REF-คณิต-ป1] หรือ label รูปแบบอื่นใด
+
+กฎการอ้างอิง:
+1. ทุกประโยคที่กล่าวถึงข้อมูลการสอนต้องมี [REF-<เลข>] กำกับ
+2. [REF-<เลข>] ต้องตรงกับหมายเลขที่มีอยู่ใน context เท่านั้น
+3. ถ้า context ไม่มี [REF-<เลข>] → ให้ตอบว่า:
+   "ไม่พบข้อมูลในระบบ กรุณาเลือกวิชา/ห้องจากตัวกรองด้านบนครับ"
 
 ตอบเป็นภาษาไทย กระชับ ใช้งานได้จริง ใช้ Markdown formatting
 ถ้าเป็นครู: แนะนำ Activity Ideas ตาม Gap ที่พบ พร้อมตัวอย่างกิจกรรมเป็นข้อๆ มีโครงสร้างชัดเจน
@@ -142,6 +186,8 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const requestId = req.headers.get("x-request-id") ?? undefined;
+
   const url = new URL(req.url);
   if (req.method === "GET" && (url.pathname.endsWith("/health") || url.pathname === "/health")) {
     return new Response(
@@ -151,12 +197,27 @@ serve(async (req) => {
   }
 
   try {
+    const auth = await requireAtlasUser(req);
+    if (!auth.ok) {
+      return respond(auth.error, "fallback", auth.status, requestId ? { requestId } : undefined);
+    }
+
     const { messages, context } = await req.json();
     const rawKey = Deno.env.get("GEMINI_API_KEY") ?? "";
     const GEMINI_API_KEY = rawKey.replace(/[^\x20-\x7E]/g, "").trim();
     if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not configured");
 
-    const contextPreamble = `ก่อนตอบ: ตรวจสอบว่า [ACTIVE FILTER] และ [REF-X] มีเฉพาะวิชาและห้องที่ผู้ใช้เลือกเท่านั้น ห้ามอ้างอิงหรือกล่าวถึงวิชาที่ไม่มีใน context เด็ดขาด`;
+    const contextPreamble = `
+[CONTEXT RULES — อ่านก่อนตอบทุกครั้ง]
+1. อ้างอิงได้เฉพาะข้อมูลใน [REF-1]..[REF-N] ที่ระบุด้านล่างเท่านั้น
+2. REF format: ใช้ได้เฉพาะ [REF-<ตัวเลข>] เช่น [REF-1], [REF-2]
+   ห้ามสร้าง [REF-วันที่], [REF-ชื่อวิชา] หรือ label รูปแบบอื่นใด
+3. Remedial X/Y หรือ %: ใช้ได้เฉพาะตัวเลขจาก context เท่านั้น
+   ถ้าไม่มี total_students → ห้ามสร้างตัวเลขขึ้นเอง และต้องตอบว่า "ไม่พบข้อมูลจำนวนนักเรียนในระบบ"
+4. Remedial IDs / Special Care IDs: ระบุได้เฉพาะ ID ที่ปรากฏใน context เท่านั้น
+   ถ้าไม่มี → ตอบว่า "ไม่พบรหัสนักเรียนในข้อมูล"
+5. วิชาและห้องเรียน: กล่าวถึงได้เฉพาะที่อยู่ใน [ACTIVE FILTER] และห้ามนำวิชา/ห้องอื่นมาปน
+`.trim();
     const systemContent = context
       ? `${SYSTEM_PROMPT}\n\n${contextPreamble}\n\nบริบทข้อมูลปัจจุบัน:\n${context}`
       : SYSTEM_PROMPT;
@@ -167,91 +228,116 @@ serve(async (req) => {
       parts: [{ text: m.content }],
     }));
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}`;
-    const response = await fetch(geminiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: systemContent }] },
-        contents: contents.length > 0 ? contents : [{ role: "user", parts: [{ text: "สวัสดีครับ" }] }],
-        generationConfig: { temperature: 0 },
-      }),
-    });
+    // Fast deterministic guards (avoid calling Gemini when answer is already known from context)
+    const lastUser = [...messages].reverse().find((m: { role: string }) => m.role !== "assistant");
+    const q = String(lastUser?.content ?? "").toLowerCase();
+    const ctx = String(context ?? "");
+    const hasIdsInContext = /Remedial IDs:|Special Care:|Remedial IDs ที่พบ/i.test(ctx) && /\b\d{2,10}\b/.test(ctx);
+    const hasTotalStudents = /Remedial:\s*\d+\s*\/\s*\d+/i.test(ctx) || /total_students.*มี/i.test(ctx);
+
+    const asksId =
+      q.includes(" id") ||
+      q.includes("เลขประจำตัว") ||
+      q.includes("รหัสนักเรียน") ||
+      q.includes("ดูแลพิเศษ");
+    if (asksId && !hasIdsInContext) {
+      return respond("ไม่พบรหัสนักเรียนในข้อมูล", "fast_guard", 200, requestId ? { requestId } : undefined);
+    }
+
+    const asksRemedial =
+      q.includes("remedial") ||
+      q.includes("ซ่อมเสริม") ||
+      q.includes("x/y") ||
+      q.includes("%");
+    if (asksRemedial && !hasTotalStudents) {
+      return respond("ไม่พบข้อมูลจำนวนนักเรียนในระบบ", "fast_guard", 200, requestId ? { requestId } : undefined);
+    }
+
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 25_000);
+    let response: Response;
+    try {
+      response = await fetch(geminiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemContent }] },
+          contents: contents.length > 0 ? contents : [{ role: "user", parts: [{ text: "สวัสดีครับ" }] }],
+          generationConfig: { temperature: 0 },
+        }),
+        signal: controller.signal,
+      });
+    } catch (e) {
+      if (e instanceof Error && e.name === "AbortError") {
+        return respond(
+          "พีทใช้เวลานานเกินไป กรุณาลองถามใหม่อีกครั้งครับ",
+          "fallback",
+          504,
+          requestId ? { requestId } : undefined
+        );
+      }
+      throw e;
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!response.ok) {
       const t = await response.text();
       console.error("Gemini chat error:", response.status, t);
       if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "คำขอมากเกินไป กรุณารอสักครู่แล้วลองใหม่" }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        return respond(
+          "คำขอมากเกินไป กรุณารอสักครู่แล้วลองใหม่ครับ",
+          "fallback",
+          429,
+          requestId ? { requestId } : undefined
         );
       }
       if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "เครดิต AI หมด กรุณาเติมเครดิตที่ Google AI Studio" }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        return respond(
+          "เครดิต AI หมด กรุณาเติมเครดิตที่ Google AI Studio",
+          "fallback",
+          402,
+          requestId ? { requestId } : undefined
         );
       }
       if (response.status === 400 || response.status === 403) {
-        return new Response(
-          JSON.stringify({ error: "GEMINI_API_KEY ไม่ถูกต้อง กรุณาตรวจสอบใน Supabase Edge Functions → Secrets" }),
-          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        return respond(
+          "GEMINI_API_KEY ไม่ถูกต้อง กรุณาตรวจสอบใน Supabase Edge Functions → Secrets",
+          "fallback",
+          401,
+          requestId ? { requestId } : undefined
         );
       }
-      return new Response(
-        JSON.stringify({ error: `Gemini error (${response.status}). ดู Supabase Logs สำหรับรายละเอียด` }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      return respond(
+        `Gemini error (${response.status}). ดู Supabase Logs สำหรับรายละเอียด`,
+        "fallback",
+        500,
+        requestId ? { requestId } : undefined
       );
     }
 
-    // Transform Gemini SSE → OpenAI-compatible SSE for frontend
-    const encoder = new TextEncoder();
-    const decoder = new TextDecoder();
-    const stream = new ReadableStream({
-      async start(controller) {
-        const reader = response.body!.getReader();
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) {
-              controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-              break;
-            }
-            const chunk = decoder.decode(value);
-            const lines = chunk.split("\n");
-            for (const line of lines) {
-              if (!line.startsWith("data: ")) continue;
-              const jsonStr = line.slice(6).trim();
-              if (!jsonStr || jsonStr === "[DONE]") continue;
-              try {
-                const parsed = JSON.parse(jsonStr);
-                const text = parsed?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-                if (text) {
-                  const openAiChunk = { choices: [{ delta: { content: text } }] };
-                  controller.enqueue(encoder.encode(`data: ${JSON.stringify(openAiChunk)}\n\n`));
-                }
-              } catch {
-                // skip malformed chunks
-              }
-            }
-          }
-        } catch (e) {
-          console.error("ai-chat stream error:", e);
-        } finally {
-          controller.close();
-        }
-      },
-    });
+    const data = await response.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 
-    return new Response(stream, {
-      headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
-    });
+    const validation = validateAiChatOutput(systemContent, text);
+    if (!validation.ok) {
+      return respond(
+        "ไม่พบข้อมูลในระบบสำหรับตัวกรองที่เลือก หรือคำตอบมีการอ้างอิงที่ไม่ถูกต้อง กรุณาลองถามใหม่อีกครั้ง",
+        "fallback",
+        200,
+        { validationFailed: true, reason: validation.reason, ...(requestId ? { requestId } : {}) }
+      );
+    }
+
+    return respond(text, "gemini", 200, requestId ? { requestId } : undefined);
   } catch (e) {
     console.error("chat error:", e);
-    return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    return respond(
+      e instanceof Error ? e.message : "Unknown error",
+      "fallback",
+      500,
+      requestId ? { requestId } : undefined
     );
   }
 });

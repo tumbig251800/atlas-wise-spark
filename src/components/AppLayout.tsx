@@ -46,10 +46,10 @@ function buildChatContext(
 
   const avgMastery = (recentLogs.reduce((s, l) => s + l.mastery_score, 0) / recentLogs.length).toFixed(1);
 
-  // Build [REF-X] lines with traceable IDs: [REF-19ก.พ.-คณิต-ป.2/1]
-  const refLines = recentLogs.map((l) => {
-    const shortDate = toThaiShortDate(l.teaching_date);
-    const refId = `REF-${shortDate}-${l.subject}-${l.grade_level}/${l.classroom}`;
+  // Build [REF-X] lines with numeric-only IDs.
+  // Requirement: aiChatValidator only accepts [REF-<digits>], e.g. [REF-1]..[REF-N].
+  const refLines = recentLogs.map((l, idx) => {
+    const refId = `REF-${idx + 1}`;
     const remedialIds = l.remedial_ids || "-";
     const total = l.total_students ?? "?";
     const remedialCount = l.remedial_ids ? l.remedial_ids.split(",").filter(Boolean).length : 0;

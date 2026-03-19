@@ -2,16 +2,16 @@ project_id = "ebyelctqcdhjmqujeskx"
 
 # Phase 2.2: verify_jwt=true — ป้องกันการเรียกโดยไม่มี JWT (401 ถ้าไม่มี Authorization)
 [functions.ai-chat]
-verify_jwt = true
+verify_jwt = false
 
 [functions.ai-summary]
-verify_jwt = true
+verify_jwt = false
 
 [functions.ai-lesson-plan]
-verify_jwt = true
+verify_jwt = false
 
 [functions.atlas-diagnostic]
-verify_jwt = true
+verify_jwt = false
 
 [functions.ai-exam-gen]
-verify_jwt = true
+verify_jwt = false

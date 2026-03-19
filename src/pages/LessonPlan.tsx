@@ -100,7 +100,7 @@ export default function LessonPlan() {
       }
       const resp = await fetch(chatUrl, {
         method: "POST",
-        headers: getEdgeFunctionHeaders(),
+        headers: await getEdgeFunctionHeaders(),
         body: JSON.stringify({
           ...config,
           context,
@@ -108,8 +108,19 @@ export default function LessonPlan() {
       });
 
       if (!resp.ok || !resp.body) {
-        if (resp.status === 429) { toast.error("คำขอมากเกินไป กรุณารอสักครู่"); return; }
-        if (resp.status === 402) { toast.error("เครดิต AI หมด"); return; }
+        const raw = await resp.text().catch(() => "");
+        const msg = (() => {
+          try {
+            const j = JSON.parse(raw) as { error?: string; message?: string };
+            return j.error || j.message || raw;
+          } catch {
+            return raw;
+          }
+        })();
+        if (resp.status === 429) { toast.error(msg || "คำขอมากเกินไป กรุณารอสักครู่"); return; }
+        if (resp.status === 402) { toast.error(msg || "เครดิต AI หมด"); return; }
+        if (resp.status === 401) { toast.error(msg || "เซสชันไม่ถูกต้อง กรุณาเข้าสู่ระบบใหม่"); return; }
+        toast.error(msg || "เกิดข้อผิดพลาดในการสร้างแผนการสอน");
         throw new Error("Failed");
       }
 

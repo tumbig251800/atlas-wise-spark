@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { requireAtlasUser } from "../_shared/atlasAuth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -181,6 +182,14 @@ serve(async (req) => {
   }
 
   try {
+    const auth = await requireAtlasUser(req);
+    if (!auth.ok) {
+      return new Response(JSON.stringify({ error: auth.error }), {
+        status: auth.status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { logId, remedialStatuses } = await req.json() as {
       logId: string;
       remedialStatuses?: { studentId: string; status: "pass" | "stay" }[];

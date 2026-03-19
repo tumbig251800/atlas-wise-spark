@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { signIn, signUp } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -13,8 +13,18 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [recoverInfo, setRecoverInfo] = useState<string | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("atlas_auth_recover");
+      if (!raw) return;
+      setRecoverInfo(raw);
+      sessionStorage.removeItem("atlas_auth_recover");
+    } catch {}
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,6 +65,15 @@ export default function Login() {
             AI Academic Consultant Platform
           </p>
         </div>
+
+        {recoverInfo && (
+          <div className="text-xs text-yellow-300 border border-yellow-300/20 bg-yellow-300/10 rounded p-3">
+            <div className="font-medium mb-1">ระบบตรวจพบเซสชันไม่ถูกต้อง</div>
+            <div className="text-muted-foreground break-words">
+              {recoverInfo}
+            </div>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {isSignUp && (

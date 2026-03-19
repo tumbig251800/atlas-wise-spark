@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { validateSummary } from "../_shared/summaryValidator.ts";
+import { requireAtlasUser } from "../_shared/atlasAuth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -42,6 +43,14 @@ serve(async (req) => {
   }
 
   try {
+    const auth = await requireAtlasUser(req);
+    if (!auth.ok) {
+      return new Response(JSON.stringify({ error: auth.error }), {
+        status: auth.status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const body = await req.json().catch(() => ({}));
     const logs_summary = body?.logs_summary ?? "ไม่มีข้อมูล";
     const mode = body?.mode ?? "default";

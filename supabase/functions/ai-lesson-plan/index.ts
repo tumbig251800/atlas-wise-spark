@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { requireAtlasUser } from "../_shared/atlasAuth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -20,6 +21,14 @@ serve(async (req) => {
   }
 
   try {
+    const auth = await requireAtlasUser(req);
+    if (!auth.ok) {
+      return new Response(JSON.stringify({ error: auth.error }), {
+        status: auth.status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { planType, topic, gradeLevel, classroom, subject, hours, context, addonType, includeWorksheets } = await req.json();
     const rawKey = Deno.env.get("GEMINI_API_KEY") ?? "";
     const GEMINI_API_KEY = rawKey.replace(/[^\x20-\x7E]/g, "").trim();
