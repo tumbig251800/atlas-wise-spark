@@ -1,73 +1,140 @@
-# Welcome to your Lovable project
+# ATLAS Teaching System
 
-## Project info
+ATLAS (Adaptive Teaching & Learning Analytics System) is a web app that helps teachers and school leaders record teaching outcomes, analyze classroom signals, and generate AI-assisted teaching plans.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+ATLAS (Adaptive Teaching & Learning Analytics System) คือเว็บแอปที่ช่วยครูและผู้บริหารโรงเรียนบันทึกผลหลังสอน วิเคราะห์สัญญาณการเรียนรู้ในห้องเรียน และสร้างแผนการสอนด้วย AI
 
-## How can I edit this code?
+## Core Features | คุณสมบัติหลัก
 
-There are several ways of editing your application.
+- AI Consultant ("Peat Rang-Thong") for evidence-based classroom insights
+- AI Lesson Plan generation with streaming responses
+- AI Summary for executive and policy-level overviews
+- AI Exam generation and diagnostic support
+- Scope-aware analysis by subject/classroom with citation style (`[REF-x]`)
+- Validation-focused safety layer to reduce unsupported claims
 
-**Use Lovable**
+- ที่ปรึกษา AI ("พีท ร่างทอง") สำหรับวิเคราะห์เชิงหลักฐานจากข้อมูลจริง
+- สร้างแผนการสอนด้วย AI แบบตอบผลลัพธ์ต่อเนื่อง (streaming)
+- สรุปภาพรวมสำหรับผู้บริหารและเชิงนโยบาย
+- สร้างข้อสอบและช่วยวินิจฉัยจุดเสี่ยงการเรียนรู้
+- ควบคุมขอบเขตตามวิชา/ชั้น/ห้อง พร้อมรูปแบบการอ้างอิง (`[REF-x]`)
+- มีชั้นความปลอดภัยด้านการตรวจความสมเหตุสมผลของคำตอบ AI
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## Tech Stack | เทคโนโลยี
 
-Changes made via Lovable will be committed automatically to this repo.
+### Frontend
 
-**Use your preferred IDE**
+- React + TypeScript + Vite
+- Tailwind CSS + shadcn-ui
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Backend
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+- Supabase (Auth, Postgres, Edge Functions)
+- Deno-based Edge Functions for AI workloads
 
-Follow these steps:
+### AI
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+- Gemini API (configured via server-side secrets)
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+## Repository Structure | โครงสร้างโปรเจกต์
 
-# Step 3: Install the necessary dependencies.
-npm i
+```text
+src/                           # Frontend pages, components, hooks, and libs
+supabase/config.toml           # Function-level deploy/auth config
+supabase/functions/            # Edge Functions (ai-chat, ai-summary, ai-lesson-plan, etc.)
+supabase/functions/_shared/    # Shared helpers (auth guard, validators)
+docs/                          # Operational notes, test evidence, runbooks
+```
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+## Environment Variables | ตัวแปรแวดล้อม
+
+Create `.env.local` (or `.env`) for frontend development:
+
+สร้างไฟล์ `.env.local` (หรือ `.env`) สำหรับฝั่ง frontend:
+
+```bash
+VITE_SUPABASE_URL=https://<project-ref>.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=<supabase-publishable-anon-key>
+```
+
+Server-side secrets are configured in Supabase (not in repo):
+
+ค่า secrets ฝั่ง server ต้องตั้งใน Supabase เท่านั้น (ไม่เก็บใน repo):
+
+- `GEMINI_API_KEY`
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` (only where required)
+
+## Local Development | วิธีรันในเครื่อง
+
+```bash
+# 1) Install dependencies
+npm install
+
+# 2) Start dev server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+Default local URL (Vite): `http://localhost:8080/`
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+URL ปกติสำหรับรัน local (Vite): `http://localhost:8080/`
 
-**Use GitHub Codespaces**
+## Deployment Notes | แนวทาง Deploy
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### Frontend
 
-## What technologies are used for this project?
+Deploy frontend to your hosting target (for example, Vercel).
 
-This project is built with:
+### Supabase Edge Functions
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+Functions are deployed via Supabase (CLI or Dashboard), including:
 
-## How can I deploy this project?
+- `ai-chat`
+- `ai-summary`
+- `ai-lesson-plan`
+- `ai-exam-gen`
+- `atlas-diagnostic`
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+Function auth strategy is managed through:
 
-## Can I connect a custom domain to my Lovable project?
+- `supabase/config.toml` (`verify_jwt` settings)
+- In-function manual auth guard (`requireAtlasUser`) in shared helpers
 
-Yes, you can!
+แนวทาง auth ของฟังก์ชันจะคุมผ่าน:
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+- `supabase/config.toml` (ค่า `verify_jwt`)
+- ตัวตรวจ auth ในโค้ด (`requireAtlasUser`) จาก shared helpers
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+## Verification Checklist (Production) | เช็กลิสต์ยืนยันหลัง Deploy
+
+After deploying `ai-lesson-plan`, verify gateway/auth behavior with `curl`:
+
+หลัง deploy `ai-lesson-plan` ให้ทดสอบ auth ด้วย `curl`:
+
+1. No `Authorization` header -> expect app-level 401 (`Missing Authorization`)
+2. `Authorization: Bearer <anon-key>` -> expect app-level auth rejection, not gateway-level `{"code":401,"message":"Invalid JWT"}`
+3. Logged-in app flow -> lesson plan generation should stream or complete
+
+1. ไม่ส่ง `Authorization` -> ควรได้ 401 จากโค้ดแอป (`Missing Authorization`)
+2. ส่ง `Authorization: Bearer <anon-key>` -> ควรถูกปฏิเสธจากโค้ดแอป ไม่ใช่ gateway `{"code":401,"message":"Invalid JWT"}`
+3. ทดสอบจากแอปที่ล็อกอินแล้ว -> ควรสร้างแผนการสอนได้แบบ stream หรือสำเร็จ
+
+Reference runbook: `docs/verify-ai-lesson-plan-deploy.md`
+
+## Security and Safety | ความปลอดภัย
+
+- Never commit API keys or access tokens
+- Keep all AI provider keys in Supabase secrets
+- Treat AI outputs as decision support; verify critical conclusions against source records
+
+- ห้าม commit API keys หรือ access tokens
+- เก็บคีย์ของผู้ให้บริการ AI ไว้ใน Supabase secrets เท่านั้น
+- ให้ถือผลลัพธ์ AI เป็นเครื่องมือช่วยตัดสินใจ และตรวจทานกับข้อมูลจริงก่อนใช้งาน
+
+## Contributing | แนวทางร่วมพัฒนา
+
+1. Create a branch from `main`
+2. Make focused changes
+3. Run local verification
+4. Open PR with summary + test evidence
