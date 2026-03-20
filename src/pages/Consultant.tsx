@@ -11,7 +11,7 @@ import { FilterSelect } from "@/components/shared/FilterSelect";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Send, Loader2, Filter, FileQuestion, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
-import { useDashboardData, loadPersistedFilters } from "@/hooks/useDashboardData";
+import { useDashboardData, loadPersistedFilters, getPersistedFiltersFromStorage, persistFilters } from "@/hooks/useDashboardData";
 import { useDiagnosticData, type DiagnosticFilter } from "@/hooks/useDiagnosticData";
 import { buildStrictAnswerTH, type DecisionObject } from "@/lib/atlasStrictNarrator";
 import { validateContextBeforeAI } from "@/lib/contextValidator";
@@ -114,21 +114,49 @@ export default function Consultant() {
 
   const dataLoading = dashboardLoading || diagnosticLoading;
 
-  // Auto-initialize filter to first available subject/grade/classroom once data loads
+  // Auto-initialize filter: prefer Dashboard's persisted filter, else last log
   useEffect(() => {
     if (!filterInitialized && !dashboardLoading && allLogs.length > 0) {
-      // allLogs is ordered ascending by teaching_date in useDashboardData.
-      // Prefer the most recent session to avoid initializing to a stale class/subject.
-      const first = allLogs[allLogs.length - 1];
-      setContextFilter({
-        subject: first.subject,
-        gradeLevel: first.grade_level,
-        classroom: String(first.classroom),
-      });
+      const persisted = getPersistedFiltersFromStorage();
+      const opts = {
+        grades: [...new Set(allLogs.map((l) => l.grade_level))],
+        classrooms: [...new Set(allLogs.map((l) => String(l.classroom ?? "")))],
+        subjects: [...new Set(allLogs.map((l) => l.subject))],
+      };
+      const persistedValid =
+        persisted &&
+        opts.grades.includes(persisted.gradeLevel) &&
+        opts.classrooms.includes(persisted.classroom) &&
+        opts.subjects.includes(persisted.subject);
+      if (persistedValid) {
+        setContextFilter({
+          subject: persisted!.subject,
+          gradeLevel: persisted!.gradeLevel,
+          classroom: persisted!.classroom,
+        });
+      } else {
+        const last = allLogs[allLogs.length - 1];
+        setContextFilter({
+          subject: last.subject,
+          gradeLevel: last.grade_level,
+          classroom: String(last.classroom),
+        });
+      }
       setFilterInitialized(true);
     }
   }, [filterInitialized, dashboardLoading, allLogs]);
-  
+
+  // Persist filter when user changes it (sync with Dashboard)
+  useEffect(() => {
+    if (filterInitialized && contextFilter.subject && contextFilter.gradeLevel && contextFilter.classroom) {
+      persistFilters({
+        subject: contextFilter.subject,
+        gradeLevel: contextFilter.gradeLevel,
+        classroom: contextFilter.classroom,
+      });
+    }
+  }, [filterInitialized, contextFilter.subject, contextFilter.gradeLevel, contextFilter.classroom]);
+
   // Filter logs by context to prevent Data Leakage
   const filteredLogs = allLogs.filter(log => {
     const matchSubject = !contextFilter.subject || log.subject === contextFilter.subject;

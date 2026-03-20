@@ -24,6 +24,19 @@ export function loadPersistedFilters(): DashboardFilters {
   return { gradeLevel: "", classroom: "", subject: "" };
 }
 
+/** Load filters from localStorage (Dashboard persist). Use for Consultant sync. */
+export function getPersistedFiltersFromStorage(): DashboardFilters | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as DashboardFilters;
+    if (parsed?.subject && parsed?.gradeLevel && parsed?.classroom) return parsed;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export function persistFilters(filters: DashboardFilters) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(filters));
 }
