@@ -9,79 +9,58 @@ alwaysApply: true
 ATLAS = Adaptive Teaching & Learning Analytics System
 - Tech Stack: React + TypeScript + Vite + Supabase + Deno Edge Functions
 - AI Consultant: "พีท ร่างทอง" (Peat Rang-Thong)
+- **สรุปการแก้ไขล่าสุด (Edge + AI):** `docs/PROJECT-EDGE-AI-SUMMARY-2026-03.md`
 
-## Current Phase: Data Leakage Fix v2 (2026-02-23)
-
-### Completed
-- [x] SCOPE assertion ใน Consultant.tsx — บังคับให้ AI ตอบเฉพาะวิชาที่มีใน filteredLogs
-- [x] Strengthen CITATION MANDATORY ใน ai-chat — ห้ามกล่าวถึงวิชาที่ไม่มีใน SCOPE
-- [x] Context preamble — เตือน AI ก่อนตอบให้ตรวจสอบ filter
-- [x] Switch AI model: gemini-2.0-flash (รองรับ Gemini API Key)
-- [x] Improve error messages: 401/403, 429, 402
-
-## Previous Phase: Bug Fixes (2026-02-22)
+## Current Phase: Edge Auth + Exam Gen + Docs (2026-03-21)
 
 ### Completed
-- [x] Phase 1: Deterministic Normalization (topic_aliases table + topicNormalizer.ts)
-- [x] Phase 2: Eliminate Sycophancy (ai-chat SYSTEM_PROMPT revamp)
-- [x] Phase 3: Data Leakage Fix (context filtering by subject/class)
+- [x] `verify_jwt = false` + `requireAtlasUser` — ai-chat, ai-summary, ai-lesson-plan, ai-exam-gen, atlas-diagnostic (config.toml)
+- [x] ai-chat v32 — bundle ตรง repo, บังคับ JWT; curl ไม่มี auth → 401
+- [x] Executive → AI Policy Advice → ปุ่ม **วิเคราะห์** (ai-summary) ใช้งานได้
+- [x] **ai-exam-gen deploy** — แก้ gateway 401 ข้อสอบหลังหน่วย; health GET → 200; +402 ในโค้ด
+- [x] Consultant — toast error อ่าน `message`/`content` จาก API
+- [x] `.gitignore` — `.cursor/plans/`
+- [x] เอกสาร: `docs/PROJECT-EDGE-AI-SUMMARY-2026-03.md`, README อัปเดต
 
-### Recent Bug Fix (2026-02-22)
-**Problem:** AI pulled ศิลปะ data when user asked about คณิตศาสตร์ ป.4/1
-**Root Cause:** No subject/class filtering in Consultant.tsx
-**Solution Implemented:**
-1. `useDiagnosticData.ts` - Added DiagnosticFilter parameter
-2. `Consultant.tsx` - Added context filter UI + filtered logs before sending to AI
-3. `ai-chat/index.ts` - Added CITATION MANDATORY rules with [REF-X] format
+## Previous: Data Leakage Fix v2 (2026-02-23)
 
-## Key Files Modified
-- `src/hooks/useDiagnosticData.ts` - Filter support
-- `src/pages/Consultant.tsx` - Filter UI + buildContextWithCitation
-- `supabase/functions/ai-chat/index.ts` - Strict citation rules
+### Completed
+- [x] SCOPE / CITATION MANDATORY ใน ai-chat + context preamble
+- [x] Consultant filter + sync กับ Dashboard
+- [x] Gemini 2.0 Flash + `GEMINI_API_KEY`
+- [x] Error messages 401/403/429/402
 
-## Phase 1.2: Verify RLS Migration (2026-03-06) ✓
-- [x] scripts/verify-rls-migration.sql
-- [x] docs/RLS-VERIFICATION.md
-- [x] db push เสร็จ — RLS migrations ครบ
+## Previous: Bug Fixes (2026-02-22)
 
-## Phase 1.3: Shared FilterSelect Component (2026-03-06) ✓
-- [x] src/components/shared/FilterSelect.tsx
-- [x] DashboardFilters, ReportFilters, ExecutiveFilters, Consultant
+### Completed
+- [x] topic_aliases + topicNormalizer
+- [x] SYSTEM_PROMPT (ลด sycophancy)
+- [x] Context filtering วิชา/ชั้น/ห้อง
 
-## Phase 1.4: Health Check Endpoints (2026-03-06) ✓
-- [x] ai-summary, ai-exam-gen — เพิ่ม GET /health
-- [x] check-setup.mjs — ทดสอบทั้ง 5 functions
-- [x] ai-exam-gen — เพิ่ม verify_jwt=false ใน config.toml
+## Key Files
+- `supabase/config.toml` — verify_jwt ต่อฟังก์ชัน
+- `supabase/functions/_shared/atlasAuth.ts` — requireAtlasUser
+- `supabase/functions/ai-chat/index.ts`, `ai-summary`, `ai-lesson-plan`, `ai-exam-gen`
+- `src/pages/Consultant.tsx` — filter, exam gen, chat
+- `src/lib/edgeFunctionFetch.ts` — JWT headers
+- `docs/PROJECT-EDGE-AI-SUMMARY-2026-03.md` — **handover หลัก**
 
-## Phase 2: Quality & Testing (2026-03-07) ✓
-- [x] scripts/test-negative.mjs — ทดสอบ 5 functions (ไม่มี JWT → 401)
-- [x] npm run test:negative
-- [x] Phase 2.2: verify_jwt=true สำหรับทั้ง 5 functions
-
-## Phase 4.1: Validation Layer (2026-03-07) ✓
-- [x] numberExtractor.ts + summaryValidator.ts
-- [x] ai-summary: validateSummary() + return validation field
-- [x] PolicySummary, ExecutiveSummary: ValidationDisclaimer
-- [x] Regex: เพิ่ม pattern "ประมาณ/ราว/กว่า" ใน numberExtractor
-
-## Phase: teaching_date แทน created_at (2026-03-07) ✓
-- [x] SystemGapReport — แสดง teaching_date (มีอยู่แล้ว)
-- [x] ReferralQueue — แสดง + sort ตาม teaching_date
-
-## Next Steps (When Resuming)
-1. Deploy ai-summary: `npx supabase functions deploy ai-summary` (ต้อง login ก่อน; อาจได้ 403)
-2. Phase 4.2 (Optional): ai-chat Citation Presence Check
+## Next Steps (Optional)
+- Phase 4.2: Citation presence check เพิ่มใน ai-chat
+- ปรับ prompt ให้คำถามกว้างจำกัด scope ตาม filter อัตโนมัติ
 
 ## Important Commands
 ```bash
 cd ~/atlas-wise-spark
-npm run dev                    # Start dev server
-supabase functions deploy      # Deploy Edge Functions
+npm run dev
+npm run test:negative
+node scripts/check-setup.mjs
+npx supabase functions deploy ai-chat   # หรือชื่อฟังก์ชันที่แก้
 ```
 
 ## Database Tables
 - teaching_logs, diagnostic_events, strike_counter, pivot_events
-- topic_aliases (for deterministic normalization)
+- topic_aliases
 - profiles, user_roles
 
 ## Quick Resume Prompt
