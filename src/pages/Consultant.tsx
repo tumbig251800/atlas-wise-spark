@@ -383,8 +383,17 @@ export default function Consultant() {
       });
 
       if (!res.ok || !res.body) {
-        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-        toast.error(err.error || "เกิดข้อผิดพลาดในการสร้างข้อสอบ");
+        const err = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          message?: string;
+          content?: string;
+        };
+        const detail =
+          (typeof err.error === "string" && err.error) ||
+          (typeof err.message === "string" && err.message) ||
+          (typeof err.content === "string" && err.content) ||
+          `HTTP ${res.status}`;
+        toast.error(detail || "เกิดข้อผิดพลาดในการสร้างข้อสอบ");
         setExamLoading(false);
         return;
       }

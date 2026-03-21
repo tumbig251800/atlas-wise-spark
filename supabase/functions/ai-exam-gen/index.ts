@@ -101,6 +101,11 @@ ${context}
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      if (response.status === 402) {
+        return new Response(JSON.stringify({ error: "เครดิต AI หมด กรุณาเติมเครดิตที่ Google AI Studio" }), {
+          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       if (response.status === 400 || response.status === 403) {
         return new Response(JSON.stringify({ error: "GEMINI_API_KEY ไม่ถูกต้อง กรุณาตรวจสอบ" }), {
           status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },

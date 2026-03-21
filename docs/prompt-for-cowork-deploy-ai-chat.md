@@ -70,4 +70,20 @@ curl -sS -w "\nHTTP Status: %{http_code}\n" -X POST "https://ebyelctqcdhjmqujesk
 
 ---
 
+---
+
+## 7. หมายเหตุ — `ai-exam-gen` (ข้อสอบหลังหน่วย)
+
+ถ้าปุ่มสร้างข้อสอบใน Consultant ขึ้น toast ทั่วไปแต่ Network เป็น **401** พร้อม `{"code":401,"message":"Missing authorization header"}` แปลว่า **gateway ยัง verify JWT** อยู่ — ต้อง deploy ฟังก์ชันนี้ให้สอดคล้อง `config.toml`:
+
+```bash
+supabase functions deploy ai-exam-gen
+```
+
+หลัง deploy การเรียกไม่มี JWT ควรได้ `{"error":"Missing Authorization"}` (จาก `requireAtlasUser`) และ **GET `/health` → 200** โดยไม่ต้องมี header
+
+**อัปเดต 2026-03-21:** deploy `ai-exam-gen` แล้ว — แก้ปัญหาข้อสอบหลังหน่วยที่โดน gateway block
+
+---
+
 **ขอบคุณครับ**
