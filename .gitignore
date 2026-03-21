@@ -19,6 +19,9 @@ dist-ssr
 .env.backup
 supabase/.temp/
 
+# Cursor IDE — local plan files (ไม่ commit)
+.cursor/plans/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
