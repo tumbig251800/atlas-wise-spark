@@ -21,7 +21,7 @@ function hasClaims(output: string): boolean {
   if (ID_RE.test(output)) return true;
   if (/\bMastery\b/i.test(output)) return true;
   if (/\bRemedial\b/i.test(output)) return true;
-  if (/(คะแนน|เฉลี่ย|จำนวน|คาบ|คน|ห้อง|ชั้น|วันที่)/.test(output)) return true;
+  if (/(คะแนน|เฉลี่ย|จำนวน|คาบ|วันที่)/.test(output)) return true;
   if (/\b\d{2,}\b/.test(output)) return true;
   return false;
 }

@@ -43,7 +43,7 @@
 
 ---
 
-## การแก้ไขที่แนะนำ (สำหรับนักพัฒนา)
+## การแก้ไขที่ทำแล้ว (2026-03)
 
-- ให้ Consultant โหลด filter จาก `localStorage` (Dashboard) เมื่อเปิดหน้า แทนการ return ค่าว่างจาก `loadPersistedFilters()`
-- หรือซิงค์ filter ระหว่าง Dashboard กับ Consultant เมื่ออยู่ในแอปเดียวกัน
+- **History → Consultant sync**: เมื่อเลือก filter (วิชา/ชั้น/ห้อง) บนหน้า History แล้วจะบันทึกลง `atlas_dashboard_filters` อัตโนมัติ ทำให้ไปเปิด Consultant จะโหลด filter เดียวกัน
+- ปุ่ม **"ไปถามพีท"** บนหน้า History เมื่อมีข้อมูลกรองแล้ว — คลิกเพื่อไป Consultant พร้อม filter นั้น

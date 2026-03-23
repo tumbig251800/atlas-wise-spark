@@ -24,7 +24,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
-import { History as HistoryIcon, Eye, BookOpen, Trash2, Loader2, UserCog } from "lucide-react";
+import { Link } from "react-router-dom";
+import { History as HistoryIcon, Eye, BookOpen, Trash2, Loader2, UserCog, MessageSquare } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { ReassignTeacherDialog } from "@/components/history/ReassignTeacherDialog";
@@ -33,6 +34,7 @@ import {
   type HistoryFiltersState,
   type HistoryFilterOptions,
 } from "@/components/history/HistoryFilters";
+import { persistFilters } from "@/hooks/useDashboardData";
 import type { Tables } from "@/integrations/supabase/types";
 
 type TeachingLog = Tables<"teaching_logs">;
@@ -94,6 +96,17 @@ export default function History() {
     };
     fetchLogs();
   }, [user?.id, isDirector]);
+
+  // Sync filter to atlas_dashboard_filters so Consultant loads the same filter
+  useEffect(() => {
+    if (filters.subject && filters.gradeLevel && filters.classroom) {
+      persistFilters({
+        subject: filters.subject,
+        gradeLevel: filters.gradeLevel,
+        classroom: filters.classroom,
+      });
+    }
+  }, [filters.subject, filters.gradeLevel, filters.classroom]);
 
   const handleClearAll = async () => {
     if (!user) return;
@@ -253,13 +266,25 @@ export default function History() {
               </Card>
             ) : (
               <>
-                <div className="sticky top-0 z-10 py-2 mb-2 bg-background/95 backdrop-blur-sm border-b border-border/50">
+                <div className="sticky top-0 z-10 py-2 mb-2 bg-background/95 backdrop-blur-sm border-b border-border/50 space-y-2">
                   <HistoryFilters
                     filters={filters}
                     setFilters={setFilters}
                     options={filterOptions}
                     isDirector={isDirector}
                   />
+                  {filteredLogs.length > 0 &&
+                    filters.subject &&
+                    filters.gradeLevel &&
+                    filters.classroom && (
+                      <Link
+                        to="/consultant"
+                        className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
+                      >
+                        <MessageSquare className="h-4 w-4" />
+                        ไปถามพีท ({filters.subject} {filters.gradeLevel}/{filters.classroom})
+                      </Link>
+                    )}
                 </div>
                 {filteredLogs.length === 0 ? (
                   <Card>
