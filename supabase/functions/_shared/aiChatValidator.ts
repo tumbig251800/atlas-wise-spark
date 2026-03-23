@@ -58,13 +58,23 @@ function contextHasTotalStudentsOrRemedialFraction(context: string): boolean {
 }
 
 export function validateAiChatOutput(context: string, output: string): AiChatValidationResult {
+  // Pre-compute allowedIds once — used in multiple bypass checks below
+  const allowedIds = extractAllowedIds(context);
+
+  // Helper: true ถ้า output กล่าวถึง ID ที่ไม่อยู่ใน allowedIds (สมมติขึ้นเอง)
+  function hasInventedId(): boolean {
+    ID_RE.lastIndex = 0;
+    for (const m of output.matchAll(ID_RE)) {
+      if (m[1] && !allowedIds.has(m[1])) return true;
+    }
+    return false;
+  }
+
   // 1) REF format enforcement
   if (REF_NON_NUMERIC_RE.test(output)) {
-    // ถ้าเป็นคำตอบเชิงคำแนะนำ/ภาพรวม และไม่ระบุ ID — อนุญาตแม้ REF format ผิด (เช่น [REF-ภาพรวม])
+    // อนุญาตถ้าเป็นคำตอบเชิงคำแนะนำ/ภาพรวม และ ID ทุกตัวที่กล่าวถึงอยู่ใน context จริง
     const hasAdvisoryPhrase = /(แนะนำ|ควร|อย่างไร|เป็นอย่างไร|แบบไหน|ภาพรวม|สรุป)/.test(output);
-    ID_RE.lastIndex = 0;
-    const hasNoIdMention = !ID_RE.test(output);
-    if (hasAdvisoryPhrase && hasNoIdMention) {
+    if (hasAdvisoryPhrase && !hasInventedId()) {
       return { ok: true, reason: "advice_only_format_relaxed" };
     }
     return { ok: false, reason: "REF format is not numeric-only" };
@@ -90,17 +100,14 @@ export function validateAiChatOutput(context: string, output: string): AiChatVal
   const hasNumericRef = /\[REF-\d+\]/i.test(output);
   if (!hasNumericRef) {
     const hasAdvisoryPhrase = /(แนะนำ|ควร|อย่างไร|เป็นอย่างไร|แบบไหน|ภาพรวม|สรุป)/.test(output);
-    ID_RE.lastIndex = 0;
-    const hasNoIdMention = !ID_RE.test(output);
-    // คำตอบเชิงคำแนะนำ/ภาพรวม: อนุญาตโดยไม่มี REF ถ้าไม่ระบุ ID (ป้องกัน invent ID)
-    if (hasAdvisoryPhrase && hasNoIdMention) {
+    // อนุญาตถ้าเป็นคำตอบเชิงคำแนะนำ/ภาพรวม และ ID ทุกตัวที่กล่าวถึงอยู่ใน context จริง
+    if (hasAdvisoryPhrase && !hasInventedId()) {
       return { ok: true, reason: "advice_only" };
     }
     return { ok: false, reason: "claims_without_refs" };
   }
 
   // 2) ID invention enforcement
-  const allowedIds = extractAllowedIds(context);
   ID_RE.lastIndex = 0;
   for (const m of output.matchAll(ID_RE)) {
     const id = m[1];

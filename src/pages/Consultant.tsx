@@ -51,7 +51,7 @@ function buildQwrMetricsBlock(logs: { mastery_score: number }[]): string {
 }
 
 function buildContextWithCitation(
-  logs: { teaching_date: string; subject: string; grade_level: string; classroom: string | number; topic?: string; mastery_score: number; major_gap: string; key_issue?: string; next_strategy?: string; remedial_ids?: string; total_students?: number }[]
+  logs: { teaching_date: string; subject: string; grade_level: string; classroom: string | number; topic?: string; mastery_score: number; major_gap: string; key_issue?: string; next_strategy?: string; remedial_ids?: string; health_care_ids?: string | null; total_students?: number }[]
 ): string {
   if (logs.length === 0) return "ไม่พบข้อมูลการสอนที่ตรงกับเงื่อนไข";
   
@@ -71,10 +71,17 @@ function buildContextWithCitation(
       .map((s) => s.trim())
       .filter((s) => s && s !== "[None]" && s !== "[N/A]")
   )];
+  const extractedHealthCareIds = [...new Set(
+    logs
+      .flatMap((l) => (l.health_care_ids || "").split(","))
+      .map((s) => s.trim())
+      .filter((s) => s && s !== "[None]" && s !== "[N/A]")
+  )];
   const hasTotalStudents = slice.some((l) => (l.total_students ?? 0) > 0);
   const hasRemedialIds = extractedRemedialIds.length > 0;
+  const hasHealthCareIds = extractedHealthCareIds.length > 0;
 
-  const guardNote = `\n\n[GUARD RULES — enforce ทุกคำตอบ]\n- REF ที่ถูกต้องในการสนทนานี้: ${refList} (ใช้ได้เฉพาะรายการนี้เท่านั้น)\n- ห้ามสร้าง REF รูปแบบอื่น เช่น [REF-19ก.พ.] หรือ [REF-ชื่อเรื่อง]\n- Remedial IDs ที่พบใน context: ${hasRemedialIds ? extractedRemedialIds.join(", ") : "ไม่มี"}\n- total_students ใน context: ${hasTotalStudents ? "มี" : "ไม่มี — ห้ามสร้างตัวเลข X/Y หรือ %"}\n- ห้ามสร้าง student ID ขึ้นเองเด็ดขาด ถ้าไม่มี ID ใน context ให้ตอบว่า \"ไม่พบรหัสนักเรียนในข้อมูล\"`;
+  const guardNote = `\n\n[GUARD RULES — enforce ทุกคำตอบ]\n- REF ที่ถูกต้องในการสนทนานี้: ${refList} (ใช้ได้เฉพาะรายการนี้เท่านั้น)\n- ห้ามสร้าง REF รูปแบบอื่น เช่น [REF-19ก.พ.] หรือ [REF-ชื่อเรื่อง]\n- Special Care IDs ที่พบใน context: ${hasHealthCareIds ? extractedHealthCareIds.join(", ") : "ไม่มี"}\n- Remedial IDs ที่พบใน context: ${hasRemedialIds ? extractedRemedialIds.join(", ") : "ไม่มี"}\n- total_students ใน context: ${hasTotalStudents ? "มี" : "ไม่มี — ห้ามสร้างตัวเลข X/Y หรือ %"}\n- ห้ามสร้าง student ID ขึ้นเองเด็ดขาด ถ้าไม่มี ID ใน context ให้ตอบว่า \"ไม่พบรหัสนักเรียนในข้อมูล\"`;
   
   return `## ข้อมูลการสอนที่กรองแล้ว (${logs.length} คาบ)
 Mastery เฉลี่ย: ${avgMastery}/5
