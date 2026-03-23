@@ -66,7 +66,7 @@ function buildContextWithCitation(
 
   const refList = slice.map((_, i) => `[REF-${i + 1}]`).join(", ");
   const extractedRemedialIds = [...new Set(
-    slice
+    logs
       .flatMap((l) => (l.remedial_ids || "").split(","))
       .map((s) => s.trim())
       .filter((s) => s && s !== "[None]" && s !== "[N/A]")

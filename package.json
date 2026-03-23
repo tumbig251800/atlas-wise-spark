@@ -9,6 +9,7 @@
     "check-setup": "node scripts/check-setup.mjs",
     "verify-rls": "npx supabase migration list",
     "test:negative": "node scripts/test-negative.mjs",
+    "deploy:ai-chat": "bash scripts/deploy-ai-chat.sh",
     "supabase:deploy": "npx supabase functions deploy",
     "build": "vite build",
     "build:dev": "vite build --mode development",

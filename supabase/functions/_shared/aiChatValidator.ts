@@ -60,12 +60,20 @@ function contextHasTotalStudentsOrRemedialFraction(context: string): boolean {
 export function validateAiChatOutput(context: string, output: string): AiChatValidationResult {
   // 1) REF format enforcement
   if (REF_NON_NUMERIC_RE.test(output)) {
+    // ถ้าเป็นคำตอบเชิงคำแนะนำ/ภาพรวม และไม่ระบุ ID — อนุญาตแม้ REF format ผิด (เช่น [REF-ภาพรวม])
+    const hasAdvisoryPhrase = /(แนะนำ|ควร|อย่างไร|เป็นอย่างไร|แบบไหน|ภาพรวม|สรุป)/.test(output);
+    ID_RE.lastIndex = 0;
+    const hasNoIdMention = !ID_RE.test(output);
+    if (hasAdvisoryPhrase && hasNoIdMention) {
+      return { ok: true, reason: "advice_only_format_relaxed" };
+    }
     return { ok: false, reason: "REF format is not numeric-only" };
   }
 
   const outputHasClaims = hasClaims(output);
 
   const allowedRefs = extractAllowedRefNumbers(context);
+  REF_NUMERIC_RE.lastIndex = 0;
   for (const m of output.matchAll(REF_NUMERIC_RE)) {
     const n = m[1];
     if (n && allowedRefs.size > 0 && !allowedRefs.has(n)) {
@@ -81,16 +89,11 @@ export function validateAiChatOutput(context: string, output: string): AiChatVal
   // If there are claims, require at least one numeric REF.
   const hasNumericRef = /\[REF-\d+\]/i.test(output);
   if (!hasNumericRef) {
-    // Advisory responses with no factual numbers/mastery/remedial are allowed without REF.
     const hasAdvisoryPhrase = /(แนะนำ|ควร|อย่างไร|เป็นอย่างไร|แบบไหน|ภาพรวม|สรุป)/.test(output);
-    const hasNoFactualClaims = !/\b\d{2,}\b/.test(output) &&
-      !/\bMastery\b/i.test(output) &&
-      !/\bRemedial\b/i.test(output) &&
-      !FRACTION_RE.test(output) &&
-      !PERCENT_RE.test(output) &&
-      !DATE_RE.test(output) &&
-      !ID_RE.test(output);
-    if (hasAdvisoryPhrase && hasNoFactualClaims) {
+    ID_RE.lastIndex = 0;
+    const hasNoIdMention = !ID_RE.test(output);
+    // คำตอบเชิงคำแนะนำ/ภาพรวม: อนุญาตโดยไม่มี REF ถ้าไม่ระบุ ID (ป้องกัน invent ID)
+    if (hasAdvisoryPhrase && hasNoIdMention) {
       return { ok: true, reason: "advice_only" };
     }
     return { ok: false, reason: "claims_without_refs" };
@@ -98,6 +101,7 @@ export function validateAiChatOutput(context: string, output: string): AiChatVal
 
   // 2) ID invention enforcement
   const allowedIds = extractAllowedIds(context);
+  ID_RE.lastIndex = 0;
   for (const m of output.matchAll(ID_RE)) {
     const id = m[1];
     if (!id) continue;

@@ -24,18 +24,37 @@
 
 ---
 
-## 3. คำสั่งที่ใช้
+## 3. Consolidation ก่อน deploy (สำคัญ)
 
-```bash
-cd <path-to-atlas-wise-spark>
-supabase functions deploy ai-chat
-```
+**Supabase ไม่รองรับ relative imports** ตอน deploy — โค้ดใน `index.ts` ที่ import จาก `_shared/` จะไม่ทำงานบน production
 
-(ถ้าต้อง login หรือ link project ก่อน ให้ทำตามขั้นตอนปกติของ Supabase CLI)
+**แก้ไข:** ใช้ script `deploy:ai-chat` ที่จะ:
+1. copy ไฟล์ consolidated (รวมโค้ดทั้งหมดเป็นไฟล์เดียว) ไปแทน `index.ts`
+2. deploy ขึ้น Supabase
+3. restore ไฟล์ source กลับ (repo คงโครงสร้าง modular)
+
+**ไฟล์ที่ใช้:** `ai-chat-consolidated.ts` ใน root — ต้องมีอยู่ก่อน deploy  
+ถ้าแก้ `ai-chat/index.ts` หรือ `_shared/*` ต้อง regenerate consolidated ก่อน (ดู `.cursor/plans/` หรือถาม dev)
 
 ---
 
-## 4. การยืนยันผลหลัง deploy
+## 4. คำสั่งที่ใช้
+
+```bash
+cd <path-to-atlas-wise-spark>
+npm run deploy:ai-chat
+```
+
+หรือรัน script โดยตรง:
+```bash
+./scripts/deploy-ai-chat.sh
+```
+
+(ถ้าต้อง login หรือ link project ก่อน ให้รัน `npx supabase login` และ `npx supabase link --project-ref ebyelctqcdhjmqujeskx` ก่อน)
+
+---
+
+## 5. การยืนยันผลหลัง deploy
 
 รันคำสั่งทดสอบนี้ — **ควรได้ HTTP 401** (ไม่ใช่ 200):
 
@@ -53,17 +72,18 @@ curl -sS -w "\nHTTP Status: %{http_code}\n" -X POST "https://ebyelctqcdhjmqujesk
 
 ---
 
-## 5. ไฟล์สำคัญ
+## 6. ไฟล์สำคัญ
 
 | ไฟล์ | หน้าที่ |
 |------|---------|
-| `supabase/functions/ai-chat/index.ts` | Edge Function หลัก — เรียก `requireAtlasUser(req)` ที่บรรทัด ~207 |
-| `supabase/functions/_shared/atlasAuth.ts` | `requireAtlasUser` — คืน 401 ถ้าไม่มี/ไม่ถูกต้อง Authorization |
+| `ai-chat-consolidated.ts` | ไฟล์รวม (inline) สำหรับ deploy — ต้องมีก่อนรัน deploy:ai-chat |
+| `supabase/functions/ai-chat/index.ts` | Source (ใช้ import) — script จะ restore หลัง deploy |
+| `supabase/functions/_shared/` | atlasAuth, aiChatValidator, numberExtractor — รวมใน consolidated |
 | `supabase/config.toml` | `[functions.ai-chat] verify_jwt = false` |
 
 ---
 
-## 6. หมายเหตุ
+## 7. หมายเหตุ
 
 - **แอป ATLAS** ส่ง JWT ของ user ที่ login แล้วใน `Authorization: Bearer <jwt>` — flow ปกติจะทำงานได้หลัง deploy นี้
 - จุดประสงค์: ป้องกันการเรียก ai-chat โดยไม่มี session (เช่น script ภายนอก) เพื่อลดความเสี่ยงด้านความปลอดภัยและค่าใช้จ่าย Gemini
@@ -72,7 +92,7 @@ curl -sS -w "\nHTTP Status: %{http_code}\n" -X POST "https://ebyelctqcdhjmqujesk
 
 ---
 
-## 7. หมายเหตุ — `ai-exam-gen` (ข้อสอบหลังหน่วย)
+## 8. หมายเหตุ — `ai-exam-gen` (ข้อสอบหลังหน่วย)
 
 ถ้าปุ่มสร้างข้อสอบใน Consultant ขึ้น toast ทั่วไปแต่ Network เป็น **401** พร้อม `{"code":401,"message":"Missing authorization header"}` แปลว่า **gateway ยัง verify JWT** อยู่ — ต้อง deploy ฟังก์ชันนี้ให้สอดคล้อง `config.toml`:
 
