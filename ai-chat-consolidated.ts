@@ -1,3 +1,6 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+
 // ==================== numberExtractor.ts (inlined) ====================
 /**
  * ATLAS Phase 4.1 — Number Extractor
@@ -60,9 +63,21 @@ function extractNumbersWithContext(text: string): NumberWithContext[] {
   });
 }
 
-// ==================== atlasAuth.ts (inlined) ====================
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+/**
+ * Normalize Mastery X/5 to percent for cross-comparison
+ * e.g. 2.3 -> 46, 3.5 -> 70
+ */
+function normalizeMasteryToPercent(values: number[]): number[] {
+  const extra: number[] = [];
+  for (const v of values) {
+    if (v >= 1 && v <= 5 && v % 1 !== 0) {
+      extra.push(Math.round((v / 5) * 100));
+    }
+  }
+  return [...values, ...extra];
+}
 
+// ==================== atlasAuth.ts (inlined) ====================
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || Deno.env.get("SUPABASE_PROJECT_URL") || "";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
 
@@ -77,6 +92,10 @@ type AtlasAuthResult =
   | { ok: true; token: string; userId: string; email?: string | null }
   | { ok: false; status: number; error: string };
 
+/**
+ * Manual JWT verification for Edge Functions.
+ * This avoids Supabase Edge gateway verify_jwt incompatibilities with ES256 signing keys.
+ */
 async function requireAtlasUser(req: Request): Promise<AtlasAuthResult> {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     return { ok: false, status: 500, error: "SUPABASE_URL / SUPABASE_ANON_KEY is not configured" };
@@ -112,6 +131,8 @@ const PERCENT_RE = /(\d+(?:\.\d+)?)\s*%/g;
 const DATE_RE = /\b\d{4}-\d{2}-\d{2}\b/g;
 
 function hasClaims(output: string): boolean {
+  // Claim-aware enforcement: only require REF if output contains factual claims.
+  // Claims include numbers, dates, mastery/remedial mentions, ID mentions, or fractions/percent.
   if (FRACTION_RE.test(output)) return true;
   if (PERCENT_RE.test(output)) return true;
   if (DATE_RE.test(output)) return true;
@@ -132,6 +153,8 @@ function extractAllowedRefNumbers(context: string): Set<string> {
 }
 
 function extractAllowedIds(context: string): Set<string> {
+  // Only allow IDs explicitly shown in context (e.g. "Remedial IDs: 101,205" or "Special Care: [103,207]")
+  // We keep it simple: any standalone 2+ digit numbers near keywords get counted as allowed IDs.
   const allowed = new Set<string>();
   const lines = context.split("\n");
   for (const line of lines) {
@@ -145,13 +168,17 @@ function extractAllowedIds(context: string): Set<string> {
 }
 
 function contextHasTotalStudentsOrRemedialFraction(context: string): boolean {
+  // Consultant context includes "Remedial: X/Y" when total_students exists; accept that.
   if (/Remedial:\s*\d+\s*\/\s*\d+/i.test(context)) return true;
+  // If guard note says total_students exists, accept.
   if (/total_students.*มี/i.test(context)) return true;
   return false;
 }
 
 function validateAiChatOutput(context: string, output: string): AiChatValidationResult {
+  // 1) REF format enforcement
   if (REF_NON_NUMERIC_RE.test(output)) {
+    // ถ้าเป็นคำตอบเชิงคำแนะนำ/ภาพรวม และไม่ระบุ ID — อนุญาตแม้ REF format ผิด (เช่น [REF-ภาพรวม])
     const hasAdvisoryPhrase = /(แนะนำ|ควร|อย่างไร|เป็นอย่างไร|แบบไหน|ภาพรวม|สรุป)/.test(output);
     ID_RE.lastIndex = 0;
     const hasNoIdMention = !ID_RE.test(output);
@@ -172,21 +199,25 @@ function validateAiChatOutput(context: string, output: string): AiChatValidation
     }
   }
 
+  // If there are no claims, do not require REF. (Greeting/general advice is allowed.)
   if (!outputHasClaims) {
     return { ok: true, reason: "no_claims" };
   }
 
+  // If there are claims, require at least one numeric REF.
   const hasNumericRef = /\[REF-\d+\]/i.test(output);
   if (!hasNumericRef) {
     const hasAdvisoryPhrase = /(แนะนำ|ควร|อย่างไร|เป็นอย่างไร|แบบไหน|ภาพรวม|สรุป)/.test(output);
     ID_RE.lastIndex = 0;
     const hasNoIdMention = !ID_RE.test(output);
+    // คำตอบเชิงคำแนะนำ/ภาพรวม: อนุญาตโดยไม่มี REF ถ้าไม่ระบุ ID (ป้องกัน invent ID)
     if (hasAdvisoryPhrase && hasNoIdMention) {
       return { ok: true, reason: "advice_only" };
     }
     return { ok: false, reason: "claims_without_refs" };
   }
 
+  // 2) ID invention enforcement
   const allowedIds = extractAllowedIds(context);
   ID_RE.lastIndex = 0;
   for (const m of output.matchAll(ID_RE)) {
@@ -197,21 +228,28 @@ function validateAiChatOutput(context: string, output: string): AiChatValidation
     }
   }
 
+  // 3) Remedial invention enforcement
   const hasRemedialEvidence = contextHasTotalStudentsOrRemedialFraction(context);
   const hasFraction = /\b(\d+)\s*\/\s*(\d+)\b/.test(output);
   const hasPercent = /(\d+(?:\.\d+)?)\s*%/.test(output);
   if ((hasFraction || hasPercent) && !hasRemedialEvidence) {
+    // Allow % if it is present in context (e.g., QWR METRICS contains %)
     const ctxHasPercent = /%/.test(context);
     if (!ctxHasPercent) {
       return { ok: false, reason: "Remedial fraction/percent without total_students evidence" };
     }
   }
 
+  // Extra guard: if output contains numbers not in context at all, block only for high-risk patterns.
+  // (We keep this narrow to avoid blocking harmless counts like \"2 ข้อ\")
   const ctxNums = new Set(extractNumbersFromText(context).map((n) => String(n)));
   for (const m of output.matchAll(/(\d{2,10})/g)) {
     const num = m[1];
+    // Skip if it is part of REF already.
     if (output.slice(Math.max(0, m.index - 6), m.index + 1).includes("[REF-")) continue;
     if (num && !ctxNums.has(num) && !allowedIds.has(num)) {
+      // only block if it's introduced as an ID-like token (e.g. "ID 9411") handled above,
+      // or remedial-like patterns handled above. Otherwise allow.
       continue;
     }
   }
@@ -219,9 +257,7 @@ function validateAiChatOutput(context: string, output: string): AiChatValidation
   return { ok: true };
 }
 
-// ==================== ai-chat main ====================
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-
+// ==================== ai-chat/index.ts (main) ====================
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -475,11 +511,13 @@ serve(async (req) => {
       ? `${SYSTEM_PROMPT}\n\n${contextPreamble}\n\nบริบทข้อมูลปัจจุบัน:\n${context}`
       : SYSTEM_PROMPT;
 
+    // Build Gemini chat history from messages
     const contents = messages.map((m: { role: string; content: string }) => ({
       role: m.role === "assistant" ? "model" : "user",
       parts: [{ text: m.content }],
     }));
 
+    // Fast deterministic guards (avoid calling Gemini when answer is already known from context)
     const lastUser = [...messages].reverse().find((m: { role: string }) => m.role !== "assistant");
     const q = String(lastUser?.content ?? "").toLowerCase();
     const ctx = String(context ?? "");
@@ -569,25 +607,19 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    let text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 
-    const sanitized = text.replace(/\[REF-(?!\d+\])[^\]]*\]/gi, "").replace(/\s{2,}/g, " ").trim();
-
-    const validation = validateAiChatOutput(systemContent, sanitized);
+    const validation = validateAiChatOutput(systemContent, text);
     if (!validation.ok) {
-      const reason = validation.reason ?? "unknown";
-      console.error("ai-chat validation failed:", reason, "output preview:", sanitized.slice(0, 200));
-      const msg =
-        "ไม่พบข้อมูลในระบบสำหรับตัวกรองที่เลือก หรือคำตอบมีการอ้างอิงที่ไม่ถูกต้อง กรุณาลองถามใหม่อีกครั้ง";
       return respond(
-        `${msg}\n\n_สาเหตุ: ${reason}_`,
+        "ไม่พบข้อมูลในระบบสำหรับตัวกรองที่เลือก หรือคำตอบมีการอ้างอิงที่ไม่ถูกต้อง กรุณาลองถามใหม่อีกครั้ง",
         "fallback",
         200,
-        { validationFailed: true, reason, ...(requestId ? { requestId } : {}) }
+        { validationFailed: true, reason: validation.reason, ...(requestId ? { requestId } : {}) }
       );
     }
 
-    return respond(sanitized || text, "gemini", 200, requestId ? { requestId } : undefined);
+    return respond(text, "gemini", 200, requestId ? { requestId } : undefined);
   } catch (e) {
     console.error("chat error:", e);
     return respond(
