@@ -55,7 +55,7 @@ function buildContextWithCitation(
 ): string {
   if (logs.length === 0) return "ไม่พบข้อมูลการสอนที่ตรงกับเงื่อนไข";
   
-  const slice = logs.slice(-10);
+  const slice = logs.slice(-20);
   const sessionDetails = slice.map((l, index) => {
     const refId = `[REF-${index + 1}]`;
     const remedialCount = (l.remedial_ids || "").split(",").filter(x => x.trim() && x !== "[None]" && x !== "[N/A]").length;
