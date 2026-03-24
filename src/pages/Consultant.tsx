@@ -204,10 +204,11 @@ export default function Consultant() {
   
   // SCOPE assertion - prevents Data Leakage (ห้าม AI พูดถึงวิชาอื่น)
   const allowedSubjects = [...new Set(filteredLogs.map((l) => l.subject))];
+  const assertedSubject = contextFilter.subject || allowedSubjects[0] || "";
   const scopeAssertion =
-    allowedSubjects.length > 0
+    assertedSubject
       ? `\n\n## [CRITICAL - ANSWER SCOPE]
-ตอบเฉพาะวิชา: ${allowedSubjects.join(", ")} เท่านั้น
+ตอบเฉพาะวิชา: ${assertedSubject} เท่านั้น
 ห้ามกล่าวถึง ศิลปะ ภาษาไทย หรือวิชาอื่นที่ไม่มีในรายการข้างต้นเด็ดขาด`
       : `\n\n## [CRITICAL - ANSWER SCOPE]
 ไม่มีข้อมูลที่ตรงกับ filter หากจะตอบ ให้ตอบว่า "ไม่พบข้อมูลในระบบ"`;
@@ -312,6 +313,19 @@ export default function Consultant() {
         (data as { content?: string }).content ??
         (data as { error?: string }).error ??
         `Error ${resp.status}`;
+
+      // TEMP DEBUG: Log validation failures for ai-chat fallback
+      if ((data as any).source === "fallback" && (data as any).meta?.validationFailed) {
+        const debugInfo = {
+          reason: (data as any).meta?.reason,
+          requestId: (data as any).meta?.requestId,
+          question: text,
+          timestamp: new Date().toISOString(),
+        };
+        console.log("[DEBUG] ai-chat validation failed:", debugInfo);
+        // Show brief reason in toast for debugging
+        toast.error(`Validation: ${debugInfo.reason}`);
+      }
 
       if (!resp.ok) {
         toast.error(content);
