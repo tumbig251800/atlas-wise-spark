@@ -14,13 +14,64 @@ import { ReferralQueue } from "@/components/executive/ReferralQueue";
 import { useDiagnosticData } from "@/hooks/useDiagnosticData";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import type { TeachingLog } from "@/hooks/useDashboardData";
+import { ChatSidebar } from "@/components/chat/ChatSidebar";
+
+function extractValidIdsFromCsv(csv: string | null): string[] {
+  return String(csv ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s && s !== "[None]" && s !== "[N/A]" && /^\d{4,5}$/.test(s));
+}
+
+function buildExecutiveChatContext(logs: TeachingLog[], filters: ExecFilters): string {
+  if (logs.length === 0) return "ไม่พบข้อมูลการสอนที่ตรงกับตัวกรองนี้";
+
+  // Sort by teaching_date asc so REF ordering is stable.
+  const ordered = [...logs].sort((a, b) => a.teaching_date.localeCompare(b.teaching_date));
+  const slice = ordered.slice(-20);
+
+  const avgMastery = (logs.reduce((s, l) => s + l.mastery_score, 0) / logs.length).toFixed(1);
+
+  const refList = slice.map((_, i) => `[REF-${i + 1}]`).join(", ");
+
+  const extractedRemedialIds = [...new Set(logs.flatMap((l) => extractValidIdsFromCsv(l.remedial_ids)))];
+  const extractedHealthCareIds = [...new Set(logs.flatMap((l) => extractValidIdsFromCsv(l.health_care_ids)))];
+
+  const hasTotalStudents = slice.some((l) => (l.total_students ?? 0) > 0);
+  const hasRemedialIds = extractedRemedialIds.length > 0;
+  const hasHealthCareIds = extractedHealthCareIds.length > 0;
+
+  const sessionDetails = slice
+    .map((l, index) => {
+      const refId = `[REF-${index + 1}]`;
+      const remedialIds = extractValidIdsFromCsv(l.remedial_ids);
+      const remedialCount = remedialIds.length;
+      const total = l.total_students ?? 0;
+      return `${refId} วันที่: ${l.teaching_date} | วิชา: ${l.subject} | ห้อง: ${l.grade_level}/${l.classroom} | หัวข้อ: ${l.topic || "ไม่ระบุ"} | Mastery: ${l.mastery_score}/5 | Gap: ${l.major_gap} | Remedial: ${remedialCount}/${total} | Strategy: ${l.next_strategy || "ไม่ระบุ"} | Issue: ${l.key_issue || "ไม่ระบุ"}`;
+    })
+    .join("\n");
+
+  const guardNote = `\n\n[GUARD RULES — enforce ทุกคำตอบ]\n- REF ที่ถูกต้องในการสนทนานี้: ${refList} (ใช้ได้เฉพาะรายการนี้เท่านั้น)\n- ห้ามสร้าง REF รูปแบบอื่น เช่น [REF-19ก.พ.] หรือ [REF-ชื่อเรื่อง]\n- Special Care IDs ที่พบใน context: ${hasHealthCareIds ? extractedHealthCareIds.join(", ") : "ไม่มี"}\n- Remedial IDs ที่พบใน context: ${hasRemedialIds ? extractedRemedialIds.join(", ") : "ไม่มี"}\n- total_students ใน context: ${hasTotalStudents ? "มี" : "ไม่มี — ห้ามสร้างตัวเลข X/Y หรือ %"}\n- ห้ามสร้าง student ID ขึ้นเองเด็ดขาด ถ้าไม่มี ID ใน context ให้ตอบว่า "ไม่พบรหัสนักเรียนในข้อมูล"`;
+
+  const baseContext = `## ข้อมูลการสอนที่กรองแล้ว (${logs.length} คาบ)\nMastery เฉลี่ย: ${avgMastery}/5\n\n### รายละเอียด (ใช้ [REF-X] อ้างอิงเสมอ):\n${sessionDetails}${guardNote}`;
+
+  const scopeAssertion = filters.subject
+    ? `\n\n## [CRITICAL - ANSWER SCOPE]\nตอบเฉพาะวิชา: ${filters.subject} เท่านั้น\nห้ามกล่าวถึง วิชาอื่นที่ไม่ตรงกับตัวกรองนี้เด็ดขาด`
+    : `\n\n## [CRITICAL - ANSWER SCOPE]\nตอบได้เฉพาะข้อมูลที่อยู่ใน [REF-X] เท่านั้น (ตามตัวกรองที่เลือก)`;
+
+  const filterInfo = `\n\n## [ACTIVE FILTER]\nวิชา: ${filters.subject || "ทั้งหมด"}\nระดับชั้น: ${filters.gradeLevel || "ทั้งหมด"}\nห้อง: ${filters.classroom || "ทั้งหมด"}\n⚠️ AI ต้องตอบเฉพาะข้อมูลที่อยู่ใน [REF-X] เท่านั้น ห้ามนำข้อมูลวิชาอื่นมาปน`;
+
+  return baseContext + scopeAssertion + filterInfo;
+}
 
 export default function Executive() {
   const { user } = useAuth();
   const [filters, setFilters] = useState<ExecFilters>({ dateFrom: "", dateTo: "", gradeLevel: "", classroom: "", subject: "", teacherName: "", academicTerm: "" });
   const [barGroupBy, setBarGroupBy] = useState<"grade" | "subject">("grade");
   const { diagnosticEvents, strikes, isLoading: diagLoading } = useDiagnosticData();
+  const [adminChatOpen, setAdminChatOpen] = useState(false);
 
   // Fetch all logs (director RLS sees all)
   const { data: allLogs = [], isLoading } = useQuery({
@@ -85,6 +136,13 @@ export default function Executive() {
 
   const filteredLogIds = useMemo(() => new Set(filteredLogs.map((l) => l.id)), [filteredLogs]);
 
+  const adminChatContext = useMemo(() => buildExecutiveChatContext(filteredLogs, filters), [filteredLogs, filters]);
+  const execFilterKey = useMemo(
+    () =>
+      `${filters.dateFrom}|${filters.dateTo}|${filters.gradeLevel}|${filters.classroom}|${filters.subject}|${filters.teacherName}|${filters.academicTerm}`,
+    [filters]
+  );
+
   // Filter diagnosticEvents by main filters (match sessions in filteredLogs)
   const filteredDiagnosticEvents = useMemo(() => {
     return diagnosticEvents.filter((e) => {
@@ -123,6 +181,20 @@ export default function Executive() {
     <AppLayout>
       <div className="space-y-6">
         <h1 className="text-2xl font-bold">ภาพรวมผู้บริหาร</h1>
+
+        {/* Admin chat: side-sheet Q&A (Phase 1 UI-only; context builder comes in Phase 2) */}
+        <div className="flex justify-end">
+          <Button size="sm" variant="secondary" onClick={() => setAdminChatOpen(true)}>
+            แชทถามผู้บริหาร
+          </Button>
+        </div>
+        {/* Remount to reset Q&A when filters change (prevents scope drift). */}
+        <ChatSidebar
+          key={execFilterKey}
+          open={adminChatOpen}
+          onOpenChange={setAdminChatOpen}
+          context={adminChatContext}
+        />
 
         <ExecutiveFilters
           filters={filters}

@@ -329,6 +329,23 @@ function respond(
   });
 }
 
+function extractIdsFromContextByLabel(context: string, label: "special" | "remedial"): string[] {
+  const out = new Set<string>();
+  const lines = String(context ?? "").split("\n");
+  for (const line of lines) {
+    const lower = line.toLowerCase();
+    const matchLabel =
+      label === "special"
+        ? lower.includes("special care")
+        : lower.includes("remedial ids") || lower.includes("remedial ids ที่พบ");
+    if (!matchLabel) continue;
+    for (const m of line.matchAll(/\b(\d{4,5})\b/g)) {
+      out.add(m[1]);
+    }
+  }
+  return [...out];
+}
+
 const SYSTEM_PROMPT = `คุณคือ "พีท ร่างทอง" (Peat Rang-Thong) ที่ปรึกษาวิชาการ AI ของระบบ ATLAS Intelligence v1.3 (System-Control Edition)
 คุณเชี่ยวชาญในมาตรฐานคุณภาพการจัดการเรียนรู้ และ 6 กิจกรรมหลักทางการสอน:
 • สอนตรง/สาธิต (Direct Instruction) — อธิบายเนื้อหาตรงจุด ชัดเจน
@@ -572,15 +589,47 @@ serve(async (req) => {
     const lastUser = [...messages].reverse().find((m: { role: string }) => m.role !== "assistant");
     const q = String(lastUser?.content ?? "").toLowerCase();
     const ctx = String(context ?? "");
-    const hasIdsInContext = /Remedial IDs|Special Care/i.test(ctx) && /\b\d{2,10}\b/.test(ctx);
+    const specialCareIds = extractIdsFromContextByLabel(ctx, "special");
+    const remedialIds = extractIdsFromContextByLabel(ctx, "remedial");
+    const hasIdsInContext = specialCareIds.length > 0 || remedialIds.length > 0;
     const hasTotalStudents = /Remedial:\s*\d+\s*\/\s*\d+/i.test(ctx) || /total_students.*มี/i.test(ctx);
 
-    const asksId =
-      q.includes(" id") ||
-      q.includes("เลขประจำตัว") ||
-      q.includes("รหัสนักเรียน");
-    if (asksId && !hasIdsInContext) {
-      return respond("ไม่พบรหัสนักเรียนในข้อมูล", "fast_guard", 200, requestId ? { requestId } : undefined);
+    const asksGapExistence =
+      /(gap|แก๊ป|gab)/i.test(q) && /(หรือไม่|ไหม|มีไหม|มีมั้ย|มีมั๊ย)/i.test(q);
+    if (asksGapExistence) {
+      const hasGapEvidence =
+        /(?:\||\s)Gap:\s*(?!ไม่มี|none|-)/i.test(ctx) ||
+        /(?:\||\s)major_gap:\s*(?!ไม่มี|none|-)/i.test(ctx);
+      const msg = hasGapEvidence
+        ? "พบข้อมูลนักเรียนที่มี Gap ในตัวกรองนี้ครับ"
+        : "ไม่พบข้อมูลนักเรียนที่มี Gap ในตัวกรองนี้ครับ";
+      return respond(msg, "fast_guard", 200, requestId ? { requestId } : undefined);
+    }
+
+    const asksWhoOrId =
+      /(ใคร|คนไหน|ใครบ้าง|ระบุ\s*id|รหัสนักเรียน|เลขประจำตัว|special care|remedial|ดูแลพิเศษ|ซ่อมเสริม)/i.test(q);
+    if (asksWhoOrId) {
+      const asksSpecial = /(special care|ดูแลพิเศษ|กลุ่มพิเศษ)/i.test(q);
+      const asksRemedialOnly = /(ซ่อมเสริม|remedial)/i.test(q) && !asksSpecial;
+
+      if (!hasIdsInContext) {
+        return respond("ไม่พบรหัสนักเรียนในข้อมูล", "fast_guard", 200, requestId ? { requestId } : undefined);
+      }
+
+      if (asksRemedialOnly) {
+        return respond(`Remedial: ${remedialIds.map((id) => `ID ${id}`).join(", ") || "ไม่พบรหัสนักเรียนในข้อมูล"}`, "fast_guard", 200, requestId ? { requestId } : undefined);
+      }
+
+      if (asksSpecial) {
+        return respond(`Special Care: ${specialCareIds.map((id) => `ID ${id}`).join(", ") || "ไม่พบรหัสนักเรียนในข้อมูล"}`, "fast_guard", 200, requestId ? { requestId } : undefined);
+      }
+
+      return respond(
+        `มีนักเรียนที่ต้องดูแล 2 กลุ่มครับ — **Special Care**: ${specialCareIds.map((id) => `ID ${id}`).join(", ") || "ไม่พบนักเรียน Special Care ในข้อมูลนี้"} | **Remedial**: ${remedialIds.map((id) => `ID ${id}`).join(", ") || "ไม่พบนักเรียนที่ต้องซ่อมเสริมในข้อมูลนี้"}`,
+        "fast_guard",
+        200,
+        requestId ? { requestId } : undefined
+      );
     }
 
     const asksRemedial =

@@ -97,6 +97,8 @@ export default function Consultant() {
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const sendingRef = useRef(false);
+  const prevFilterKeyRef = useRef<string | null>(null);
+  const didInitFilterKeyRef = useRef(false);
 
   // Exam generation state
   const [examDialogOpen, setExamDialogOpen] = useState(false);
@@ -171,6 +173,26 @@ export default function Consultant() {
     const matchClass = !contextFilter.classroom || String(log.classroom) === contextFilter.classroom;
     return matchSubject && matchGrade && matchClass;
   });
+  
+  const filterKey = `${contextFilter.subject || ""}|${contextFilter.gradeLevel || ""}|${contextFilter.classroom || ""}`;
+
+  // Reset chat state when filter changes to prevent context drift.
+  // We skip the initial auto-init (when didInitFilterKeyRef is still false).
+  useEffect(() => {
+    if (!filterInitialized) return;
+    if (!didInitFilterKeyRef.current) {
+      prevFilterKeyRef.current = filterKey;
+      didInitFilterKeyRef.current = true;
+      return;
+    }
+    if (prevFilterKeyRef.current !== filterKey) {
+      prevFilterKeyRef.current = filterKey;
+      sendingRef.current = false;
+      setIsLoading(false);
+      setInput("");
+      setMessages([]);
+    }
+  }, [filterInitialized, filterKey]);
   
   // Build context with citation format
   const baseContext = buildContextWithCitation(filteredLogs);

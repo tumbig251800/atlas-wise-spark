@@ -93,6 +93,7 @@ Active Strikes (≥2): ${activeStrikeCount} รายการ
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [chatOpen, setChatOpen] = useState(false);
   const location = useLocation();
+  const shouldShowFloatingChat = false;
   const { allLogs } = useDashboardData(loadPersistedFilters());
   const { colorCounts, activeStrikes } = useDiagnosticData();
 
@@ -112,8 +113,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="p-6">{children}</div>
         </main>
       </div>
-      <ChatFloatingButton onClick={() => setChatOpen(true)} />
-      <ChatSidebar open={chatOpen} onOpenChange={setChatOpen} context={chatContext} />
+      {shouldShowFloatingChat && (
+        <>
+          <ChatFloatingButton onClick={() => setChatOpen(true)} />
+          <ChatSidebar open={chatOpen} onOpenChange={setChatOpen} context={chatContext} />
+        </>
+      )}
     </SidebarProvider>
   );
 }

@@ -71,7 +71,7 @@ Mastery ตามชั้น: ${Object.entries(gradeSummary).map(([g, v]) => `$
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-[hsl(var(--atlas-gold))]" />
-          AI Policy Advice — พีท ร่างทอง
+          AI ผู้บริหาร (Policy Advice) — พีท ร่างทอง
         </h3>
         <Button size="sm" onClick={generate} disabled={loading || !logs.length}>
           {loading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}
@@ -84,7 +84,7 @@ Mastery ตามชั้น: ${Object.entries(gradeSummary).map(([g, v]) => `$
           <ValidationDisclaimer validation={validation} />
         </div>
       ) : (
-        <p className="text-muted-foreground text-sm">กดปุ่ม "วิเคราะห์" เพื่อให้ AI สรุปสถานการณ์ระดับโรงเรียน</p>
+        <p className="text-muted-foreground text-sm">ช่องนี้สำหรับผู้บริหาร: กดปุ่ม "วิเคราะห์" เพื่อให้ AI สรุปสถานการณ์ระดับโรงเรียน</p>
       )}
     </div>
   );
