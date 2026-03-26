@@ -607,9 +607,9 @@ serve(async (req) => {
     }
 
     const asksWhoOrId =
-      /(ใคร|คนไหน|ใครบ้าง|ระบุ\s*id|รหัสนักเรียน|เลขประจำตัว|special care|remedial|ดูแลพิเศษ|ซ่อมเสริม)/i.test(q);
+      /(ใคร|คนไหน|ใครบ้าง|ระบุ\s*id|รหัสนักเรียน|เลขประจำตัว|special care|remedial|ดูแล(?:เป็น|ป็น)?\s*พิเศษ|ซ่อมเสริม)/i.test(q);
     if (asksWhoOrId) {
-      const asksSpecial = /(special care|ดูแลพิเศษ|กลุ่มพิเศษ)/i.test(q);
+      const asksSpecial = /(special care|ดูแล(?:เป็น|ป็น)?\s*พิเศษ|กลุ่มพิเศษ)/i.test(q);
       const asksRemedialOnly = /(ซ่อมเสริม|remedial)/i.test(q) && !asksSpecial;
 
       if (!hasIdsInContext) {
