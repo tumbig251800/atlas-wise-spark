@@ -1,5 +1,4 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || Deno.env.get("SUPABASE_PROJECT_URL") || "";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
 
@@ -14,10 +13,6 @@ export type AtlasAuthResult =
   | { ok: true; token: string; userId: string; email?: string | null }
   | { ok: false; status: number; error: string };
 
-/**
- * Manual JWT verification for Edge Functions.
- * This avoids Supabase Edge gateway verify_jwt incompatibilities with ES256 signing keys.
- */
 export async function requireAtlasUser(req: Request): Promise<AtlasAuthResult> {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     return { ok: false, status: 500, error: "SUPABASE_URL / SUPABASE_ANON_KEY is not configured" };
@@ -38,4 +33,3 @@ export async function requireAtlasUser(req: Request): Promise<AtlasAuthResult> {
 
   return { ok: true, token, userId: data.user.id, email: data.user.email ?? null };
 }
-

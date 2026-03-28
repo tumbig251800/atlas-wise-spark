@@ -24,17 +24,12 @@
 
 ---
 
-## 3. Consolidation ก่อน deploy (สำคัญ)
+## 3. การ Deploy
 
-**Supabase ไม่รองรับ relative imports** ตอน deploy — โค้ดใน `index.ts` ที่ import จาก `_shared/` จะไม่ทำงานบน production
+**หมายเหตุ:** โปรเจกต์ได้ถูก refactor ให้รองรับ modular imports ปกติแล้ว ไม่ต้องใช้ไฟล์ consolidated อีกต่อไป
 
 **แก้ไข:** ใช้ script `deploy:ai-chat` ที่จะ:
-1. copy ไฟล์ consolidated (รวมโค้ดทั้งหมดเป็นไฟล์เดียว) ไปแทน `index.ts`
-2. deploy ขึ้น Supabase
-3. restore ไฟล์ source กลับ (repo คงโครงสร้าง modular)
-
-**ไฟล์ที่ใช้:** `ai-chat-consolidated.ts` ใน root — ต้องมีอยู่ก่อน deploy  
-ถ้าแก้ `ai-chat/index.ts` หรือ `_shared/*` ต้อง regenerate consolidated ก่อน (ดู `.cursor/plans/` หรือถาม dev)
+deploy ขึ้น Supabase โดยตรงจาก Source file
 
 ---
 
@@ -76,9 +71,8 @@ curl -sS -w "\nHTTP Status: %{http_code}\n" -X POST "https://ebyelctqcdhjmqujesk
 
 | ไฟล์ | หน้าที่ |
 |------|---------|
-| `ai-chat-consolidated.ts` | ไฟล์รวม (inline) สำหรับ deploy — ต้องมีก่อนรัน deploy:ai-chat |
-| `supabase/functions/ai-chat/index.ts` | Source (ใช้ import) — script จะ restore หลัง deploy |
-| `supabase/functions/_shared/` | atlasAuth, aiChatValidator, numberExtractor — รวมใน consolidated |
+| `supabase/functions/ai-chat/index.ts` | Source File หลักที่ใช้รัน AI Chat (deploy จากไฟล์นี้โดยตรง) |
+| `supabase/functions/_shared/` | atlasAuth, aiChatValidator, numberExtractor (แชร์ให้ Edge function อื่น ๆ ด้วย) |
 | `supabase/config.toml` | `[functions.ai-chat] verify_jwt = false` |
 
 ---

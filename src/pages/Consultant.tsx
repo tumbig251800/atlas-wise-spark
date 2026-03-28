@@ -325,6 +325,7 @@ export default function Consultant() {
         body: JSON.stringify({
           messages: [...messages, userMsg],
           context,
+          audience: "teacher",
         }),
         signal: controller.signal,
       });

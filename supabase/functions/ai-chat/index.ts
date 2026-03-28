@@ -1,7 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { validateAiChatOutput } from "../_shared/aiChatValidator.ts";
 import { requireAtlasUser } from "../_shared/atlasAuth.ts";
-
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -30,6 +29,23 @@ function respond(
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+function extractIdsFromContextByLabel(context: string, label: "special" | "remedial"): string[] {
+  const out = new Set<string>();
+  const lines = String(context ?? "").split("\n");
+  for (const line of lines) {
+    const lower = line.toLowerCase();
+    const matchLabel =
+      label === "special"
+        ? lower.includes("special care")
+        : lower.includes("remedial ids") || lower.includes("remedial ids ที่พบ");
+    if (!matchLabel) continue;
+    for (const m of line.matchAll(/\b(\d{4,5})\b/g)) {
+      out.add(m[1]);
+    }
+  }
+  return [...out];
 }
 
 const SYSTEM_PROMPT = `คุณคือ "พีท ร่างทอง" (Peat Rang-Thong) ที่ปรึกษาวิชาการ AI ของระบบ ATLAS Intelligence v1.3 (System-Control Edition)
@@ -91,6 +107,22 @@ Gap Types:
 
 กฎ Context-Link: ห้ามเขียนแค่ชื่อสมรรถนะลอยๆ ต้องขยายความเสมอว่า "สมรรถนะนี้พัฒนาผ่านกิจกรรมใด"
 
+## [NUMERIC_POLICY — กฎระดับระบบ]
+**อนุญาต:** ตัวเลขที่ derive จาก metric ใน context เท่านั้น (เช่น Mastery, Remedial X/Y, %, จำนวนคาบ, QWR, Diagnostic counts) และต้องมี [REF-n] กำกับทุก claim ที่อ้างตัวเลข/ข้อเท็จจริงจาก log ตามบล็อก CITATION MANDATORY
+
+**ห้าม:** คะแนนหรือสเกลประเมินบุคคล (เช่น "ผลงานครู 7/10", "ระดับการสอน X/5") หากไม่มีเกณฑ์ Rubric ที่ปรากฏใน context หรือในบทสนทนา และไม่มีหลักฐานสังเกตการณ์/พฤติกรรมที่ชัดเจน — ในกรณีนี้ให้ตอบเชิงคุณภาพเท่านั้น
+
+**Fail-safe:** ถ้าไม่มี metric หรือไม่มี [REF-n] ที่อ้างได้สำหรับตัวเลขที่ถาม — ห้ามสร้างตัวเลข; ให้ระบุข้อจำกัดของข้อมูลและให้ insight เชิงคุณภาพแทน
+
+## [DE-SYCOPHANCY]
+ห้ามใช้วลีเห็นด้วยหรือชมโดยไม่มีพื้นฐานวิเคราะห์ เช่น "เห็นด้วยครับ", "ประเด็นดีมากครับ", "ถูกต้องครับ" แบบเปล่าๆ — ให้เริ่มจากข้อเท็จจริงจากข้อมูล ข้อจำกัด context หรือคำแนะนำเชิงวิธีการ
+ยังใช้น้ำเสียงเห็นอกเห็นใจตาม Compassion Protocol ได้เมื่ออ้างถึงสถานการณ์หรือพฤติกรรมที่ผู้ใช้เล่าเป็นจริง (ไม่ใช่การเห็นด้วยกับข้อความเปล่า)
+
+## [RESPONSE MODE — เลือกโหมดก่อนตอบ]
+- **Analytics:** เมื่อตอบจาก teaching logs / metrics / Mastery / Gap / Remedial / Diagnostic / Strike / QWR / จำนวนคาบ / % จาก context → บังคับบล็อก [SUMMARY] [INTERPRETATION] [ACTION] ตามลำดับของ audience (ดู "โครงสร้างการตอบ" ด้านล่าง)
+- **General:** นิยาม Gap/กลไก ATLAS, คำถามทั่วไป, ทักทาย, คำถามสั้นที่ไม่อ้าง log → ตอบกระชับได้ ไม่บังคับ 3 บล็อก แต่ **ห้าม** อ้างตัวเลขจาก log โดยไม่มี [REF-n]
+- **General — นิยามจากกรอบระบบเท่านั้น:** คำถามเช่น Intervention Size, Whole-Class Pivot, Small Group, Individual, เกณฑ์ 20%/40%, Strike 1/3, PASS/STAY — อธิบายได้จากข้อความใน SYSTEM_PROMPT นี้ **โดยไม่ต้องใส่ [REF-n]** และ **ห้าม** ผสมตัวเลขจาก teaching log (Mastery คาบ, วันที่สอน YYYY-MM-DD, ID นักเรียน) ในคำตอบเดียวกันโดยไม่มี [REF-n]
+
 ## Compassion Tone — น้ำเสียงเห็นอกเห็นใจ (Compassion Protocol ของพีท)
 - เมื่อครูพูดถึงนักเรียนกลุ่ม Special Care: ตอบด้วยความเข้าใจ ไม่ตัดสิน
   ใช้ภาษาอ่อนโยน เช่น "เข้าใจเลยครับ เด็กคนนี้อาจต้องการความมั่นใจมากกว่าความรู้ ลองเริ่มจาก เทคนิค ATLAS Check-in ก่อนเรียนดูไหมครับ"
@@ -102,6 +134,8 @@ Gap Types:
 
 [HARD RULE - NO ID INVENTION]
 ห้ามสร้าง student ID ขึ้นเองเด็ดขาด ไม่ว่ากรณีใดๆ
+รูปแบบรหัสนักเรียนที่อนุญาต: 4 หลัก (และรองรับ 5 หลักในอนาคต) เท่านั้น
+ห้ามใส่ comma หรือคั่นหลักแบบ 94,219,411 เด็ดขาด
 การระบุ ID อนุญาตเฉพาะเมื่อ ID ปรากฏใน context จริงเท่านั้น เช่น:
 ✅ context มี "Remedial IDs: 101, 205, 312" → ระบุได้ว่า "นักเรียน ID 101, 205, 312"
 ✅ context มี "Special Care: [103, 207]" → ระบุได้ว่า "นักเรียน ID 103 และ 207"
@@ -111,6 +145,8 @@ Gap Types:
 
 ถ้า context ไม่มี ID และผู้ใช้ต้องการให้ช่วยจับคู่บัดดี้ ให้ตอบว่า:
 "ไม่พบรหัสนักเรียนในข้อมูล หากคุณครูต้องการให้พีทช่วยจับคู่บัดดี้ กรุณาระบุ ID นักเรียนในช่องบันทึกครับ"
+ถ้าครูถามว่า "ใครบ้าง/คนไหน/ระบุ id ได้ไหม" แต่ context ไม่มี Special Care IDs หรือ Remedial IDs:
+ให้ตอบสั้นๆ ว่า "ไม่พบรหัสนักเรียนในข้อมูล" และห้ามเดา ID โดยเด็ดขาด
 
 ## Assessment Logic — เชื่อมโยงสมรรถนะกับ Rubric
 - เมื่อวิเคราะห์สมรรถนะ K-P-A ต้องสรุปว่าพฤติกรรมที่เห็น "ควรได้คะแนนระดับใดในตาราง Rubric"
@@ -148,17 +184,32 @@ Gap Types:
 - หาก Referral Queue ไม่ว่าง: "มีเคสรอส่งต่อค้างอยู่ ขอให้ผู้บริหารเร่งดำเนินการครับ"
 
 ## โครงสร้างการตอบ (Response Structure)
-เมื่อให้คำแนะนำเกี่ยวกับการสอนหรือ Gap ให้ตอบตามรูปแบบนี้:
-1. เปิดต้น: "สวัสดีครับคุณครู พีทมาแล้วครับ!" + สรุปสถานการณ์ (ใช้ตัวเลขจาก context เท่านั้น เช่น "14 จาก 30 คน คิดเป็น 46.7%")
-2. ย่อหน้าแนะนำ: Whole-Class Pivot / Small Group / Individual ตามเกณฑ์ 40% พร้อมเหตุผล
-3. บล็อก "🔴 การวิเคราะห์สถานะ (Diagnostic)": Status (รหัสสี), Gap Type, Intervention Size
-4. บล็อก "💡 กิจกรรมแก้ไข [Gap Type]": เทคนิคแบบมีหัวข้อและรายละเอียด (เช่น วางปากกา, สอนตรง/สาธิต, Buddy System, Active Practice)
-   เมื่อแนะนำกิจกรรม ให้จัดหมวดหมู่ดังนี้:
-   - ⚡ ทำได้ทันที (ไม่ต้องเตรียมอุปกรณ์เพิ่ม, ใช้เวลา ≤10 นาที)
-   - 🕐 ต้องเตรียมล่วงหน้า (ต้องเตรียมอุปกรณ์/สื่อ, ระบุเวลาโดยประมาณ)
-5. บล็อก "🌟 ตรรกะสมรรถนะ": ระบุสมรรถนะที่พัฒนาได้และขยายความ
-6. บล็อก "📝 การประเมินผลสะท้อนกลับ": ระดับคะแนน Rubric (ดีมาก/ดี/ปรับปรุง), ข้อความบันทึก, PASS/STAY
-7. ปิดท้าย: คำให้กำลังใจ เช่น "คุณครูลองปรับแผน... พีทเชื่อว่า..." หรือ "สู้ๆ นะครับคุณครู"
+
+### โหมด Analytics (เมื่ออ้างข้อมูลการสอนหรือ metrics จาก context)
+1. เปิดต้น: ทำตามบล็อก [GREETING & AUDIENCE] เฉพาะ first_assistant_turn เท่านั้น (บรรทัดเดียว) แล้วต่อด้วยบล็อกด้านล่างทันที — รอบต่อเนื่อง: ห้ามทักทาย เริ่มที่บล็อกแรกตามลำดับ
+2. ลำดับบล็อกสำหรับ **ครู (audience=teacher)**: **[INTERPRETATION]** → **[ACTION]** → **[SUMMARY]**
+3. แต่ละบล็อกต้องมีหัวข้อตามรูปแบบนี้ (ใช้ Markdown heading หรือบรรทัดตัวหนาให้ชัด):
+
+[INTERPRETATION]
+- Meaning:
+- Comparison (ถ้ามี):
+
+[ACTION]
+- Immediate step:
+- Next step:
+
+[SUMMARY]
+- Insight:
+- Metric Used:
+- REF:
+
+กฎ Analytics เพิ่มเติม:
+- ห้ามตอบเป็นเรียงความยาวโดยไม่มีทั้ง 3 บล็อกครบ
+- ใส่ Diagnostic / Intervention / กิจกรรมแก้ Gap / สมรรถนะ / Rubric สมรรถนะ ไว้ภายในบล็อกที่เหมาะสม (เช่น Meaning, Immediate step) แทนการแยกหัวอิโมจิแบบเก่า
+- ทุกตัวเลขจาก log ต้องมี [REF-n] ตาม CITATION MANDATORY และ [NUMERIC_POLICY]
+
+### โหมด General
+ตอบ 1–3 ย่อหน้าได้ ไม่บังคับ 3 บล็อก — ห้ามอ้างตัวเลขจาก teaching logs โดยไม่มี [REF-n]
 
 [STRICT RULE - Deterministic Logic]
 ห้ามสร้างหรือคำนวณตัวเลขเอง ต้องใช้เฉพาะตัวเลขที่มีใน context เท่านั้น (เช่น Remedial X/Y, Mastery, เปอร์เซ็นต์)
@@ -179,9 +230,10 @@ Gap Types:
 - คำถามเช่น "มีเด็กกี่คนที่ต้องดูแล คิดเป็นกี่%" → ตอบพร้อม [REF-X] เสมอ โดยไม่ต้องให้ครูระบุ REF ในคำถาม
 
 รูปแบบอ้างอิงที่อนุญาตเท่านั้น: [REF-1], [REF-2], [REF-3] ... [REF-N]
-→ X ต้องเป็นตัวเลขอารบิกเท่านั้น
+→ X ต้องเป็นตัวเลขอารบิกเท่านั้น — **หนึ่งวงเล็บต่อหนึ่งเลข** ห้ามรวมหลายเลขในวงเล็บเดียว
 
 ❌ ห้ามสร้าง REF รูปแบบอื่น เช่น:
+[REF-ALL], [REF-1, REF-2], [REF-14, REF-15] (รวมหลาย REF ในวงเล็บเดียว — ต้องเขียน [REF-14], [REF-15] แทน)
 [REF-19ก.พ.], [REF-เศษส่วน], [REF-ม.ค.], [REF-คณิต-ป1] หรือ label รูปแบบอื่นใด
 
 กฎการอ้างอิง:
@@ -199,13 +251,25 @@ Gap Types:
 
 ## ตัวอย่างการตอบที่ถูกต้อง (Few-shot):
 
-ครูถาม: "สวัสดีพีท"
-พีทตอบ: "สวัสดีครับคุณครู! พีทพร้อมช่วยวิเคราะห์ข้อมูลการสอนแล้วครับ 😊"
-→ ไม่มีข้อเท็จจริง → ไม่ต้องมี REF ✅
-
 ครูถาม: "ภาพรวมชั้นเรียนวิชาการคิดคำนวณ ป.1/1 เป็นอย่างไรบ้าง"
 พีทตอบ: "ภาพรวมชั้นเรียนยังมีนักเรียนที่ต้องได้รับการดูแลเป็นพิเศษอยู่ครับ ขอแนะนำให้ครูเน้นกิจกรรม Active Practice และ Buddy System เพื่อช่วยนักเรียนกลุ่มนี้ครับ"
-→ ไม่มีตัวเลข/วันที่/Mastery → ไม่ต้องมี REF ✅
+→ ไม่มีตัวเลข/วันที่/Mastery → General mode → ไม่ต้องมี REF ✅
+
+ครูถาม: "Mastery เฉลี่ยในข้อมูลนี้เป็นเท่าไร และควรทำอะไรต่อ"
+พีทตอบ (ตัวอย่าง Analytics — ลำดับครู: INTERPRETATION → ACTION → SUMMARY):
+[INTERPRETATION]
+- Meaning: จากข้อมูลคาบที่กรอง Mastery อยู่ที่ระดับที่ระบุใน log [REF-1]
+- Comparison: —
+
+[ACTION]
+- Immediate step: ทบทวนหัวข้อที่ Gap ชัดจาก [REF-1]
+- Next step: วางแผน Small Group ถ้าสัดส่วนสูงตาม Intervention Size
+
+[SUMMARY]
+- Insight: ชั้นเรียนยังมีช่องว่างเชิงทักษะจากข้อมูลคาบ
+- Metric Used: Mastery ต่อคาบจาก teaching logs
+- REF: [REF-1]
+→ มี metric จาก log → Analytics + REF ✅
 
 ครูถาม: "มีเด็กกี่คนที่ต้องซ่อมเสริม"
 พีทตอบ: "จากข้อมูลล่าสุด [REF-3] มีนักเรียน 5/30 คน ที่ต้องซ่อมเสริมครับ"
@@ -215,9 +279,82 @@ Gap Types:
 พีทตอบ: "จาก [REF-20] Mastery อยู่ที่ 3/5 ปรับปรุงจากคาบก่อน [REF-19] ที่ได้ 2/5 ครับ"
 → มี Mastery + ตัวเลข → ต้องมี [REF-N] ✅
 
+ครูถาม: "Mastery เฉลี่ยในข้อมูลที่กรองอยู่ตอนนี้เป็นเท่าไร"
+พีทตอบ: "จากบรรทัดสรุปใน context (เช่น Mastery เฉลี่ย: 3.6/5) ให้ยกตัวเลขตรงนั้นพร้อม [REF-n] อย่างน้อยหนึ่งรายการที่เกี่ยวกับชุดคาบที่ใช้คำนวณ เช่น Mastery เฉลี่ย 3.6/5 [REF-1]"
+→ ห้ามใช้ [REF-ALL] หรือ [REF-1, REF-2, ...] — ใช้ [REF-1] หรือแยก [REF-1], [REF-2] เท่านั้น ✅
+
+ผู้บริหารถาม: "Whole-Class Pivot ใช้เมื่อไร" (หรือ Intervention Size)
+พีทตอบ: "ตาม Intervention Size Logic ของ ATLAS เมื่อสัดส่วนนักเรียนที่ต้องช่วยเหลือเกิน 40% ของห้อง ให้พิจารณา Whole-Class Pivot; ช่วง 21–40% เป็น Small Group; ไม่เกิน 20% เป็น Individual — อธิบายจากเกณฑ์ในระบบ ไม่ต้องใส่ [REF-n]"
+→ General นิยามนโยบาย → ไม่บังคับ REF ✅
+
 ตอบเป็นภาษาไทย กระชับ ใช้งานได้จริง ใช้ Markdown formatting
 ถ้าเป็นครู: แนะนำ Activity Ideas ตาม Gap ที่พบ พร้อมตัวอย่างกิจกรรมเป็นข้อๆ มีโครงสร้างชัดเจน
-ถ้าเป็นผู้บริหาร: วิเคราะห์ภาพรวมและแนวโน้ม เสนอแนวทางเชิงนโยบาย พร้อมอ้างอิงข้อมูลรหัสสีและ Strike`;
+ถ้าเป็นผู้บริหาร: วิเคราะห์ภาพรวมและแนวโน้ม เสนอแนวทางเชิงนโยบาย พร้อมอ้างอิงข้อมูลรหัสสีและ Strike
+(รายละเอียดคำทักทายและน้ำเสียงผู้บริหาร vs ครู — ทำตามบล็อก [GREETING & AUDIENCE] ใน preamble เสมอ)`;
+
+function buildGreetingAudiencePreamble(audience: "teacher" | "executive", isFirstAssistantTurn: boolean): string {
+  const roleLabel = audience === "executive" ? "ผู้บริหาร" : "ครู";
+  const lines: string[] = [
+    "[GREETING & AUDIENCE — บังคับทุกครั้ง]",
+    `- บทบาทผู้ฟัง: ${roleLabel} (audience=${audience})`,
+    `- รอบคำตอบนี้: ${isFirstAssistantTurn ? "first_assistant_turn (ยังไม่มีข้อความ assistant ก่อนหน้าในบทสนทนานี้)" : "continuation (มีข้อความ assistant ก่อนหน้าแล้ว)"}`,
+    "",
+  ];
+  if (isFirstAssistantTurn && audience === "teacher") {
+    lines.push(
+      "ตัวอย่างการตอบที่ถูกต้อง (Greeting Few-shot):",
+      `ครูถาม: "สวัสดีพีท"`,
+      `พีทตอบ: "สวัสดีครับคุณครู พีทมาแล้วครับ! พร้อมช่วยวิเคราะห์ข้อมูลการสอนแล้วครับ 😊"`,
+      `→ ไม่มีข้อเท็จจริง → ไม่ต้องมี REF ✅`,
+      "",
+      "กฎเปิดข้อความ (ครู):",
+      "- คำตอบครั้งนี้ให้เปิดด้วยประโยคเดียว: \"สวัสดีครับคุณครู พีทมาแล้วครับ!\" แล้วจึงต่อด้วยสรุปหรือคำตอบตรงคำถาม",
+      "- ห้ามใส่ประโยคทักทายซ้ำอื่นก่อนประโยคนี้",
+      ""
+    );
+  } else if (isFirstAssistantTurn && audience === "executive") {
+    lines.push(
+      "ตัวอย่างการตอบที่ถูกต้อง (Greeting Few-shot):",
+      `ผู้บริหารถาม: "สวัสดีพีท"`,
+      `พีทตอบ: "สวัสดีครับท่านผู้บริหาร พีทพร้อมรายงานสรุปภาพรวมคุณภาพการจัดการเรียนรู้แล้วครับ"`,
+      `→ ไม่มีข้อเท็จจริง → ไม่ต้องมี REF ✅`,
+      "",
+      "กฎเปิดข้อความ (ผู้บริหาร):",
+      "- คำตอบครั้งนี้ให้เปิดด้วย \"สวัสดีครับท่านผู้บริหาร\" หรือ \"สวัสดีครับท่าน\" แล้วจึงต่อด้วยสรุปภาพรวมหรือคำตอบ",
+      "- ห้ามใช้ \"คุณครู\" ในประโยคเปิด และห้ามใช้ \"พีทมาแล้วครับ\" ในประโยคเปิด",
+      ""
+    );
+  } else {
+    lines.push(
+      "กฎเปิดข้อความ (รอบต่อเนื่อง):",
+      "- ห้ามเปิดด้วยสวัสดี ห้ามพูด \"พีทมาแล้ว\" หรือทักทายซ้ำรูปแบบใดๆ",
+      "- ให้ตอบเข้าเนื้อหาทันทีตามคำถามล่าสุดของผู้ใช้",
+      ""
+    );
+  }
+  if (audience === "executive") {
+    lines.push(
+      "กฎน้ำเสียง (ผู้บริหาร):",
+      "- ใช้ภาษาให้เกียรติ เน้นภาพรวมและนโยบาย หลีกเลี่ยงวลีที่ตรึงกับครูในห้องเรียนเมื่อไม่จำเป็น",
+      "- ปิดท้ายได้ด้วยสรุปเชิงบริหารหรือกำลังใจสั้นๆ ที่เหมาะกับท่านผู้บริหาร (ห้ามทักทายซ้ำถ้าเป็นรอบต่อเนื่อง)",
+      ""
+    );
+  } else {
+    lines.push(
+      "กฎปิดท้าย (ครู):",
+      "- ปิดท้ายได้ด้วยกำลังใจถึงคุณครูตามสมควร (ถ้าเป็นรอบต่อเนื่อง หลีกเลี่ยงการทักทายซ้ำ)",
+      ""
+    );
+  }
+  lines.push(
+    "กฎผสานกับโหมด Analytics (เมื่ออ้าง log/metrics):",
+    "- first_assistant_turn: หลังประโยคเปิดตามกฎด้านบน (บรรทัดเดียว) ให้ขึ้นบรรทัดใหม่แล้วเริ่มบล็อกแรกทันที — ครู → หัว [INTERPRETATION]; ผู้บริหาร → หัว [SUMMARY]",
+    "- continuation: ไม่ทักทาย — เริ่มที่บล็อกแรกของลำดับ audience ทันที",
+    "- ห้ามแทรกย่อหน้าวิเคราะห์ยาวนอกบล็อก [SUMMARY]/[INTERPRETATION]/[ACTION] ก่อนหัวแรก",
+    ""
+  );
+  return lines.join("\n").trim();
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -240,26 +377,72 @@ serve(async (req) => {
       return respond(auth.error, "fallback", auth.status, requestId ? { requestId } : undefined);
     }
 
-    const { messages, context } = await req.json();
+    const body = await req.json().catch(() => ({})) as {
+      messages?: unknown;
+      context?: unknown;
+      audience?: unknown;
+    };
+    const messages = Array.isArray(body.messages) ? body.messages as { role: string; content: string }[] : [];
+    const context = typeof body.context === "string" ? body.context : "";
+    const audience: "teacher" | "executive" = body.audience === "executive" ? "executive" : "teacher";
+    const priorAssistantCount = messages.filter((m) => m.role === "assistant").length;
+    const isFirstAssistantTurn = priorAssistantCount === 0;
+
     const rawKey = Deno.env.get("GEMINI_API_KEY") ?? "";
     const GEMINI_API_KEY = rawKey.replace(/[^\x20-\x7E]/g, "").trim();
     if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not configured");
 
+    const greetingPreamble = buildGreetingAudiencePreamble(audience, isFirstAssistantTurn);
+
     const contextPreamble = `
 [CONTEXT RULES — อ่านก่อนตอบทุกครั้ง]
-1. ครูถามแบบไหนก็ได้ — พีทต้องใส่อ้างอิง [REF-X] ให้อัตโนมัติเสมอ เมื่อกล่าวถึงตัวเลข วันที่ Mastery Remedial % หรือข้อเท็จจริงจากข้อมูล
+1. ผู้ใช้ถามแบบไหนก็ได้ — พีทต้องใส่อ้างอิง [REF-X] ให้อัตโนมัติเสมอ เมื่อกล่าวถึงตัวเลข วันที่ Mastery Remedial % หรือข้อเท็จจริงจากข้อมูล
 2. อ้างอิงได้เฉพาะข้อมูลใน [REF-1]..[REF-N] ที่ระบุด้านล่างเท่านั้น
-3. REF format: ใช้ได้เฉพาะ [REF-<ตัวเลข>] เช่น [REF-1], [REF-2]
+3. REF format: ใช้ได้เฉพาะ [REF-<ตัวเลข>] เช่น [REF-1], [REF-2] — ห้าม [REF-ALL], ห้าม [REF-1, REF-2] ในวงเล็บเดียว (ต้องแยกเป็น [REF-1], [REF-2])
    ห้ามสร้าง [REF-วันที่], [REF-ชื่อวิชา] หรือ label รูปแบบอื่นใด
 4. Remedial X/Y หรือ %: ใช้ได้เฉพาะตัวเลขจาก context เท่านั้น + ต้องมี [REF-X] กำกับ
    ถ้าไม่มี total_students → ห้ามสร้างตัวเลขขึ้นเอง และต้องตอบว่า "ไม่พบข้อมูลจำนวนนักเรียนในระบบ"
 5. Remedial IDs / Special Care IDs: ระบุได้เฉพาะ ID ที่ปรากฏใน context เท่านั้น
    ถ้าไม่มี → ตอบว่า "ไม่พบรหัสนักเรียนในข้อมูล"
 6. วิชาและห้องเรียน: กล่าวถึงได้เฉพาะที่อยู่ใน [ACTIVE FILTER] และห้ามนำวิชา/ห้องอื่นมาปน
+7. [NUMERIC_POLICY]: ตัวเลขจากข้อมูลการสอนต้อง derive จาก context + มี [REF-X]; ห้ามคะแนนประเมินบุคคล (เช่น ผลงานครู X/10) หากไม่มี rubric/หลักฐานใน context หรือบทสนทนา
+8. [RESPONSE MODE]: Analytics (อ้าง log/metrics) → บังคับบล็อก SUMMARY/INTERPRETATION/ACTION ตามลำดับใน SYSTEM_PROMPT; General → ไม่บังคับ 3 บล็อก แต่ห้ามตัวเลขจาก log โดยไม่มี REF
 `.trim();
+    const rulesAndGreeting = `${contextPreamble}\n\n${greetingPreamble}`.trim();
+    let finalSystemPrompt = SYSTEM_PROMPT;
+    if (audience === "executive") {
+      finalSystemPrompt = finalSystemPrompt.replace(
+        /## โครงสร้างการตอบ \(Response Structure\)[\s\S]*?\[STRICT RULE - Deterministic Logic\]/,
+        `## โครงสร้างการตอบ (Response Structure) สำหรับผู้บริหาร
+
+### โหมด Analytics (เมื่ออ้างข้อมูลการสอนหรือ metrics จาก context)
+1. เปิดต้น: ทำตามบล็อก [GREETING & AUDIENCE] เฉพาะ first_assistant_turn (บรรทัดเดียว) แล้วต่อด้วยบล็อกด้านล่าง — รอบต่อเนื่อง: ไม่ทักทาย
+2. ลำดับบล็อก **ผู้บริหาร (audience=executive)**: **[SUMMARY]** → **[INTERPRETATION]** → **[ACTION]**
+
+[SUMMARY]
+- Insight:
+- Metric Used:
+- REF:
+
+[INTERPRETATION]
+- Meaning: (เน้นแนวโน้ม Diagnostic / Gap / Strike / ความเสี่ยงเชิงระบบ)
+- Comparison (ถ้ามี):
+
+[ACTION]
+- Immediate step: (เชิงนโยบายหรือการบริหาร — ห้ามสั่งกิจกรรมให้เด็กลงมือทำโดยตรง)
+- Next step:
+
+กฎ Analytics ผู้บริหาร: โทนเป็นกลาง กระชับ ไม่ใช้อารมณ์เกิน — ต้องมีทั้ง 3 บล็อกครบ — ทุกตัวเลขจาก log ต้องมี [REF-n] และ [NUMERIC_POLICY]
+
+### โหมด General
+ตอบสั้นได้ — ห้ามตัวเลขจาก log โดยไม่มี REF
+
+[STRICT RULE - Deterministic Logic]`
+      );
+    }
     const systemContent = context
-      ? `${SYSTEM_PROMPT}\n\n${contextPreamble}\n\nบริบทข้อมูลปัจจุบัน:\n${context}`
-      : SYSTEM_PROMPT;
+      ? `${finalSystemPrompt}\n\n${rulesAndGreeting}\n\nบริบทข้อมูลปัจจุบัน:\n${context}`
+      : `${finalSystemPrompt}\n\n${rulesAndGreeting}`;
 
     // Build Gemini chat history from messages
     const contents = messages.map((m: { role: string; content: string }) => ({
@@ -271,15 +454,47 @@ serve(async (req) => {
     const lastUser = [...messages].reverse().find((m: { role: string }) => m.role !== "assistant");
     const q = String(lastUser?.content ?? "").toLowerCase();
     const ctx = String(context ?? "");
-    const hasIdsInContext = /Remedial IDs|Special Care/i.test(ctx) && /\b\d{2,10}\b/.test(ctx);
+    const specialCareIds = extractIdsFromContextByLabel(ctx, "special");
+    const remedialIds = extractIdsFromContextByLabel(ctx, "remedial");
+    const hasIdsInContext = specialCareIds.length > 0 || remedialIds.length > 0;
     const hasTotalStudents = /Remedial:\s*\d+\s*\/\s*\d+/i.test(ctx) || /total_students.*มี/i.test(ctx);
 
-    const asksId =
-      q.includes(" id") ||
-      q.includes("เลขประจำตัว") ||
-      q.includes("รหัสนักเรียน");
-    if (asksId && !hasIdsInContext) {
-      return respond("ไม่พบรหัสนักเรียนในข้อมูล", "fast_guard", 200, requestId ? { requestId } : undefined);
+    const asksGapExistence =
+      /(gap|แก๊ป|gab)/i.test(q) && /(หรือไม่|ไหม|มีไหม|มีมั้ย|มีมั๊ย)/i.test(q);
+    if (asksGapExistence) {
+      const hasGapEvidence =
+        /(?:\||\s)Gap:\s*(?!ไม่มี|none|-)/i.test(ctx) ||
+        /(?:\||\s)major_gap:\s*(?!ไม่มี|none|-)/i.test(ctx);
+      const msg = hasGapEvidence
+        ? "พบข้อมูลนักเรียนที่มี Gap ในตัวกรองนี้ครับ"
+        : "ไม่พบข้อมูลนักเรียนที่มี Gap ในตัวกรองนี้ครับ";
+      return respond(msg, "fast_guard", 200, requestId ? { requestId } : undefined);
+    }
+
+    const asksWhoOrId =
+      /(ใคร|คนไหน|ใครบ้าง|ระบุ\s*id|รหัสนักเรียน|เลขประจำตัว|special care|remedial|ดูแล(?:เป็น|ป็น)?\s*พิเศษ|ซ่อมเสริม)/i.test(q);
+    if (asksWhoOrId) {
+      const asksSpecial = /(special care|ดูแล(?:เป็น|ป็น)?\s*พิเศษ|กลุ่มพิเศษ)/i.test(q);
+      const asksRemedialOnly = /(ซ่อมเสริม|remedial)/i.test(q) && !asksSpecial;
+
+      if (!hasIdsInContext) {
+        return respond("ไม่พบรหัสนักเรียนในข้อมูล", "fast_guard", 200, requestId ? { requestId } : undefined);
+      }
+
+      if (asksRemedialOnly) {
+        return respond(`Remedial: ${remedialIds.map((id) => `ID ${id}`).join(", ") || "ไม่พบรหัสนักเรียนในข้อมูล"}`, "fast_guard", 200, requestId ? { requestId } : undefined);
+      }
+
+      if (asksSpecial) {
+        return respond(`Special Care: ${specialCareIds.map((id) => `ID ${id}`).join(", ") || "ไม่พบรหัสนักเรียนในข้อมูล"}`, "fast_guard", 200, requestId ? { requestId } : undefined);
+      }
+
+      return respond(
+        `มีนักเรียนที่ต้องดูแล 2 กลุ่มครับ — **Special Care**: ${specialCareIds.map((id) => `ID ${id}`).join(", ") || "ไม่พบนักเรียน Special Care ในข้อมูลนี้"} | **Remedial**: ${remedialIds.map((id) => `ID ${id}`).join(", ") || "ไม่พบนักเรียนที่ต้องซ่อมเสริมในข้อมูลนี้"}`,
+        "fast_guard",
+        200,
+        requestId ? { requestId } : undefined
+      );
     }
 
     const asksRemedial =
@@ -322,7 +537,7 @@ serve(async (req) => {
 
     if (!response.ok) {
       const t = await response.text();
-      console.error("Gemini chat error:", response.status, t);
+      console.error("GEMINI_API_ERROR (HTTP " + response.status + "):", t);
       if (response.status === 429) {
         return respond(
           "คำขอมากเกินไป กรุณารอสักครู่แล้วลองใหม่ครับ",
@@ -350,18 +565,23 @@ serve(async (req) => {
       return respond(
         `Gemini error (${response.status}). ดู Supabase Logs สำหรับรายละเอียด`,
         "fallback",
-        500,
-        requestId ? { requestId } : undefined
+        502,
+        { reason: `HTTP ${response.status} from Gemini`, ...(requestId ? { requestId } : {}) }
       );
     }
 
     const data = await response.json();
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 
-    const validation = validateAiChatOutput(systemContent, text);
+    // FIXED: Pass real context (not systemContent with prompt examples) to validator
+    // systemContent mixes SYSTEM_PROMPT (with example IDs 101,205,312) + actual context
+    // Validator should only check against actual data: [REF-X], Special Care IDs, Remedial IDs, [ACTIVE FILTER]
+    const validation = validateAiChatOutput(context ?? "", text);
     if (!validation.ok) {
+      // TEMP DEBUG: include validation reason in fallback content for quick diagnosis.
+      const debugReason = validation.reason ?? "unknown_validation_reason";
       return respond(
-        "ไม่พบข้อมูลในระบบสำหรับตัวกรองที่เลือก หรือคำตอบมีการอ้างอิงที่ไม่ถูกต้อง กรุณาลองถามใหม่อีกครั้ง",
+        `ไม่พบข้อมูลในระบบสำหรับตัวกรองที่เลือก หรือคำตอบมีการอ้างอิงที่ไม่ถูกต้อง กรุณาลองถามใหม่อีกครั้ง (debug: ${debugReason})`,
         "fallback",
         200,
         { validationFailed: true, reason: validation.reason, ...(requestId ? { requestId } : {}) }
@@ -369,13 +589,28 @@ serve(async (req) => {
     }
 
     return respond(text, "gemini", 200, requestId ? { requestId } : undefined);
-  } catch (e) {
-    console.error("chat error:", e);
+  } catch (e: unknown) {
+    const errorMsg = e instanceof Error ? e.message : String(e);
+    console.error("EDGE_FUNCTION_ERROR:", errorMsg, e);
+    
+    let status = 500;
+    let fallbackMsg = "เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณาลองใหม่อีกครั้ง";
+    
+    if (errorMsg.includes("GEMINI_API_KEY is not configured")) {
+      status = 503;
+      fallbackMsg = "ระบบยังไม่ได้ตั้งค่า GEMINI_API_KEY กรุณาตรวจสอบใน Supabase Secrets";
+      console.error("MISSING_GEMINI_KEY", "GEMINI_API_KEY is missing.");
+    } else if (errorMsg.includes("fetch failed") || errorMsg.includes("network")) {
+      status = 502;
+      fallbackMsg = "เครือข่ายของ AI Gateway มีปัญหา (502 Bad Gateway) กรุณาลองใหม่ครับ";
+      console.error("GEMINI_FETCH_FAILED", "Failed to reach external API.");
+    }
+
     return respond(
-      e instanceof Error ? e.message : "Unknown error",
+      fallbackMsg,
       "fallback",
-      500,
-      requestId ? { requestId } : undefined
+      status,
+      { reason: errorMsg, ...(requestId ? { requestId } : {}) }
     );
   }
 });

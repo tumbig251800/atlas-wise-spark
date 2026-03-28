@@ -1,5 +1,4 @@
 import { extractNumbersFromText } from "./numberExtractor.ts";
-
 export interface AiChatValidationResult {
   ok: boolean;
   reason?: string;
@@ -12,21 +11,97 @@ const FRACTION_RE = /\b(\d+)\s*\/\s*(\d+)\b/g;
 const PERCENT_RE = /(\d+(?:\.\d+)?)\s*%/g;
 const DATE_RE = /\b\d{4}-\d{2}-\d{2}\b/g;
 
-function hasClaims(output: string): boolean {
-  // Claim-aware enforcement: only require REF if output contains factual claims.
-  // Claims include numbers, dates, mastery/remedial mentions, ID mentions, or fractions/percent.
+/** Strike ladder only (1/3, 2/3, 3/3) — policy text, not teaching-log metrics */
+function isStrikeLadderFraction(a: number, b: number): boolean {
+  return b === 3 && a >= 1 && a <= 3;
+}
+
+/**
+ * True when output looks like it cites teaching logs / class metrics and should carry [REF-n].
+ * Excludes pure ATLAS policy definitions (Intervention %, Whole-Class Pivot, Strike wording only).
+ */
+function requiresTeachingLogCitation(output: string): boolean {
   const hasNullResultPhrase = /(ไม่พบ|ไม่มี)/.test(output);
-  if (FRACTION_RE.test(output)) return true;
-  if (PERCENT_RE.test(output)) return true;
+
+  if (/\[REF-/i.test(output)) return true;
   if (DATE_RE.test(output)) return true;
-  if (ID_RE.test(output)) return true;
-  if (/\bMastery\b/i.test(output)) return true;
-  // Null-result responses (e.g. "ไม่พบ ... Remedial") should not be forced to add REF.
+
   if (/\bRemedial\b/i.test(output) && !hasNullResultPhrase) return true;
   if (/\bSpecial Care\b/i.test(output) && !hasNullResultPhrase) return true;
-  if (/(คะแนน|เฉลี่ย|จำนวน|คาบ|วันที่)/.test(output)) return true;
-  if (/\b\d{2,}\b/.test(output)) return true;
+
+  if (/(?:\bID\b|รหัสนักเรียน)\s*[:：]?\s*\d{4,5}\b/i.test(output)) return true;
+  if (/Remedial:\s*\d+/i.test(output)) return true;
+
+  if (/\b\d+(?:\.\d+)?\s*\/\s*5\b/.test(output)) return true;
+
+  FRACTION_RE.lastIndex = 0;
+  let fractionNeedsRef = false;
+  for (const m of output.matchAll(/\b(\d+)\s*\/\s*(\d+)\b/g)) {
+    const a = parseInt(m[1] ?? "0", 10);
+    const b = parseInt(m[2] ?? "0", 10);
+    if (b === 5) {
+      fractionNeedsRef = true;
+      break;
+    }
+    if (isStrikeLadderFraction(a, b)) continue;
+    if (b >= 10 || a >= 10) {
+      fractionNeedsRef = true;
+      break;
+    }
+    if (a >= 2 && b >= 2 && !(a <= 3 && b === 3)) {
+      fractionNeedsRef = true;
+      break;
+    }
+  }
+  if (fractionNeedsRef) return true;
+
+  PERCENT_RE.lastIndex = 0;
+  if (PERCENT_RE.test(output)) {
+    const teachingNearPercent =
+      /\bMastery\b|Gap:|major_gap|\[REF-|ซ่อมเสริม|\d+\s*\/\s*5|คาบ|Remedial:|เฉลี่ย|จำนวนนักเรียน|Teaching Logs/i.test(
+        output
+      );
+    if (teachingNearPercent) return true;
+    if (isLikelyPolicyFrameworkOnly(output)) return false;
+    return true;
+  }
+
+  if (/\bMastery\b/i.test(output)) {
+    if (/\b\d+(?:\.\d+)?\s*\/\s*5\b/.test(output)) return true;
+    if (/เฉลี่ย/.test(output)) return true;
+    if (/\bMastery\b[^.\n]{0,80}?\d/.test(output)) return true;
+  }
+
+  if (/(คะแนน|เฉลี่ย|จำนวน|คาบ|วันที่)/.test(output)) {
+    if (/\d/.test(output) && !isLikelyPolicyFrameworkOnly(output)) return true;
+  }
+
+  if (/\b\d{2,}\b/.test(output)) {
+    if (isLikelyPolicyFrameworkOnly(output)) return false;
+    return true;
+  }
+
   return false;
+}
+
+function isLikelyPolicyFrameworkOnly(output: string): boolean {
+  if (
+    !/(Whole-?Class|Small\s+Group|Intervention|ขนาดการช่วยเหลือ|Individual|Pivot|Strike\s*\d|PASS|STAY|เกณฑ์|ทั้งห้อง|กลุ่มย่อย|รายบุคคล|ร้อยละ|เปอร์เซ็นต์|ปรับแผนการสอน)/i.test(
+      output
+    )
+  ) {
+    return false;
+  }
+  if (/\d{4}-\d{2}-\d{2}|\[REF-|\b9\d{3}\b/i.test(output)) return false;
+  if (/\bMastery\b/i.test(output) && /\d/.test(output)) return false;
+  const nums = [...output.matchAll(/\b(\d{2,})\b/g)].map((x) => parseInt(x[1] ?? "0", 10));
+  for (const v of nums) {
+    if (v >= 1900 && v <= 2099) return false;
+    if ([20, 21, 40, 41, 70].includes(v)) continue;
+    if (v <= 12) continue;
+    return false;
+  }
+  return true;
 }
 
 function extractAllowedRefNumbers(context: string): Set<string> {
@@ -98,17 +173,12 @@ export function validateAiChatOutput(context: string, output: string): AiChatVal
     return false;
   }
 
-  // 1) REF format enforcement
+  // 1) REF format enforcement — never relax: invalid [REF-...] must fail validation
   if (REF_NON_NUMERIC_RE.test(output)) {
-    // อนุญาตถ้าเป็นคำตอบเชิงคำแนะนำ/ภาพรวม และ ID ทุกตัวที่กล่าวถึงอยู่ใน context จริง
-    const hasAdvisoryPhrase = /(แนะนำ|ควร|อย่างไร|เป็นอย่างไร|แบบไหน|ภาพรวม|สรุป|ไม่พบ|ไม่มี)/.test(output);
-    if (hasAdvisoryPhrase && !hasInventedId()) {
-      return { ok: true, reason: "advice_only_format_relaxed" };
-    }
     return { ok: false, reason: "REF format is not numeric-only" };
   }
 
-  const outputHasClaims = hasClaims(output);
+  const outputHasClaims = requiresTeachingLogCitation(output);
 
   const allowedRefs = extractAllowedRefNumbers(context);
   REF_NUMERIC_RE.lastIndex = 0;
@@ -124,14 +194,9 @@ export function validateAiChatOutput(context: string, output: string): AiChatVal
     return { ok: true, reason: "no_claims" };
   }
 
-  // If there are claims, require at least one numeric REF.
+  // If output cites teaching logs / metrics, require at least one numeric REF.
   const hasNumericRef = /\[REF-\d+\]/i.test(output);
   if (!hasNumericRef) {
-    const hasAdvisoryPhrase = /(แนะนำ|ควร|อย่างไร|เป็นอย่างไร|แบบไหน|ภาพรวม|สรุป|ไม่พบ|ไม่มี)/.test(output);
-    // อนุญาตถ้าเป็นคำตอบเชิงคำแนะนำ/ภาพรวม และ ID ทุกตัวที่กล่าวถึงอยู่ใน context จริง
-    if (hasAdvisoryPhrase && !hasInventedId()) {
-      return { ok: true, reason: "advice_only" };
-    }
     return { ok: false, reason: "claims_without_refs" };
   }
 
@@ -180,7 +245,7 @@ export function validateAiChatOutput(context: string, output: string): AiChatVal
   }
 
   // Extra guard: if output contains numbers not in context at all, block only for high-risk patterns.
-  // (We keep this narrow to avoid blocking harmless counts like \"2 ข้อ\")
+  // (We keep this narrow to avoid blocking harmless counts like "2 ข้อ")
   const ctxNums = new Set(extractNumbersFromText(context).map((n) => String(n)));
   for (const m of output.matchAll(/(\d{2,10})/g)) {
     const num = m[1];
@@ -195,4 +260,3 @@ export function validateAiChatOutput(context: string, output: string): AiChatVal
 
   return { ok: true };
 }
-

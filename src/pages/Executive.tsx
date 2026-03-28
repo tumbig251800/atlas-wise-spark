@@ -194,6 +194,7 @@ export default function Executive() {
           open={adminChatOpen}
           onOpenChange={setAdminChatOpen}
           context={adminChatContext}
+          audience="executive"
         />
 
         <ExecutiveFilters

@@ -32,7 +32,7 @@ Interpretation:
 
 Files updated:
 - `supabase/functions/_shared/aiChatValidator.ts`
-- `ai-chat-consolidated.ts`
+- `supabase/functions/ai-chat/index.ts` (แหล่งเดียวหลัง refactor; ไม่มี `ai-chat-consolidated.ts` แล้ว)
 
 Key changes:
 - ID token parsing supports `ID:` format.
@@ -45,7 +45,6 @@ Key changes:
 
 Files updated:
 - `supabase/functions/ai-chat/index.ts`
-- `ai-chat-consolidated.ts`
 
 Key change:
 - Validator now validates against actual `context` instead of `systemContent`.
@@ -55,7 +54,6 @@ Key change:
 
 Files updated:
 - `supabase/functions/ai-chat/index.ts`
-- `ai-chat-consolidated.ts`
 
 Key change:
 - Explicitly requires:
@@ -143,7 +141,7 @@ Pass criteria:
 
 ## 7) Notes for Next Assignee (Cowork/Agent)
 
-1. Keep `ai-chat-consolidated.ts` in sync with source before deploy.
+1. Deploy `ai-chat` ด้วย `npm run deploy:ai-chat` จากโค้ด modular ใน `supabase/functions/ai-chat/` และ `_shared/` (ไฟล์ consolidated ถูกถอดออกจาก repo แล้ว).
 2. Do not relax ID policy to 2-3 digits.
 3. Do not remove validator guardrails; route deterministic intents earlier instead.
 4. Remove TEMP DEBUG only after deterministic route is verified stable.

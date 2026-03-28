@@ -19,13 +19,17 @@ function genId() {
   return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+export type AiChatAudience = "teacher" | "executive";
+
 interface ChatSidebarProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   context?: string;
+  /** ส่งไปยัง ai-chat: น้ำเสียงทักทาย (ครู vs ผู้บริหาร) */
+  audience?: AiChatAudience;
 }
 
-export function ChatSidebar({ open, onOpenChange, context }: ChatSidebarProps) {
+export function ChatSidebar({ open, onOpenChange, context, audience = "teacher" }: ChatSidebarProps) {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -107,6 +111,7 @@ export function ChatSidebar({ open, onOpenChange, context }: ChatSidebarProps) {
         body: JSON.stringify({
           messages: [...messages, userMsg],
           context: context || "",
+          audience,
         }),
         signal: controller.signal,
       });

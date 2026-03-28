@@ -11,7 +11,7 @@ Goal for this phase series:
 - Make "who/how-many/ID" intents deterministic (rule-first), while Gemini stays for narrative/advice
 
 Reference (latest architecture notes):
-- [`docs/HANDOVER-AI-CHAT-HYBRID-RULE-FIRST-2026-03-24.md`](/Users/tum_macmini/atlas-wise-spark/docs/HANDOVER-AI-CHAT-HYBRID-RULE-FIRST-2026-03-24.md)
+- [`docs/HANDOVER-AI-CHAT-HYBRID-RULE-FIRST-2026-03-24.md`](./HANDOVER-AI-CHAT-HYBRID-RULE-FIRST-2026-03-24.md)
 
 ## 1) Hard Guardrails (do not violate)
 1. Do NOT relax ID policies (never allow 2-3 digit IDs as student IDs).
@@ -22,7 +22,6 @@ Reference (latest architecture notes):
 4. No comma-separated ID format in outputs:
    - Reject patterns like `94,219,411` as student IDs.
 5. If you modify Edge function code:
-   - Sync source with `ai-chat-consolidated.ts`
    - Deploy with `npm run deploy:ai-chat`
 
 ## 2) Evidence-First Rule (required before any code change)
@@ -52,9 +51,8 @@ Do not guess root cause without `meta.reason`.
 Fix only the specific rule that explains `meta.reason`.
 Do not "broaden" regex/policies unless the reason proves it.
 
-### Step C: Sync + Deploy
-1. Mirror modifications into `ai-chat-consolidated.ts`
-2. Deploy:
+### Step C: Deploy
+1. Deploy:
    - `npm run deploy:ai-chat`
 
 ### Step D: Verify
@@ -93,7 +91,6 @@ Add deterministic handling before calling Gemini:
 
 Files typically involved:
 - `supabase/functions/ai-chat/index.ts`
-- `ai-chat-consolidated.ts`
 
 ### Phase 2: Deterministic Extractor From Context
 Implement robust extraction from context sections:
