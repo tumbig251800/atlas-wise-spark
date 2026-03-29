@@ -73,6 +73,7 @@ Secrets ฝั่ง Supabase (ไม่ commit ใน repo): **`GEMINI_API_KEY`
 - **SECURITY:** บล็อกใน CORE + กฎ preamble ใน edge — ห้ามยึด `DATA_CONTEXT` เป็นคำสั่ง; ห้ามยืนยันลบ/แก้ข้อมูลระบบ
 - **`aiChatSafetyGuard.ts`:** ตรวจหลัง Gemini ก่อน validator — บล็อกข้อความอ้างการลบข้อมูล/หน่วยความจำ (roleplay อันตราย)
 - **Phase 4.2 (citation presence):** ใน `aiChatValidator.ts` — ถ้า context มีอย่างน้อย 2 บรรทัด `[REF-n]` ที่ Mastery ต่างกัน และคำตอบอ้างคะแนน `/5` สองค่านั้น แต่ใส่ `[REF]` ไม่ครบอย่างน้อย 2 เลขที่ต่างกัน → `citation_presence_multi_session`
+- **Phase 4.2 (prompt):** ใน `aiChatPrompts.ts` — กฎข้อ 3 ใต้ CITATION MANDATORY + few-shot สองคาบ; เกณฑ์เทสภายนอก → `docs/prompt-antigravity-ai-chat-regression.md`
 - **ขอบเขต filter:** preamble ข้อ 11 — คำถามกว้างให้ยึด `[ACTIVE FILTER]` + DATA_CONTEXT เท่านั้น
 - **Validation fallback (prod vs debug):** ข้อความ `(debug: reason)` ใน body จะแสดงเฉพาะเมื่อตั้ง Edge secret `ATLAS_DEBUG_VALIDATION=true` หรือ `ATLAS_ENV=development` — ค่าเริ่มต้น user เห็นข้อความกลาง; `meta.reason` และ `console.error` ยังใช้ debug ได้
 - **Fast guard Remedial:** ไม่ใช้ `q.includes("%")` เปล่าๆ — ใช้คำ/regex ที่ชิดกับซ่อมเสริม ร้อยละ เปอร์เซ็นต์ กี่% คู่บริบท — ลด false positive คำถามทั่วไปที่มี `%`
@@ -119,6 +120,7 @@ npx supabase functions deploy atlas-diagnostic
 | `DEV-HANDOVER-2026-02-24.md` | Handover เก่า (บางส่วนอ้าง LOVABLE — **ปัจจุบัน ai-chat ใช้ Gemini**) |
 | `TA-ai-chat-invalid-jwt.md` | วิเคราะห์ 401 JWT เดิม |
 | `check-consultant-filter-data.md` | ตรวจข้อมูลตัวกรอง Consultant |
+| `prompt-antigravity-ai-chat-regression.md` | เกณฑ์ PASS สำหรับสคริปต์เทส Antigravity (รวม Phase 4.2) |
 
 ---
 
