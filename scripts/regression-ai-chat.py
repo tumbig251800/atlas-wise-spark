@@ -78,23 +78,29 @@ def call_ai(
     try:
         with urllib.request.urlopen(req) as r:
             res = json.loads(r.read().decode())
+            meta = res.get("meta") or {}
             return {
                 "status": r.getcode(),
                 "ok": res.get("ok", False),
                 "content": res.get("content", ""),
                 "source": res.get("source", "unknown"),
-                "reason": res.get("meta", {}).get("reason", "N/A"),
+                "meta": meta,
+                "validation_failed": bool(meta.get("validationFailed")),
+                "reason": meta.get("reason", "N/A"),
             }
     except urllib.error.HTTPError as e:
         try:
             raw = e.read().decode()
             res = json.loads(raw)
+            meta = res.get("meta") or {}
             return {
                 "status": e.code,
                 "ok": False,
                 "content": res.get("content", str(e)),
                 "source": "error",
-                "reason": res.get("meta", {}).get("reason", "N/A"),
+                "meta": meta,
+                "validation_failed": bool(meta.get("validationFailed")),
+                "reason": meta.get("reason", "N/A"),
             }
         except Exception:
             return {
@@ -102,6 +108,8 @@ def call_ai(
                 "ok": False,
                 "content": str(e),
                 "source": "error",
+                "meta": {},
+                "validation_failed": False,
                 "reason": "HTTP Error",
             }
 
@@ -199,8 +207,54 @@ def run_regression() -> list[list[str]]:
     pass_debug = "(debug:" not in res["content"]
     results.append(["Validation UI", "PASS" if pass_debug else "FAIL", res["source"], f"reason: {res['reason']}"])
 
-    # 7. Auth — no JWT → 401
-    print("Test 7: Auth Check...")
+    # 7. REF subset — context ไม่มีป้าย [REF-n] แต่บังคับให้คำตอบมี [REF-1]
+    print("Test 7: REF subset (empty context)...")
+    res = call_ai(
+        [
+            {
+                "role": "user",
+                "content": (
+                    "ตอบสั้นมาก ห้ามถามกลับ — ต้องมีในคำตอบทั้งคำว่า Mastery 3/5 และ [REF-1] "
+                    "ติดในประโยคเดียวกัน"
+                ),
+            }
+        ],
+        context="",
+        token=token,
+    )
+    out_lower = res["content"].lower()
+    pass_ref_empty = (
+        res["source"] == "fallback" and res["reason"] == "refs_missing_from_context"
+    ) or (
+        res["source"] == "gemini" and "[ref-1]" not in out_lower
+    )
+    note = f"vf={res['validation_failed']} reason={res['reason']}"
+    results.append(["REF subset ∅ ctx", "PASS" if pass_ref_empty else "FAIL", res["source"], note])
+
+    # 8. REF subset — context มีแค่ [REF-1] แต่บังคับอ้าง [REF-99]
+    print("Test 8: REF subset (invalid REF id)...")
+    ctx_one_ref = (
+        "[REF-1] 2026-03-27: Mastery: 3/5 | Remedial: 0/30\n"
+        "[ACTIVE FILTER]\nวิชา: คณิต\n"
+    )
+    res = call_ai(
+        [
+            {
+                "role": "user",
+                "content": (
+                    "ตอบสั้นมาก — อ้างอิงเฉพาะ [REF-99] ว่า Mastery เท่าไร ห้ามใช้ [REF-1]"
+                ),
+            }
+        ],
+        context=ctx_one_ref,
+        token=token,
+    )
+    pass_ref_bad = res["source"] == "fallback" and res["reason"] == "REF-99 not present in context"
+    note8 = f"vf={res['validation_failed']} reason={res['reason']}"
+    results.append(["REF subset bad id", "PASS" if pass_ref_bad else "FAIL", res["source"], note8])
+
+    # 9. Auth — no JWT → 401
+    print("Test 9: Auth Check...")
     res = call_ai([{"role": "user", "content": "สวัสดี"}], token=None)
     pass_auth = res["status"] == 401
     results.append(["Auth Check", "PASS" if pass_auth else "FAIL", res["source"], "Expect 401"])

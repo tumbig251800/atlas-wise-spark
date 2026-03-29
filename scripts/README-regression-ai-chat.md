@@ -42,6 +42,8 @@ python3 scripts/regression-ai-chat.py
 
 Exit code: `0` = ทุกเคส PASS, `1` = มี FAIL, `2` = ขาด env
 
+เคสล่าสุด: **REF subset** — (1) context ว่างแต่บังคับให้คำตอบมี `[REF-1]` → คาด `fallback` + `refs_missing_from_context` หรือ `gemini` โดยไม่อ้าง `[REF-1]` (ปลอดภัย) (2) context มีแค่ `[REF-1]` แต่บังคับ `[REF-99]` → คาด `fallback` + `REF-99 not present in context` (ขึ้นกับว่าโมเดลใส่ REF-99 ในคำตอบหรือไม่ — ถ้า FAIL บ่อย ลองรันซ้ำ)
+
 หรือใช้ npm (ถ้ามี `python3` ใน PATH):
 
 ```bash
