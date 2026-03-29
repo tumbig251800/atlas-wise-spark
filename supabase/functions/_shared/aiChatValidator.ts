@@ -249,10 +249,18 @@ export function validateAiChatOutput(context: string, output: string): AiChatVal
   }
 
   const allowedRefs = extractAllowedRefNumbers(context);
+  // REF subset (O ⊆ C): any numeric [REF-n] in output must appear on context lines.
+  // When context has no REF labels (C empty) but output cites REF → reject (hallucinated labels).
   REF_NUMERIC_RE.lastIndex = 0;
+  const refsInOutput = new Set<string>();
   for (const m of output.matchAll(REF_NUMERIC_RE)) {
-    const n = m[1];
-    if (n && allowedRefs.size > 0 && !allowedRefs.has(n)) {
+    if (m[1]) refsInOutput.add(m[1]);
+  }
+  if (refsInOutput.size > 0 && allowedRefs.size === 0) {
+    return { ok: false, reason: "refs_missing_from_context" };
+  }
+  for (const n of refsInOutput) {
+    if (!allowedRefs.has(n)) {
       return { ok: false, reason: `REF-${n} not present in context` };
     }
   }

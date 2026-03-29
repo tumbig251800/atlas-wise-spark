@@ -141,4 +141,29 @@ describe("validateAiChatOutput", () => {
     );
     expect(r.ok).toBe(true);
   });
+
+  it("REF subset: rejects numeric REF when context has no REF lines (hallucinated label)", () => {
+    const r = validateAiChatOutput(emptyCtx, "สรุปตาม [REF-1] ครับ");
+    expect(r.ok).toBe(false);
+    expect(r.reason).toBe("refs_missing_from_context");
+  });
+
+  it("REF subset: rejects REF when context is prose-only without [REF-n] labels", () => {
+    const proseOnly =
+      "บันทึกการสอน 2026-01-01 วิชาคณิต Mastery 3/5 แต่ไม่มีป้าย [REF-n]";
+    const r = validateAiChatOutput(proseOnly, "อ้างจากข้อมูล [REF-1] ครับ");
+    expect(r.ok).toBe(false);
+    expect(r.reason).toBe("refs_missing_from_context");
+  });
+
+  it("REF subset: rejects REF-99 when context only defines REF-1", () => {
+    const r = validateAiChatOutput(sampleCtx, "ดูที่ [REF-99]");
+    expect(r.ok).toBe(false);
+    expect(r.reason).toBe("REF-99 not present in context");
+  });
+
+  it("REF subset: allows only REFs that exist in context", () => {
+    const r = validateAiChatOutput(sampleCtx, "Mastery 3/5 ตาม [REF-1]");
+    expect(r.ok).toBe(true);
+  });
 });
