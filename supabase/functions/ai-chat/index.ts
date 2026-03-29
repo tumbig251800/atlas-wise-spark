@@ -247,12 +247,21 @@ serve(async (req) => {
       );
     }
 
-    const asksRemedial =
+    // อย่าใช้ q.includes("%") อย่างเดียว — false positive กับคำถามทั่วไปที่มี % โดยไม่เกี่ยวซ่อมเสริม
+    const asksRemedialMetrics =
       q.includes("remedial") ||
       q.includes("ซ่อมเสริม") ||
       q.includes("x/y") ||
-      q.includes("%");
-    if (asksRemedial && !hasTotalStudents) {
+      /\bx\s*\/\s*y\b/i.test(q) ||
+      /ร้อยละ|เปอร์เซ็นต์|เปอร์\s*เซ็น/.test(q) ||
+      /กี่\s*%/.test(q) ||
+      /(?:เป็น|คิดเป็น)\s+\d+(?:\.\d+)?\s*%/.test(q) ||
+      (/%\s*(ของห้อง|ของคลาส|นักเรียน|ห้องเรียน)/.test(q) &&
+        /(ซ่อม|remedial|x\s*\/\s*y|x\/y)/.test(q)) ||
+      (/(?:สัดส่วน|อัตรา)[^?.]{0,40}%/.test(q) && /(ซ่อม|remedial)/.test(q)) ||
+      /(กี่คน|มีกี่คน|ได้กี่คน)[^?.]{0,50}(?:ซ่อม|remedial)/.test(q) ||
+      /(?:ซ่อม|remedial)[^?.]{0,50}(?:กี่คน|กี่\s*%|ร้อยละ|เปอร์เซ็นต์)/.test(q);
+    if (asksRemedialMetrics && !hasTotalStudents) {
       return respond("ไม่พบข้อมูลจำนวนนักเรียนในระบบ", "fast_guard", 200, buildMeta(requestId));
     }
 
