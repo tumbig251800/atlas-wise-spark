@@ -63,4 +63,37 @@ describe("validateAiChatOutput", () => {
     );
     expect(r.ok).toBe(true);
   });
+
+  it("allows PASS/STAY policy with Mastery threshold percents (no log REF)", () => {
+    const out =
+      "PASS หมายถึงนักเรียนผ่านเกณฑ์ซ่อมเสริมและระบบรีเซ็ต Strike กลับเป็น 0; STAY หมายถึงยังไม่ผ่านเกณฑ์ Strike จะเพิ่มขึ้น เกณฑ์ความสำเร็จมักผูกกับ Mastery ไม่ต่ำกว่า 70% ตามกรอบ ATLAS";
+    const r = validateAiChatOutput(emptyCtx, out);
+    expect(r.ok).toBe(true);
+    expect(r.reason).toBe("no_claims");
+  });
+
+  it("allows Intervention policy with extra threshold-style percents (no log REF)", () => {
+    const out =
+      "Intervention Size: ไม่เกิน 25% ของห้องเป็น Individual; ช่วง 25–50% ใช้ Small Group; เกิน 50% พิจารณา Whole-Class Pivot ตามขนาดการช่วยเหลือของ ATLAS";
+    const r = validateAiChatOutput(emptyCtx, out);
+    expect(r.ok).toBe(true);
+    expect(r.reason).toBe("no_claims");
+  });
+
+  it("rejects malformed REF labels in policy-style text", () => {
+    const r = validateAiChatOutput(
+      emptyCtx,
+      "Strike แบ่งเป็น [REF-Strike 1/3] [REF-2/3] ตามระบบ ATLAS"
+    );
+    expect(r.ok).toBe(false);
+    expect(r.reason).toBe("REF format is not numeric-only");
+  });
+
+  it("allows bracket Strike wording without REF prefix (not a citation)", () => {
+    const r = validateAiChatOutput(
+      emptyCtx,
+      "ระดับแรกคือ [Strike 1/3] แจ้งเตือนครู ตามนโยบาย ATLAS"
+    );
+    expect(r.ok).toBe(true);
+  });
 });

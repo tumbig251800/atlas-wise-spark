@@ -11,6 +11,19 @@ const FRACTION_RE = /\b(\d+)\s*\/\s*(\d+)\b/g;
 const PERCENT_RE = /(\d+(?:\.\d+)?)\s*%/g;
 const DATE_RE = /\b\d{4}-\d{2}-\d{2}\b/g;
 
+/** ATLAS policy / framework wording — answer must also pass isLikelyPolicyFrameworkOnly guards below */
+const POLICY_FRAMEWORK_KEYWORDS_RE =
+  /(Whole-?Class|Small\s+Group|Intervention|ขนาดการช่วยเหลือ|Individual|Pivot|Strike|PASS|STAY|เกณฑ์|ทั้งห้อง|กลุ่มย่อย|รายบุคคล|ร้อยละ|เปอร์เซ็นต์|ปรับแผนการสอน|ซ่อมเสริม|Remedial|Special\s+Care|การส่งต่อ|Referral|Escalation|แจ้งเตือน|ประชุมกลุ่มสาระ|รีเซ็ต|ผ่านเกณฑ์|คงอยู่|PASS\/STAY|Diagnostic\s+Engine|สถานะสี)/i;
+
+/** Mastery + digit allowed when clearly defining thresholds (not class-level metrics) */
+const MASTERY_POLICY_DEFINITION_RE =
+  /(เกณฑ์|GREEN|🟢|≥|>=|ไม่ต่ำกว่า|ความสำเร็จ|ผ่านเกณฑ์|สถานะสี|Diagnostic|ระดับ.*Mastery|Mastery.*ระดับ)/i;
+
+/** Common ATLAS threshold / copy percentages in policy text (after keyword gate) */
+const POLICY_WHITELIST_TWO_DIGIT = new Set([
+  10, 12, 15, 20, 21, 25, 40, 41, 50, 70, 80, 90, 100,
+]);
+
 /** Strike ladder only (1/3, 2/3, 3/3) — policy text, not teaching-log metrics */
 function isStrikeLadderFraction(a: number, b: number): boolean {
   return b === 3 && a >= 1 && a <= 3;
@@ -26,8 +39,8 @@ function requiresTeachingLogCitation(output: string): boolean {
   if (/\[REF-/i.test(output)) return true;
   if (DATE_RE.test(output)) return true;
 
-  if (/\bRemedial\b/i.test(output) && !hasNullResultPhrase) return true;
-  if (/\bSpecial Care\b/i.test(output) && !hasNullResultPhrase) return true;
+  if (/\bRemedial\b/i.test(output) && !hasNullResultPhrase && !isLikelyPolicyFrameworkOnly(output)) return true;
+  if (/\bSpecial Care\b/i.test(output) && !hasNullResultPhrase && !isLikelyPolicyFrameworkOnly(output)) return true;
 
   if (/(?:\bID\b|รหัสนักเรียน)\s*[:：]?\s*\d{4,5}\b/i.test(output)) return true;
   if (/Remedial:\s*\d+/i.test(output)) return true;
@@ -57,16 +70,19 @@ function requiresTeachingLogCitation(output: string): boolean {
 
   PERCENT_RE.lastIndex = 0;
   if (PERCENT_RE.test(output)) {
+    if (isLikelyPolicyFrameworkOnly(output)) return false;
     const teachingNearPercent =
       /\bMastery\b|Gap:|major_gap|\[REF-|ซ่อมเสริม|\d+\s*\/\s*5|คาบ|Remedial:|เฉลี่ย|จำนวนนักเรียน|Teaching Logs/i.test(
         output
       );
     if (teachingNearPercent) return true;
-    if (isLikelyPolicyFrameworkOnly(output)) return false;
     return true;
   }
 
   if (/\bMastery\b/i.test(output)) {
+    if (isLikelyPolicyFrameworkOnly(output) && !/\b\d+(?:\.\d+)?\s*\/\s*5\b/.test(output)) {
+      return false;
+    }
     if (/\b\d+(?:\.\d+)?\s*\/\s*5\b/.test(output)) return true;
     if (/เฉลี่ย/.test(output)) return true;
     if (/\bMastery\b[^.\n]{0,80}?\d/.test(output)) return true;
@@ -85,22 +101,30 @@ function requiresTeachingLogCitation(output: string): boolean {
 }
 
 function isLikelyPolicyFrameworkOnly(output: string): boolean {
-  if (
-    !/(Whole-?Class|Small\s+Group|Intervention|ขนาดการช่วยเหลือ|Individual|Pivot|Strike\s*\d|PASS|STAY|เกณฑ์|ทั้งห้อง|กลุ่มย่อย|รายบุคคล|ร้อยละ|เปอร์เซ็นต์|ปรับแผนการสอน)/i.test(
-      output
-    )
-  ) {
+  if (!POLICY_FRAMEWORK_KEYWORDS_RE.test(output)) {
     return false;
   }
   if (/\d{4}-\d{2}-\d{2}|\[REF-|\b9\d{3}\b/i.test(output)) return false;
-  if (/\bMastery\b/i.test(output) && /\d/.test(output)) return false;
+  if (/\bMastery\b/i.test(output) && /\d/.test(output)) {
+    if (!MASTERY_POLICY_DEFINITION_RE.test(output)) return false;
+  }
   const nums = [...output.matchAll(/\b(\d{2,})\b/g)].map((x) => parseInt(x[1] ?? "0", 10));
   for (const v of nums) {
     if (v >= 1900 && v <= 2099) return false;
-    if ([20, 21, 40, 41, 70].includes(v)) continue;
+    if (POLICY_WHITELIST_TWO_DIGIT.has(v)) continue;
     if (v <= 12) continue;
     return false;
   }
+  return true;
+}
+
+/** When there is no data context, relax REF requirement only for safe policy-shaped answers */
+function emptyContextAllowsSkipRefRequirement(output: string): boolean {
+  if (!isLikelyPolicyFrameworkOnly(output)) return false;
+  if (DATE_RE.test(output)) return false;
+  if (/(?:\bID\b|รหัสนักเรียน)\s*[:：]?\s*\d{4,5}\b/i.test(output)) return false;
+  if (/Remedial:\s*\d+/i.test(output)) return false;
+  if (/\b\d+(?:\.\d+)?\s*\/\s*5\b/.test(output)) return false;
   return true;
 }
 
@@ -178,7 +202,10 @@ export function validateAiChatOutput(context: string, output: string): AiChatVal
     return { ok: false, reason: "REF format is not numeric-only" };
   }
 
-  const outputHasClaims = requiresTeachingLogCitation(output);
+  let outputHasClaims = requiresTeachingLogCitation(output);
+  if (outputHasClaims && !context.trim() && emptyContextAllowsSkipRefRequirement(output)) {
+    outputHasClaims = false;
+  }
 
   const allowedRefs = extractAllowedRefNumbers(context);
   REF_NUMERIC_RE.lastIndex = 0;
