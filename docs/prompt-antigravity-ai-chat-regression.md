@@ -2,6 +2,8 @@
 
 ใช้สคริปต์ยิง `POST /functions/v1/ai-chat` แบบเดียวกับหน้าแอป
 
+**สคริปต์ใน repo:** [`scripts/regression-ai-chat.py`](../scripts/regression-ai-chat.py) และคู่มือ [`scripts/README-regression-ai-chat.md`](../scripts/README-regression-ai-chat.md) — รัน `npm run test:regression-ai-chat` หลังตั้ง env (ดู README)
+
 ## Environment (ห้าม hardcode ใน repo)
 
 - `SUPABASE_URL`

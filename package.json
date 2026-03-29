@@ -16,7 +16,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:regression-ai-chat": "python3 scripts/regression-ai-chat.py"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

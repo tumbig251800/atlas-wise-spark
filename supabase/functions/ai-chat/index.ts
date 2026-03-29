@@ -248,13 +248,14 @@ serve(async (req) => {
     }
 
     // อย่าใช้ q.includes("%") อย่างเดียว — false positive กับคำถามทั่วไปที่มี % โดยไม่เกี่ยวซ่อมเสริม
+    const remedialOrFraction = /(ซ่อม|remedial|x\s*\/\s*y|\bx\/y\b)/i;
     const asksRemedialMetrics =
       q.includes("remedial") ||
       q.includes("ซ่อมเสริม") ||
       q.includes("x/y") ||
       /\bx\s*\/\s*y\b/i.test(q) ||
-      /ร้อยละ|เปอร์เซ็นต์|เปอร์\s*เซ็น/.test(q) ||
-      /กี่\s*%/.test(q) ||
+      (/(?:ร้อยละ|เปอร์เซ็นต์|เปอร์\s*เซ็น)/.test(q) && remedialOrFraction.test(q)) ||
+      (/กี่\s*%/.test(q) && remedialOrFraction.test(q)) ||
       /(?:เป็น|คิดเป็น)\s+\d+(?:\.\d+)?\s*%/.test(q) ||
       (/%\s*(ของห้อง|ของคลาส|นักเรียน|ห้องเรียน)/.test(q) &&
         /(ซ่อม|remedial|x\s*\/\s*y|x\/y)/.test(q)) ||
