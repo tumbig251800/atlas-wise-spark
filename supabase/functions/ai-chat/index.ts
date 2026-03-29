@@ -209,6 +209,29 @@ serve(async (req) => {
     const hasIdsInContext = specialCareIds.length > 0 || remedialIds.length > 0;
     const hasTotalStudents = /Remedial:\s*\d+\s*\/\s*\d+/i.test(ctx) || /total_students.*มี/i.test(ctx);
 
+    /** Gap ใน log เป็นประเภทต่อคาบ — ไม่มีรายการรหัสนักเรียนเชื่อม Gap โดยตรง */
+    const asksGapWithIdIntent =
+      /(gap|แก๊ป|gab)/i.test(q) &&
+      /(\bid\b|id\s*ใด|มี\s*id|รหัส|เลขประจำตัว|รายชื่อ|ใครบ้าง|ใคร|ไอดี|รายการ\s*รหัส)/i.test(q);
+    if (asksGapWithIdIntent) {
+      const explain =
+        "ข้อมูล ATLAS ระบุประเภท Gap ต่อคาบเรียน (เช่น P-Gap, A-Gap) ไม่มีรายการรหัสนักเรียนที่เชื่อมกับ Gap โดยตรงในข้อมูลนี้ครับ";
+      if (hasIdsInContext) {
+        return respond(
+          `${explain} รหัสที่ดึงได้จากบรรทัด Remedial / Special Care ในข้อมูลมีดังนี้ — **Special Care**: ${specialCareIds.map((id) => `ID ${id}`).join(", ") || "ไม่พบ"} | **Remedial**: ${remedialIds.map((id) => `ID ${id}`).join(", ") || "ไม่พบ"}`,
+          "fast_guard",
+          200,
+          buildMeta(requestId)
+        );
+      }
+      return respond(
+        `${explain} และไม่พบบรรทัด Remedial IDs / Special Care ที่มีรหัสนักเรียนใน context นี้ครับ`,
+        "fast_guard",
+        200,
+        buildMeta(requestId)
+      );
+    }
+
     const asksGapExistence =
       /(gap|แก๊ป|gab)/i.test(q) && /(หรือไม่|ไหม|มีไหม|มีมั้ย|มีมั๊ย)/i.test(q);
     if (asksGapExistence) {
@@ -216,13 +239,15 @@ serve(async (req) => {
         /(?:\||\s)Gap:\s*(?!ไม่มี|none|-)/i.test(ctx) ||
         /(?:\||\s)major_gap:\s*(?!ไม่มี|none|-)/i.test(ctx);
       const msg = hasGapEvidence
-        ? "พบข้อมูลนักเรียนที่มี Gap ในตัวกรองนี้ครับ"
-        : "ไม่พบข้อมูลนักเรียนที่มี Gap ในตัวกรองนี้ครับ";
+        ? "พบข้อมูลคาบเรียนที่ระบุประเภท Gap ในตัวกรองนี้ครับ"
+        : "ไม่พบข้อมูลคาบเรียนที่ระบุ Gap ในตัวกรองนี้ครับ";
       return respond(msg, "fast_guard", 200, buildMeta(requestId));
     }
 
     const asksWhoOrId =
-      /(ใคร|คนไหน|ใครบ้าง|ระบุ\s*id|รหัสนักเรียน|เลขประจำตัว|special care|remedial|ดูแล(?:เป็น|ป็น)?\s*พิเศษ|ซ่อมเสริม)/i.test(q);
+      /(ใคร|คนไหน|ใครบ้าง|ระบุ\s*id|รหัสนักเรียน|เลขประจำตัว|special care|remedial|ดูแล(?:เป็น|ป็น)?\s*พิเศษ|ซ่อมเสริม)/i.test(q) ||
+      /(มี\s*id|id\s*ใด|รหัส\s*ใด|รหัส\s*อะไร|ไอดี|รายการ\s*รหัส)/i.test(q) ||
+      /(บอก|แสดง|ระบุ)(?:\s+)?(id|รหัสนักเรียน)(?:\s+)?(ใด|อะไร|บ้าง)?/i.test(q);
     if (asksWhoOrId) {
       const asksSpecial = /(special care|ดูแล(?:เป็น|ป็น)?\s*พิเศษ|กลุ่มพิเศษ)/i.test(q);
       const asksRemedialOnly = /(ซ่อมเสริม|remedial)/i.test(q) && !asksSpecial;
