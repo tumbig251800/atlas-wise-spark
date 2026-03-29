@@ -74,6 +74,7 @@ Secrets ฝั่ง Supabase (ไม่ commit ใน repo): **`GEMINI_API_KEY`
 - **`aiChatSafetyGuard.ts`:** ตรวจหลัง Gemini ก่อน validator — บล็อกข้อความอ้างการลบข้อมูล/หน่วยความจำ (roleplay อันตราย)
 - **Phase 4.2 (citation presence):** ใน `aiChatValidator.ts` — ถ้า context มีอย่างน้อย 2 บรรทัด `[REF-n]` ที่ Mastery ต่างกัน และคำตอบอ้างคะแนน `/5` สองค่านั้น แต่ใส่ `[REF]` ไม่ครบอย่างน้อย 2 เลขที่ต่างกัน → `citation_presence_multi_session`
 - **ขอบเขต filter:** preamble ข้อ 11 — คำถามกว้างให้ยึด `[ACTIVE FILTER]` + DATA_CONTEXT เท่านั้น
+- **Validation fallback (prod vs debug):** ข้อความ `(debug: reason)` ใน body จะแสดงเฉพาะเมื่อตั้ง Edge secret `ATLAS_DEBUG_VALIDATION=true` หรือ `ATLAS_ENV=development` — ค่าเริ่มต้น user เห็นข้อความกลาง; `meta.reason` และ `console.error` ยังใช้ debug ได้
 
 ---
 

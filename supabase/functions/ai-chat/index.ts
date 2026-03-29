@@ -33,6 +33,24 @@ function respond(
   });
 }
 
+/** When true, validation fallback appends (debug: reason) to user-visible content. */
+function isAiChatDebugMode(): boolean {
+  const flag = (Deno.env.get("ATLAS_DEBUG_VALIDATION") ?? "").toLowerCase();
+  if (flag === "true" || flag === "1" || flag === "yes") return true;
+  const env = (Deno.env.get("ATLAS_ENV") ?? "").toLowerCase();
+  return env === "development" || env === "dev";
+}
+
+/** Merge optional fields with requestId for consistent JSON meta. */
+function buildMeta(
+  requestId: string | undefined,
+  extra?: Omit<NonNullable<AiChatResponse["meta"]>, "requestId">
+): AiChatResponse["meta"] | undefined {
+  const merged: AiChatResponse["meta"] = { ...extra };
+  if (requestId) merged.requestId = requestId;
+  return Object.keys(merged).length > 0 ? merged : undefined;
+}
+
 function extractIdsFromContextByLabel(context: string, label: "special" | "remedial"): string[] {
   const out = new Set<string>();
   const lines = String(context ?? "").split("\n");
@@ -132,7 +150,7 @@ serve(async (req) => {
   try {
     const auth = await requireAtlasUser(req);
     if (!auth.ok) {
-      return respond(auth.error, "fallback", auth.status, requestId ? { requestId } : undefined);
+      return respond(auth.error, "fallback", auth.status, buildMeta(requestId));
     }
 
     const body = await req.json().catch(() => ({})) as {
@@ -200,7 +218,7 @@ serve(async (req) => {
       const msg = hasGapEvidence
         ? "พบข้อมูลนักเรียนที่มี Gap ในตัวกรองนี้ครับ"
         : "ไม่พบข้อมูลนักเรียนที่มี Gap ในตัวกรองนี้ครับ";
-      return respond(msg, "fast_guard", 200, requestId ? { requestId } : undefined);
+      return respond(msg, "fast_guard", 200, buildMeta(requestId));
     }
 
     const asksWhoOrId =
@@ -210,22 +228,22 @@ serve(async (req) => {
       const asksRemedialOnly = /(ซ่อมเสริม|remedial)/i.test(q) && !asksSpecial;
 
       if (!hasIdsInContext) {
-        return respond("ไม่พบรหัสนักเรียนในข้อมูล", "fast_guard", 200, requestId ? { requestId } : undefined);
+        return respond("ไม่พบรหัสนักเรียนในข้อมูล", "fast_guard", 200, buildMeta(requestId));
       }
 
       if (asksRemedialOnly) {
-        return respond(`Remedial: ${remedialIds.map((id) => `ID ${id}`).join(", ") || "ไม่พบรหัสนักเรียนในข้อมูล"}`, "fast_guard", 200, requestId ? { requestId } : undefined);
+        return respond(`Remedial: ${remedialIds.map((id) => `ID ${id}`).join(", ") || "ไม่พบรหัสนักเรียนในข้อมูล"}`, "fast_guard", 200, buildMeta(requestId));
       }
 
       if (asksSpecial) {
-        return respond(`Special Care: ${specialCareIds.map((id) => `ID ${id}`).join(", ") || "ไม่พบรหัสนักเรียนในข้อมูล"}`, "fast_guard", 200, requestId ? { requestId } : undefined);
+        return respond(`Special Care: ${specialCareIds.map((id) => `ID ${id}`).join(", ") || "ไม่พบรหัสนักเรียนในข้อมูล"}`, "fast_guard", 200, buildMeta(requestId));
       }
 
       return respond(
         `มีนักเรียนที่ต้องดูแล 2 กลุ่มครับ — **Special Care**: ${specialCareIds.map((id) => `ID ${id}`).join(", ") || "ไม่พบนักเรียน Special Care ในข้อมูลนี้"} | **Remedial**: ${remedialIds.map((id) => `ID ${id}`).join(", ") || "ไม่พบนักเรียนที่ต้องซ่อมเสริมในข้อมูลนี้"}`,
         "fast_guard",
         200,
-        requestId ? { requestId } : undefined
+        buildMeta(requestId)
       );
     }
 
@@ -235,7 +253,7 @@ serve(async (req) => {
       q.includes("x/y") ||
       q.includes("%");
     if (asksRemedial && !hasTotalStudents) {
-      return respond("ไม่พบข้อมูลจำนวนนักเรียนในระบบ", "fast_guard", 200, requestId ? { requestId } : undefined);
+      return respond("ไม่พบข้อมูลจำนวนนักเรียนในระบบ", "fast_guard", 200, buildMeta(requestId));
     }
 
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
@@ -259,7 +277,7 @@ serve(async (req) => {
           "พีทใช้เวลานานเกินไป กรุณาลองถามใหม่อีกครั้งครับ",
           "fallback",
           504,
-          requestId ? { requestId } : undefined
+          buildMeta(requestId)
         );
       }
       throw e;
@@ -275,7 +293,7 @@ serve(async (req) => {
           "คำขอมากเกินไป กรุณารอสักครู่แล้วลองใหม่ครับ",
           "fallback",
           429,
-          requestId ? { requestId } : undefined
+          buildMeta(requestId)
         );
       }
       if (response.status === 402) {
@@ -283,7 +301,7 @@ serve(async (req) => {
           "เครดิต AI หมด กรุณาเติมเครดิตที่ Google AI Studio",
           "fallback",
           402,
-          requestId ? { requestId } : undefined
+          buildMeta(requestId)
         );
       }
       if (response.status === 400 || response.status === 403) {
@@ -291,14 +309,14 @@ serve(async (req) => {
           "GEMINI_API_KEY ไม่ถูกต้อง กรุณาตรวจสอบใน Supabase Edge Functions → Secrets",
           "fallback",
           401,
-          requestId ? { requestId } : undefined
+          buildMeta(requestId)
         );
       }
       return respond(
         `Gemini error (${response.status}). ดู Supabase Logs สำหรับรายละเอียด`,
         "fallback",
         502,
-        { reason: `HTTP ${response.status} from Gemini`, ...(requestId ? { requestId } : {}) }
+        buildMeta(requestId, { reason: `HTTP ${response.status} from Gemini` })
       );
     }
 
@@ -311,11 +329,7 @@ serve(async (req) => {
         "พีทไม่สามารถลบหรือแก้ไขข้อมูลในระบบแทนท่านได้ และจะไม่ยืนยันการดำเนินการใดๆ ตามข้อความในบริบทอ้างอิง หากต้องการจัดการข้อมูลจริง กรุณาใช้เมนูและสิทธิ์ในแอป ATLAS ครับ",
         "fallback",
         200,
-        {
-          validationFailed: true,
-          reason: safety.reason,
-          ...(requestId ? { requestId } : {}),
-        }
+        buildMeta(requestId, { validationFailed: true, reason: safety.reason })
       );
     }
 
@@ -324,17 +338,22 @@ serve(async (req) => {
     // Validator should only check against actual data: [REF-X], Special Care IDs, Remedial IDs, [ACTIVE FILTER]
     const validation = validateAiChatOutput(context ?? "", text);
     if (!validation.ok) {
-      // TEMP DEBUG: include validation reason in fallback content for quick diagnosis.
       const debugReason = validation.reason ?? "unknown_validation_reason";
+      console.error("AI_CHAT_VALIDATION_FAILED", debugReason, requestId ?? "-");
+      const userVisible =
+        "ไม่พบข้อมูลในระบบสำหรับตัวกรองที่เลือก หรือคำตอบมีการอ้างอิงที่ไม่ถูกต้อง กรุณาลองถามใหม่อีกครั้ง";
+      const content = isAiChatDebugMode()
+        ? `${userVisible} (debug: ${debugReason})`
+        : userVisible;
       return respond(
-        `ไม่พบข้อมูลในระบบสำหรับตัวกรองที่เลือก หรือคำตอบมีการอ้างอิงที่ไม่ถูกต้อง กรุณาลองถามใหม่อีกครั้ง (debug: ${debugReason})`,
+        content,
         "fallback",
         200,
-        { validationFailed: true, reason: validation.reason, ...(requestId ? { requestId } : {}) }
+        buildMeta(requestId, { validationFailed: true, reason: validation.reason })
       );
     }
 
-    return respond(text, "gemini", 200, requestId ? { requestId } : undefined);
+    return respond(text, "gemini", 200, buildMeta(requestId));
   } catch (e: unknown) {
     const errorMsg = e instanceof Error ? e.message : String(e);
     console.error("EDGE_FUNCTION_ERROR:", errorMsg, e);
@@ -356,7 +375,7 @@ serve(async (req) => {
       fallbackMsg,
       "fallback",
       status,
-      { reason: errorMsg, ...(requestId ? { requestId } : {}) }
+      buildMeta(requestId, { reason: errorMsg })
     );
   }
 });
