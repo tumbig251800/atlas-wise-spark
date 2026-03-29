@@ -1,6 +1,6 @@
 # Regression: `ai-chat` (Python)
 
-สคริปต์ยิง `POST /functions/v1/ai-chat` แบบเดียวกับแอป — ใช้ตรวจ Phase 4.2 citation, Fast Guard (นโยบาย vs ซ่อมเสริม), multi-turn, validation UI และ auth 401
+สคริปต์ยิง `POST /functions/v1/ai-chat` แบบเดียวกับแอป — **11 เทส** ครอบคลุม Phase 4.2 citation, Fast Guard, multi-turn, validation UI, REF subset, **ฝั่งผู้บริหาร (ทักทาย + หัวข้อ analytics)** และ auth 401
 
 ## ความต้องการ
 
@@ -42,7 +42,21 @@ python3 scripts/regression-ai-chat.py
 
 Exit code: `0` = ทุกเคส PASS, `1` = มี FAIL, `2` = ขาด env
 
-เคสล่าสุด: **REF subset** — (1) context ว่างแต่บังคับให้คำตอบมี `[REF-1]` → คาด `fallback` + `refs_missing_from_context` หรือ `gemini` โดยไม่อ้าง `[REF-1]` (ปลอดภัย) (2) context มีแค่ `[REF-1]` แต่บังคับ `[REF-99]` → คาด `fallback` + `REF-99 not present in context` (ขึ้นกับว่าโมเดลใส่ REF-99 ในคำตอบหรือไม่ — ถ้า FAIL บ่อย ลองรันซ้ำ)
+### รายการเทส (สรุป)
+
+| # | หมวด |
+|---|--------|
+| 1 | Health |
+| 2 | Phase 4.2 Citation (สอง `[REF-n]`) |
+| 3–4 | Fast Guard — นโยบาย % / ซ่อมเสริมไม่มีตัวเลข |
+| 5 | Multi-turn (ไม่ทักทายซ้ำ) |
+| 6 | Validation UI — ไม่มี `(debug:` |
+| 7–8 | REF subset (context ไม่มี REF / REF id ผิด) |
+| 9 | Executive greeting — ต้องมี “ผู้บริหาร” ห้าม “คุณครู” |
+| 10 | Executive analytics — ต้องมี “ภาพรวมสรุป”, “การวิเคราะห์”, “แนวทางเชิงนโยบาย” |
+| 11 | Auth — ไม่มี JWT → 401 |
+
+เทส 7–8 อาจสุ่มตามพฤติกรรม LLM — ถ้า FAIL บ่อยให้รันซ้ำหรือดูคอลัมน์ `reason` ในตารางผล
 
 หรือใช้ npm (ถ้ามี `python3` ใน PATH):
 
