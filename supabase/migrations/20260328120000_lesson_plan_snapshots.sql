@@ -52,6 +52,15 @@ CREATE POLICY "lesson_plan_snapshots_delete_director"
   ON public.lesson_plan_snapshots FOR DELETE
   USING (public.has_role(auth.uid(), 'director'::app_role));
 
+-- Idempotent: remote DBs may not have applied earlier migrations that defined this helper.
+CREATE OR REPLACE FUNCTION public.update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SET search_path = public;
+
 CREATE TRIGGER update_lesson_plan_snapshots_updated_at
   BEFORE UPDATE ON public.lesson_plan_snapshots
   FOR EACH ROW
