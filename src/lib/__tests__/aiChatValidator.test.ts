@@ -7,6 +7,12 @@ const sampleCtx = `[REF-1] วันที่: 2026-01-01 | วิชา: คณ
 วิชา: คณิต
 `;
 
+const twoSessionCtx = `[REF-1] วันที่: 2026-01-01 | วิชา: คณิต | Mastery: 3/5 | Gap: P-Gap | Remedial: 1/30
+[REF-2] วันที่: 2026-01-02 | วิชา: คณิต | Mastery: 2/5 | Gap: K-Gap | Remedial: 0/30
+[ACTIVE FILTER]
+วิชา: คณิต
+`;
+
 describe("validateAiChatOutput", () => {
   it("rejects grouped REF tokens (comma inside brackets)", () => {
     const r = validateAiChatOutput(
@@ -93,6 +99,23 @@ describe("validateAiChatOutput", () => {
     const r = validateAiChatOutput(
       emptyCtx,
       "ระดับแรกคือ [Strike 1/3] แจ้งเตือนครู ตามนโยบาย ATLAS"
+    );
+    expect(r.ok).toBe(true);
+  });
+
+  it("Phase 4.2: rejects single REF when citing two different Mastery scores from two sessions", () => {
+    const r = validateAiChatOutput(
+      twoSessionCtx,
+      "### วิเคราะห์\nคาบล่าสุด Mastery 3/5 คาบก่อนหน้า 2/5 [REF-1]"
+    );
+    expect(r.ok).toBe(false);
+    expect(r.reason).toBe("citation_presence_multi_session");
+  });
+
+  it("Phase 4.2: passes when two Mastery scores each have a distinct REF", () => {
+    const r = validateAiChatOutput(
+      twoSessionCtx,
+      "### วิเคราะห์\nล่าสุด 3/5 [REF-1] คาบก่อน 2/5 [REF-2]"
     );
     expect(r.ok).toBe(true);
   });

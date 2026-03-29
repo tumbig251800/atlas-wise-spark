@@ -184,6 +184,47 @@ function contextHasTotalStudentsOrRemedialFraction(context: string): boolean {
   return false;
 }
 
+/** REF id -> Mastery numerator from that context line (e.g. 3 from 3/5). */
+function extractRefToMasteryNumerator(context: string): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const line of context.split("\n")) {
+    const refM = line.match(/\[REF-(\d+)\]/);
+    if (!refM?.[1]) continue;
+    const mm = line.match(/Mastery:\s*(\d+(?:\.\d+)?)\s*\/\s*5/i);
+    if (mm?.[1]) map.set(refM[1], mm[1]);
+  }
+  return map;
+}
+
+/**
+ * Phase 4.2 — Citation presence: if the model cites two different Mastery /5 scores that appear
+ * on different [REF-n] lines in context, it must emit at least two distinct numeric REF tags.
+ */
+function citationPresenceMultiSessionViolation(context: string, output: string): boolean {
+  const refToM = extractRefToMasteryNumerator(context);
+  if (refToM.size < 2) return false;
+
+  const masteryInOutput = new Set<string>();
+  for (const m of output.matchAll(/\b(\d+(?:\.\d+)?)\s*\/\s*5\b/g)) {
+    if (m[1]) masteryInOutput.add(m[1]);
+  }
+  if (masteryInOutput.size < 2) return false;
+
+  const unionRefs = new Set<string>();
+  for (const v of masteryInOutput) {
+    for (const [refId, mv] of refToM) {
+      if (mv === v) unionRefs.add(refId);
+    }
+  }
+  if (unionRefs.size < 2) return false;
+
+  const refsInOutput = new Set<string>();
+  for (const m of output.matchAll(/\[REF-(\d+)\]/gi)) {
+    if (m[1]) refsInOutput.add(m[1]);
+  }
+  return refsInOutput.size < 2;
+}
+
 export function validateAiChatOutput(context: string, output: string): AiChatValidationResult {
   // Pre-compute allowedIds once — used in multiple bypass checks below
   const allowedIds = extractAllowedIds(context);
@@ -225,6 +266,10 @@ export function validateAiChatOutput(context: string, output: string): AiChatVal
   const hasNumericRef = /\[REF-\d+\]/i.test(output);
   if (!hasNumericRef) {
     return { ok: false, reason: "claims_without_refs" };
+  }
+
+  if (citationPresenceMultiSessionViolation(context, output)) {
+    return { ok: false, reason: "citation_presence_multi_session" };
   }
 
   // 2) ID invention enforcement

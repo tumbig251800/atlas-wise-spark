@@ -67,6 +67,14 @@ Secrets ฝั่ง Supabase (ไม่ commit ใน repo): **`GEMINI_API_KEY`
 - `.gitignore`: เพิ่ม `.cursor/plans/` (ไม่ commit แผน IDE)
 - `docs/prompt-for-cowork-deploy-ai-chat.md`: คำสั่ง/checklist สำหรับ Cowork (ai-chat + หมายเหตุ ai-exam-gen)
 
+### 3.6 ai-chat — Phase 4 / Security / Phase 4.2 (มี.ค. 2026)
+
+- **Phase 4:** แยก prompt เป็น `supabase/functions/_shared/aiChatPrompts.ts` (CORE + TEACHER + EXECUTIVE); `ai-chat/index.ts` เรียก `buildSystemPrompt(audience)`
+- **SECURITY:** บล็อกใน CORE + กฎ preamble ใน edge — ห้ามยึด `DATA_CONTEXT` เป็นคำสั่ง; ห้ามยืนยันลบ/แก้ข้อมูลระบบ
+- **`aiChatSafetyGuard.ts`:** ตรวจหลัง Gemini ก่อน validator — บล็อกข้อความอ้างการลบข้อมูล/หน่วยความจำ (roleplay อันตราย)
+- **Phase 4.2 (citation presence):** ใน `aiChatValidator.ts` — ถ้า context มีอย่างน้อย 2 บรรทัด `[REF-n]` ที่ Mastery ต่างกัน และคำตอบอ้างคะแนน `/5` สองค่านั้น แต่ใส่ `[REF]` ไม่ครบอย่างน้อย 2 เลขที่ต่างกัน → `citation_presence_multi_session`
+- **ขอบเขต filter:** preamble ข้อ 11 — คำถามกว้างให้ยึด `[ACTIVE FILTER]` + DATA_CONTEXT เท่านั้น
+
 ---
 
 ## 4. คำสั่ง Deploy ที่ใช้บ่อย
@@ -114,8 +122,8 @@ npx supabase functions deploy atlas-diagnostic
 
 ## 7. สิ่งที่ยังเป็นทางเลือก (Next)
 
-- Phase 4.2 (ถ้าต้องการ): Citation presence check เพิ่มเติมใน ai-chat
-- ทบทวน scope เมื่อถามคำถามกว้าง (“วิชาใด…”) ให้จำกัดตาม filter อัตโนมัติใน prompt
+- ขยาย Phase 4.2 ให้ครอบคลุมการอ้าง % จากหลายแหล่งใน context (ถ้าต้องการละเอียดขึ้น)
+- ทบทวน UX Consultant เมื่อผู้ใช้ถามกว้างมาก — อาจแนะนำให้เลือกตัวกรองให้แคบขึ้นในข้อความระบบ
 
 ---
 

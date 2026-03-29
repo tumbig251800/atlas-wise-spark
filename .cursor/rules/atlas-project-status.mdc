@@ -11,16 +11,19 @@ ATLAS = Adaptive Teaching & Learning Analytics System
 - AI Consultant: "พีท ร่างทอง" (Peat Rang-Thong)
 - **สรุปการแก้ไขล่าสุด (Edge + AI):** `docs/PROJECT-EDGE-AI-SUMMARY-2026-03.md`
 
-## Current Phase: Edge Auth + Exam Gen + Docs (2026-03-21)
+## Current Phase: ai-chat Phase 4 + Security + Phase 4.2 (2026-03)
 
 ### Completed
 - [x] `verify_jwt = false` + `requireAtlasUser` — ai-chat, ai-summary, ai-lesson-plan, ai-exam-gen, atlas-diagnostic (config.toml)
-- [x] ai-chat v32 — bundle ตรง repo, บังคับ JWT; curl ไม่มี auth → 401
+- [x] ai-chat — bundle ตรง repo, บังคับ JWT; curl ไม่มี auth → 401
 - [x] Executive → AI Policy Advice → ปุ่ม **วิเคราะห์** (ai-summary) ใช้งานได้
 - [x] **ai-exam-gen deploy** — แก้ gateway 401 ข้อสอบหลังหน่วย; health GET → 200; +402 ในโค้ด
 - [x] Consultant — toast error อ่าน `message`/`content` จาก API
 - [x] `.gitignore` — `.cursor/plans/`
-- [x] เอกสาร: `docs/PROJECT-EDGE-AI-SUMMARY-2026-03.md`, README อัปเดต
+- [x] **Phase 4:** `aiChatPrompts.ts` (CORE/TEACHER/EXECUTIVE), slim `ai-chat/index.ts`
+- [x] **Security:** CORE + preamble + `aiChatSafetyGuard.ts` (หลัง Gemini)
+- [x] **Phase 4.2:** `citation_presence_multi_session` ใน `aiChatValidator.ts` (หลาย Mastery /5 → หลาย `[REF-n]`)
+- [x] เอกสาร: `docs/PROJECT-EDGE-AI-SUMMARY-2026-03.md` (มี §3.6)
 
 ## Previous: Data Leakage Fix v2 (2026-02-23)
 
@@ -40,14 +43,15 @@ ATLAS = Adaptive Teaching & Learning Analytics System
 ## Key Files
 - `supabase/config.toml` — verify_jwt ต่อฟังก์ชัน
 - `supabase/functions/_shared/atlasAuth.ts` — requireAtlasUser
+- `supabase/functions/_shared/aiChatPrompts.ts`, `aiChatValidator.ts`, `aiChatSafetyGuard.ts`
 - `supabase/functions/ai-chat/index.ts`, `ai-summary`, `ai-lesson-plan`, `ai-exam-gen`
 - `src/pages/Consultant.tsx` — filter, exam gen, chat
 - `src/lib/edgeFunctionFetch.ts` — JWT headers
 - `docs/PROJECT-EDGE-AI-SUMMARY-2026-03.md` — **handover หลัก**
 
 ## Next Steps (Optional)
-- Phase 4.2: Citation presence check เพิ่มใน ai-chat
-- ปรับ prompt ให้คำถามกว้างจำกัด scope ตาม filter อัตโนมัติ
+- ขยาย Phase 4.2 ให้ครอบคลุม % จากหลายแหล่งใน context (ถ้าต้องการ)
+- UX: แนะนำให้แคบตัวกรองเมื่อถามกว้างมาก
 
 ## Important Commands
 ```bash
