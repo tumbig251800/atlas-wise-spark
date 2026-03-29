@@ -253,8 +253,29 @@ def run_regression() -> list[list[str]]:
     note8 = f"vf={res['validation_failed']} reason={res['reason']}"
     results.append(["REF subset bad id", "PASS" if pass_ref_bad else "FAIL", res["source"], note8])
 
-    # 9. Auth — no JWT → 401
-    print("Test 9: Auth Check...")
+    # 9. Executive — Greeting
+    print("Test 9: Executive - Greeting...")
+    res = call_ai([{"role": "user", "content": "สวัสดี"}], audience="executive", token=token)
+    pass_exec_greet = "ผู้บริหาร" in res["content"] and "คุณครู" not in res["content"]
+    results.append(["Exec Greeting", "PASS" if pass_exec_greet else "FAIL", res["source"], "Must use 'ผู้บริหาร'"])
+
+    # 10. Executive — Analytics format
+    print("Test 10: Executive - Analytics format...")
+    ctx_exec = (
+        "[REF-1] 2026-03-27: Mastery: 3/5 | Remedial: 0/30\n"
+        "[ACTIVE FILTER]\nวิชา: วิทยาศาสตร์\n"
+    )
+    res = call_ai(
+        [{"role": "user", "content": "สรุปข้อมูลให้หน่อย"}],
+        context=ctx_exec,
+        audience="executive",
+        token=token,
+    )
+    pass_exec_format = "ภาพรวมสรุป" in res["content"] and "การวิเคราะห์" in res["content"] and "แนวทางเชิงนโยบาย" in res["content"]
+    results.append(["Exec Analytics", "PASS" if pass_exec_format else "FAIL", res["source"], "Exec Markdown Headings"])
+
+    # 11. Auth — no JWT → 401
+    print("Test 11: Auth Check...")
     res = call_ai([{"role": "user", "content": "สวัสดี"}], token=None)
     pass_auth = res["status"] == 401
     results.append(["Auth Check", "PASS" if pass_auth else "FAIL", res["source"], "Expect 401"])
