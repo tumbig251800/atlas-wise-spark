@@ -78,6 +78,14 @@ Secrets ฝั่ง Supabase (ไม่ commit ใน repo): **`GEMINI_API_KEY`
 - **Validation fallback (prod vs debug):** ข้อความ `(debug: reason)` ใน body จะแสดงเฉพาะเมื่อตั้ง Edge secret `ATLAS_DEBUG_VALIDATION=true` หรือ `ATLAS_ENV=development` — ค่าเริ่มต้น user เห็นข้อความกลาง; `meta.reason` และ `console.error` ยังใช้ debug ได้
 - **Fast guard Remedial:** ไม่ใช้ `q.includes("%")` เปล่าๆ — ใช้คำ/regex ที่ชิดกับซ่อมเสริม ร้อยละ เปอร์เซ็นต์ กี่% คู่บริบท — ลด false positive คำถามทั่วไปที่มี `%`
 
+### 3.7 แผนการสอน — โหมด Reflection / Snapshot + `learningUnit` (มี.ค. 2026)
+
+- **Edge:** `parseLessonPlanBody` ใน `lessonPlanRequest.ts` — รองรับ legacy แบน + **`version: 2`** พร้อม `mode: reflection | context_snapshot` และฟิลด์ **`learningUnit`**
+- **Prompt:** `lessonPlanPrompts.ts` แยกจาก `aiChatPrompts.ts` — กฎ Context Lock / Class Profile ต่างกันตามโหมด; ห้ามรหัสย่อ A1–A6 ในเนื้อหาถึงครู; หน่วยการเรียนอยู่ใน system/user prompt และ header ใบงาน
+- **Frontend:** หน้า Lesson Plan — เลือกโหมด; กรอกหน่วยการเรียน (บังคับ); Snapshot ไม่บังคับมี `teaching_logs`; ส่ง body v2 ไป API
+- **DB:** ตาราง `lesson_plan_snapshots` + RLS ยังมีใน migration — **แอปไม่โหลด/บันทึกจาก UI** (เก็บไว้ตาม product ตัดสินใจภายหลัง)
+- **ทดสอบ:** `docs/verify-ai-lesson-plan-deploy.md`, `npm run test:regression-lesson-plan` (optional JWT ผ่าน `ATLAS_LESSON_PLAN_TEST_JWT`)
+
 ---
 
 ## 4. คำสั่ง Deploy ที่ใช้บ่อย
@@ -104,6 +112,7 @@ npx supabase functions deploy atlas-diagnostic
 | สคริปต์ | คำสั่ง | ความหมาย |
 |---------|--------|----------|
 | Negative tests | `npm run test:negative` | ไม่มี JWT → คาดหวัง 401 จากฟังก์ชันหลัก |
+| Lesson plan regression | `npm run test:regression-lesson-plan` | health + 401; ถ้ามี `ATLAS_LESSON_PLAN_TEST_JWT` ทดสอบ v2 reflection/snapshot + 400 เมื่อ snapshot ผิดรูปแบบ |
 | Setup check | `node scripts/check-setup.mjs` | `.env`, health, ai-chat พร้อม session (anon อาจไม่ผ่าน ai-chat — ปกติ) |
 
 รายละเอียด: `docs/NEGATIVE_TESTS.md`, `docs/verify-ai-lesson-plan-deploy.md`
@@ -131,4 +140,4 @@ npx supabase functions deploy atlas-diagnostic
 
 ---
 
-*อัปเดตล่าสุด: 2026-03-21*
+*อัปเดตล่าสุด: 2026-03-28*

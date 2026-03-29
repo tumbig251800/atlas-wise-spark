@@ -82,6 +82,48 @@ export type Database = {
           },
         ]
       }
+      lesson_plan_snapshots: {
+        Row: {
+          id: string
+          user_id: string
+          label: string | null
+          grade_level: string
+          classroom: string
+          subject: string
+          snapshot_class_profile: string
+          snapshot_focus: string
+          snapshot_notes: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          label?: string | null
+          grade_level?: string
+          classroom?: string
+          subject?: string
+          snapshot_class_profile?: string
+          snapshot_focus?: string
+          snapshot_notes?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          label?: string | null
+          grade_level?: string
+          classroom?: string
+          subject?: string
+          snapshot_class_profile?: string
+          snapshot_focus?: string
+          snapshot_notes?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pivot_events: {
         Row: {
           class_id: string

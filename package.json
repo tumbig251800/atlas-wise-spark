@@ -7,6 +7,7 @@
     "dev": "vite",
     "start": "vite --open",
     "check-setup": "node scripts/check-setup.mjs",
+    "verify:lesson-plan-ui": "node scripts/verify-lesson-plan-ui.mjs",
     "verify-rls": "npx supabase migration list",
     "test:negative": "node scripts/test-negative.mjs",
     "deploy:ai-chat": "bash scripts/deploy-ai-chat.sh",
@@ -17,7 +18,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:regression-ai-chat": "python3 scripts/regression-ai-chat.py"
+    "test:regression-ai-chat": "python3 scripts/regression-ai-chat.py",
+    "test:regression-lesson-plan": "node scripts/regression-ai-lesson-plan.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
