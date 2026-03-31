@@ -41,7 +41,7 @@ export function DataPackChart({ logs, diagnosticEvents = [] }: Props) {
   const last5 = logs.slice(-5);
 
   const decisionLookup = new Map<string, DecisionObject>();
-  (diagnosticEvents ?? []).forEach((de: any) => {
+  (diagnosticEvents ?? []).forEach((de) => {
     if (de.decision_object && !de.student_id && !decisionLookup.has(de.teaching_log_id)) {
       decisionLookup.set(de.teaching_log_id, de.decision_object as DecisionObject);
     }

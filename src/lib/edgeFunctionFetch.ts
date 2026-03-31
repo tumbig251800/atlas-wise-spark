@@ -49,7 +49,9 @@ function safeJwtPayload(token: string): { iss?: string; ref?: string; exp?: numb
 async function clearAuthState(reason: string, meta?: Record<string, unknown>): Promise<void> {
   try {
     await supabase.auth.signOut();
-  } catch {}
+  } catch (error) {
+    console.warn("clearAuthState: signOut failed", error);
+  }
   try {
     if (typeof localStorage !== "undefined") {
       localStorage.removeItem(ATLAS_AUTH_STORAGE_KEY);
@@ -58,7 +60,9 @@ async function clearAuthState(reason: string, meta?: Record<string, unknown>): P
         if (k.startsWith("sb-")) localStorage.removeItem(k);
       }
     }
-  } catch {}
+  } catch (error) {
+    console.warn("clearAuthState: storage cleanup failed", error);
+  }
 
   try {
     if (typeof window !== "undefined") {
@@ -71,7 +75,9 @@ async function clearAuthState(reason: string, meta?: Record<string, unknown>): P
         })
       );
     }
-  } catch {}
+  } catch (error) {
+    console.warn("clearAuthState: recovery marker failed", error);
+  }
 }
 
 /**
@@ -152,4 +158,115 @@ export function getAiSummaryUrl(): string {
 /** Headers for ai-exam-gen */
 export async function getAiExamGenHeaders(): Promise<Record<string, string>> {
   return getEdgeFunctionHeaders();
+}
+
+export interface EdgeErrorShape {
+  error?: string;
+  message?: string;
+  content?: string;
+}
+
+export interface EdgeJsonResult<T> {
+  ok: boolean;
+  status: number;
+  data: T | null;
+  errorMessage: string | null;
+}
+
+function parseEdgeErrorText(raw: string, fallback: string): string {
+  if (!raw) return fallback;
+  try {
+    const parsed = JSON.parse(raw) as EdgeErrorShape;
+    return parsed.error || parsed.message || parsed.content || raw;
+  } catch {
+    return raw;
+  }
+}
+
+export async function invokeEdgeJson<T>(
+  url: string,
+  payload: unknown,
+  init?: { signal?: AbortSignal }
+): Promise<EdgeJsonResult<T>> {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: await getEdgeFunctionHeaders(),
+    body: JSON.stringify(payload),
+    signal: init?.signal,
+  });
+
+  const raw = await response.text();
+  if (!response.ok) {
+    return {
+      ok: false,
+      status: response.status,
+      data: null,
+      errorMessage: parseEdgeErrorText(raw, `HTTP ${response.status}`),
+    };
+  }
+
+  if (!raw.trim()) {
+    return { ok: true, status: response.status, data: null, errorMessage: null };
+  }
+
+  try {
+    return {
+      ok: true,
+      status: response.status,
+      data: JSON.parse(raw) as T,
+      errorMessage: null,
+    };
+  } catch {
+    return {
+      ok: false,
+      status: response.status,
+      data: null,
+      errorMessage: "รูปแบบข้อมูลจากเซิร์ฟเวอร์ไม่ถูกต้อง",
+    };
+  }
+}
+
+export async function streamEdgeContent(
+  url: string,
+  payload: unknown,
+  onChunk: (chunk: string) => void
+): Promise<void> {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: await getEdgeFunctionHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok || !response.body) {
+    const raw = await response.text().catch(() => "");
+    const message = parseEdgeErrorText(raw, `HTTP ${response.status}`);
+    throw new Error(message);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    let idx: number;
+    while ((idx = buffer.indexOf("\n")) !== -1) {
+      let line = buffer.slice(0, idx);
+      buffer = buffer.slice(idx + 1);
+      if (line.endsWith("\r")) line = line.slice(0, -1);
+      if (!line.startsWith("data: ")) continue;
+      const json = line.slice(6).trim();
+      if (json === "[DONE]") break;
+      try {
+        const parsed = JSON.parse(json) as { choices?: Array<{ delta?: { content?: string } }> };
+        const content = parsed.choices?.[0]?.delta?.content;
+        if (content) onChunk(content);
+      } catch (error) {
+        console.warn("Invalid SSE chunk received", error);
+      }
+    }
+  }
 }

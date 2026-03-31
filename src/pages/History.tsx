@@ -188,8 +188,8 @@ export default function History() {
 
       setLogs((prev) => prev.filter((l) => l.id !== log.id));
       toast({ title: "ลบสำเร็จ", description: `ลบบันทึก ${formatDate(log.teaching_date)} ${log.subject} แล้ว` });
-    } catch (err: any) {
-      toast({ title: "ลบไม่สำเร็จ", description: err.message, variant: "destructive" });
+    } catch (err: unknown) {
+      toast({ title: "ลบไม่สำเร็จ", description: err instanceof Error ? err.message : "ไม่สามารถลบข้อมูลได้", variant: "destructive" });
     } finally {
       setDeletingId(null);
     }

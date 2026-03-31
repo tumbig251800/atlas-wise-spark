@@ -9,7 +9,6 @@ import { supabase } from "@/lib/atlasSupabase";
 import type { Database } from "@/integrations/supabase/types";
 
 // unit_assessments exists on atlas_prod but not in Lovable Cloud auto-generated types
-const db = supabase as any;
 import { parseCSVFile, ensureISODate, type ParsedCSVRow } from "@/lib/csvImport";
 import { parseAssessmentCSV, type ParsedAssessmentRow } from "@/lib/assessmentImport";
 import { TemplateDownloader } from "@/components/TemplateDownloader";
@@ -114,7 +113,9 @@ function TeachingLogTab() {
         ok++;
         supabase.functions.invoke("atlas-diagnostic", {
           body: { logId: logData.id }
-        }).catch(() => {});
+        }).catch((error) => {
+          console.warn("atlas-diagnostic invoke failed", error);
+        });
         if (parsed.rows.indexOf(row) < parsed.rows.length - 1) {
           await new Promise(r => setTimeout(r, 100));
         }
@@ -297,7 +298,7 @@ function AssessmentTab() {
       const termToUse = row.academic_term || academicTerm || null;
 
       // Duplicate check via supabase client (JWT handled automatically)
-      const { data: existing, error: checkErr } = await db
+      const { data: existing, error: checkErr } = await supabase
         .from("unit_assessments")
         .select("id")
         .eq("teacher_id", user.id)
@@ -319,7 +320,7 @@ function AssessmentTab() {
       }
 
       // Insert via supabase client (JWT handled automatically)
-      const insertPayload: any = {
+      const insertPayload: Database["public"]["Tables"]["unit_assessments"]["Insert"] = {
         teacher_id: user.id,
         student_id: row.student_id,
         student_name: row.student_name,
@@ -333,7 +334,7 @@ function AssessmentTab() {
         assessed_date: row.assessed_date ?? undefined,
       };
 
-      const { error: insertErr } = await db
+      const { error: insertErr } = await supabase
         .from("unit_assessments")
         .insert(insertPayload);
 

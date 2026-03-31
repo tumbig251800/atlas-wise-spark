@@ -17,6 +17,12 @@ export interface FilterOptions {
   subjects: string[];
 }
 
+export interface ContextFilter {
+  gradeLevel?: string;
+  classroom?: string;
+  subject?: string;
+}
+
 const STORAGE_KEY = "atlas_dashboard_filters";
 
 export function loadPersistedFilters(): DashboardFilters {
@@ -79,6 +85,69 @@ export function useDashboardData(filters: DashboardFilters) {
     allLogs,
     filteredLogs,
     filterOptions,
+    isLoading: logsQuery.isLoading,
+    error: logsQuery.error,
+  };
+}
+
+export function useDashboardFilterOptions() {
+  const { user } = useAuth();
+
+  const optionsQuery = useQuery({
+    queryKey: ["dashboard-filter-options", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("teaching_logs")
+        .select("grade_level,classroom,subject")
+        .order("teaching_date", { ascending: false })
+        .limit(2000);
+      if (error) throw error;
+      const rows = data ?? [];
+      return {
+        gradeLevels: [...new Set(rows.map((l) => l.grade_level))].filter(Boolean).sort(),
+        classrooms: [...new Set(rows.map((l) => String(l.classroom ?? "")))].filter(Boolean).sort(),
+        subjects: [...new Set(rows.map((l) => l.subject))].filter(Boolean).sort(),
+      } satisfies FilterOptions;
+    },
+    enabled: !!user,
+  });
+
+  return {
+    filterOptions: optionsQuery.data ?? { gradeLevels: [], classrooms: [], subjects: [] },
+    isLoading: optionsQuery.isLoading,
+    error: optionsQuery.error,
+  };
+}
+
+export function useContextFirstTeachingLogs(filter: ContextFilter) {
+  const { user } = useAuth();
+  const hasCompleteContext = Boolean(filter.subject && filter.gradeLevel && filter.classroom);
+
+  const logsQuery = useQuery({
+    queryKey: [
+      "consultant-context-logs",
+      user?.id,
+      filter.subject ?? "",
+      filter.gradeLevel ?? "",
+      filter.classroom ?? "",
+    ],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("teaching_logs")
+        .select("*")
+        .eq("subject", filter.subject ?? "")
+        .eq("grade_level", filter.gradeLevel ?? "")
+        .eq("classroom", filter.classroom ?? "")
+        .order("teaching_date", { ascending: true });
+      if (error) throw error;
+      return data as TeachingLog[];
+    },
+    enabled: !!user && hasCompleteContext,
+  });
+
+  return {
+    logs: logsQuery.data ?? [],
+    hasCompleteContext,
     isLoading: logsQuery.isLoading,
     error: logsQuery.error,
   };

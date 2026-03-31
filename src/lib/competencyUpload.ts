@@ -7,7 +7,9 @@ import { COMPETENCY_TEMPLATE_HEADERS } from "@/lib/competencyTemplate";
 import { CAPABILITY_KEYS_2026 } from "@/lib/capabilityConstants2026";
 import { supabase } from "@/lib/atlasSupabase";
 
-const db = supabase as any;
+const db = supabase as unknown as {
+  from: (table: string) => ReturnType<typeof supabase.from>;
+};
 
 const CAP_COLS = CAPABILITY_KEYS_2026.map((k) => `${k}_score`);
 

@@ -18,7 +18,7 @@ interface Step1Props {
     topic: string;
     totalStudents: number | null;
   };
-  onChange: (field: string, value: any) => void;
+  onChange: (field: string, value: unknown) => void;
   errors: Record<string, string>;
   teacherName?: string;
 }

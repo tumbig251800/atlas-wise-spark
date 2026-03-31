@@ -92,13 +92,17 @@ export default function TeachingLog() {
       try {
         const p = JSON.parse(persist);
         loaded = { ...loaded, ...p };
-      } catch {}
+      } catch (error) {
+        console.warn("Failed to parse persisted form payload", error);
+      }
     }
     if (draft) {
       try {
         const d = JSON.parse(draft);
         loaded = { ...loaded, ...d };
-      } catch {}
+      } catch (error) {
+        console.warn("Failed to parse persisted form payload", error);
+      }
     }
     setForm(loaded);
   }, []);
@@ -108,7 +112,7 @@ export default function TeachingLog() {
     localStorage.setItem(DRAFT_KEY, JSON.stringify(form));
   }, [form]);
 
-  const handleChange = useCallback((field: string, value: any) => {
+  const handleChange = useCallback((field: string, value: unknown) => {
     setForm((prev) => ({ ...prev, [field]: value }));
     setErrors((prev) => {
       const next = { ...prev };
@@ -254,12 +258,15 @@ export default function TeachingLog() {
       const persist = localStorage.getItem(SMART_PERSIST_KEY);
       let resetForm = { ...INITIAL_FORM };
       if (persist) {
-        try { resetForm = { ...resetForm, ...JSON.parse(persist) }; } catch {}
+        try { resetForm = { ...resetForm, ...JSON.parse(persist) }; } catch (error) {
+          console.warn("Failed to parse smart persist form", error);
+        }
       }
       setForm(resetForm);
       setCurrentStep(1);
-    } catch (err: any) {
-      toast({ title: "❌ เกิดข้อผิดพลาด", description: err.message, variant: "destructive" });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "ไม่สามารถบันทึกข้อมูลได้";
+      toast({ title: "❌ เกิดข้อผิดพลาด", description: message, variant: "destructive" });
     } finally {
       setSubmitting(false);
     }

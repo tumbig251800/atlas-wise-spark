@@ -14,7 +14,7 @@ interface Step3Props {
     healthCareStatus: "" | "none" | "has";
     healthCareIds: string;
   };
-  onChange: (field: string, value: any) => void;
+  onChange: (field: string, value: unknown) => void;
   errors: Record<string, string>;
   masteryScore: number | null;
 }

@@ -10,7 +10,9 @@ import type {
 } from "@/types/smartReport";
 
 // unit_assessments exists on atlas_prod but not in Lovable Cloud auto-generated types
-const db = supabase as any;
+const db = supabase as unknown as {
+  from: (table: string) => ReturnType<typeof supabase.from>;
+};
 
 const TEACHING_LOG_COLS =
   "id,learning_unit,next_strategy,major_gap,mastery_score,remedial_ids,teaching_date,subject,grade_level,classroom,academic_term,topic,key_issue,total_students,teacher_id";

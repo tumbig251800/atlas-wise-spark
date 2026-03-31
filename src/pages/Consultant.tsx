@@ -11,83 +11,41 @@ import { FilterSelect } from "@/components/shared/FilterSelect";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Send, Loader2, Filter, FileQuestion, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
-import { useDashboardData, loadPersistedFilters, getPersistedFiltersFromStorage, persistFilters } from "@/hooks/useDashboardData";
+import {
+  useDashboardFilterOptions,
+  useContextFirstTeachingLogs,
+  getPersistedFiltersFromStorage,
+  persistFilters,
+} from "@/hooks/useDashboardData";
 import { useDiagnosticData, type DiagnosticFilter } from "@/hooks/useDiagnosticData";
 import { buildStrictAnswerTH, type DecisionObject } from "@/lib/atlasStrictNarrator";
 import { validateContextBeforeAI } from "@/lib/contextValidator";
-import { getEdgeFunctionHeaders, getAiChatUrl, getAiExamGenUrl, getAiExamGenHeaders } from "@/lib/edgeFunctionFetch";
+import {
+  getAiChatUrl,
+  getAiExamGenUrl,
+  invokeEdgeJson,
+  streamEdgeContent,
+} from "@/lib/edgeFunctionFetch";
+import { buildContextWithCitation, buildQwrMetricsBlock } from "@/domain/consultantContext";
 
 type Msg = { id: string; role: "user" | "assistant"; content: string };
 
 type SSEChunk = { choices?: Array<{ delta?: { content?: string } }> };
 type DecisionEventLike = { decision_object?: unknown; student_id?: string | null };
+type AiChatFallbackMeta = {
+  validationFailed?: boolean;
+  reason?: string;
+  requestId?: string;
+};
+type AiChatResponse = {
+  content?: string;
+  error?: string;
+  source?: string;
+  meta?: AiChatFallbackMeta;
+};
 
 function genMsgId() {
   return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-}
-
-function mean(arr: number[]) {
-  if (!arr.length) return 0;
-  return arr.reduce((s, v) => s + v, 0) / arr.length;
-}
-
-function buildQwrMetricsBlock(logs: { mastery_score: number }[]): string {
-  // Align with Dashboard QWRTrendChart.tsx:
-  // baseline = first 20% sessions, current = last 20% sessions (logs are ordered by teaching_date asc).
-  if (logs.length < 5) {
-    return `\n\n## [QWR METRICS]\nข้อมูลยังไม่เพียงพอ (ต้องมีอย่างน้อย 5 คาบ)`;
-  }
-
-  const n = logs.length;
-  const baselineSlice = logs.slice(0, Math.ceil(n * 0.2));
-  const currentSlice = logs.slice(Math.floor(n * 0.8));
-
-  const baselineAvg = mean(baselineSlice.map((l) => l.mastery_score));
-  const currentAvg = mean(currentSlice.map((l) => l.mastery_score));
-  const velocity = currentAvg - baselineAvg;
-  const velocityPct = ((velocity / 5) * 100).toFixed(1);
-
-  return `\n\n## [QWR METRICS]\nGrowth Velocity: ${velocityPct}%\nBaseline Avg: ${baselineAvg.toFixed(2)}\nCurrent Avg: ${currentAvg.toFixed(2)}\nจำนวนคาบ: ${n}\n\n[STRICT]\n- หากกล่าวถึง Growth Velocity / Baseline / Current ต้องอ้างอิงจากบล็อก [QWR METRICS] นี้เท่านั้น\n- ห้ามสร้างตัวเลข QWR เองเด็ดขาด`;
-}
-
-function buildContextWithCitation(
-  logs: { teaching_date: string; subject: string; grade_level: string; classroom: string | number; topic?: string; mastery_score: number; major_gap: string; key_issue?: string; next_strategy?: string; remedial_ids?: string; health_care_ids?: string | null; total_students?: number }[]
-): string {
-  if (logs.length === 0) return "ไม่พบข้อมูลการสอนที่ตรงกับเงื่อนไข";
-  
-  const slice = logs.slice(-20);
-  const sessionDetails = slice.map((l, index) => {
-    const refId = `[REF-${index + 1}]`;
-    const remedialCount = (l.remedial_ids || "").split(",").filter(x => x.trim() && x !== "[None]" && x !== "[N/A]").length;
-    return `${refId} วันที่: ${l.teaching_date} | วิชา: ${l.subject} | ห้อง: ${l.grade_level}/${l.classroom} | หัวข้อ: ${l.topic || "ไม่ระบุ"} | Mastery: ${l.mastery_score}/5 | Gap: ${l.major_gap} | Remedial: ${remedialCount}/${l.total_students || 0} | Strategy: ${l.next_strategy || "ไม่ระบุ"} | Issue: ${l.key_issue || "ไม่ระบุ"}`;
-  }).join("\n");
-
-  const avgMastery = (logs.reduce((s, l) => s + l.mastery_score, 0) / logs.length).toFixed(1);
-
-  const refList = slice.map((_, i) => `[REF-${i + 1}]`).join(", ");
-  const extractedRemedialIds = [...new Set(
-    logs
-      .flatMap((l) => (l.remedial_ids || "").split(","))
-      .map((s) => s.trim())
-      .filter((s) => s && s !== "[None]" && s !== "[N/A]")
-  )];
-  const extractedHealthCareIds = [...new Set(
-    logs
-      .flatMap((l) => (l.health_care_ids || "").split(","))
-      .map((s) => s.trim())
-      .filter((s) => s && s !== "[None]" && s !== "[N/A]")
-  )];
-  const hasTotalStudents = slice.some((l) => (l.total_students ?? 0) > 0);
-  const hasRemedialIds = extractedRemedialIds.length > 0;
-  const hasHealthCareIds = extractedHealthCareIds.length > 0;
-
-  const guardNote = `\n\n[GUARD RULES — enforce ทุกคำตอบ]\n- REF ที่ถูกต้องในการสนทนานี้: ${refList} (ใช้ได้เฉพาะรายการนี้เท่านั้น)\n- ห้ามสร้าง REF รูปแบบอื่น เช่น [REF-19ก.พ.] หรือ [REF-ชื่อเรื่อง]\n- Special Care IDs ที่พบใน context: ${hasHealthCareIds ? extractedHealthCareIds.join(", ") : "ไม่มี"}\n- Remedial IDs ที่พบใน context: ${hasRemedialIds ? extractedRemedialIds.join(", ") : "ไม่มี"}\n- total_students ใน context: ${hasTotalStudents ? "มี" : "ไม่มี — ห้ามสร้างตัวเลข X/Y หรือ %"}\n- ห้ามสร้าง student ID ขึ้นเองเด็ดขาด ถ้าไม่มี ID ใน context ให้ตอบว่า \"ไม่พบรหัสนักเรียนในข้อมูล\"`;
-  
-  return `## ข้อมูลการสอนที่กรองแล้ว (${logs.length} คาบ)
-Mastery เฉลี่ย: ${avgMastery}/5
-
-### รายละเอียด (ใช้ [REF-X] อ้างอิงเสมอ):
-${sessionDetails}${guardNote}`;
 }
 
 export default function Consultant() {
@@ -109,8 +67,7 @@ export default function Consultant() {
   const [examStep, setExamStep] = useState<"select" | "generating">("select");
   const examBottomRef = useRef<HTMLDivElement>(null);
   
-  // Context filter state - prevents Data Leakage
-  // Start with empty filter; auto-set to first available data once loaded
+  // Context filter state - context-first (no implicit fallback context).
   const [contextFilter, setContextFilter] = useState<DiagnosticFilter>({
     subject: "",
     gradeLevel: "",
@@ -118,42 +75,38 @@ export default function Consultant() {
   });
   const [filterInitialized, setFilterInitialized] = useState(false);
 
-  const { allLogs, filterOptions, isLoading: dashboardLoading } = useDashboardData(loadPersistedFilters());
-  const { diagnosticEvents, colorCounts, activeStrikes, isLoading: diagnosticLoading } = useDiagnosticData(contextFilter);
+  const { filterOptions, isLoading: optionsLoading } = useDashboardFilterOptions();
+  const {
+    logs: filteredLogs,
+    hasCompleteContext,
+    isLoading: logsLoading,
+  } = useContextFirstTeachingLogs(contextFilter);
+  const { diagnosticEvents, colorCounts, activeStrikes, isLoading: diagnosticLoading } = useDiagnosticData(
+    contextFilter,
+    { contextFirst: true }
+  );
 
-  const dataLoading = dashboardLoading || diagnosticLoading;
+  const dataLoading = optionsLoading || (hasCompleteContext && (logsLoading || diagnosticLoading));
 
-  // Auto-initialize filter: prefer Dashboard's persisted filter, else last log
+  // Auto-initialize from persisted Dashboard filter only.
   useEffect(() => {
-    if (!filterInitialized && !dashboardLoading && allLogs.length > 0) {
+    if (!filterInitialized && !optionsLoading) {
       const persisted = getPersistedFiltersFromStorage();
-      const opts = {
-        grades: [...new Set(allLogs.map((l) => l.grade_level))],
-        classrooms: [...new Set(allLogs.map((l) => String(l.classroom ?? "")))],
-        subjects: [...new Set(allLogs.map((l) => l.subject))],
-      };
       const persistedValid =
         persisted &&
-        opts.grades.includes(persisted.gradeLevel) &&
-        opts.classrooms.includes(persisted.classroom) &&
-        opts.subjects.includes(persisted.subject);
+        filterOptions.gradeLevels.includes(persisted.gradeLevel) &&
+        filterOptions.classrooms.includes(persisted.classroom) &&
+        filterOptions.subjects.includes(persisted.subject);
       if (persistedValid) {
         setContextFilter({
-          subject: persisted!.subject,
-          gradeLevel: persisted!.gradeLevel,
-          classroom: persisted!.classroom,
-        });
-      } else {
-        const last = allLogs[allLogs.length - 1];
-        setContextFilter({
-          subject: last.subject,
-          gradeLevel: last.grade_level,
-          classroom: String(last.classroom),
+          subject: persisted.subject,
+          gradeLevel: persisted.gradeLevel,
+          classroom: persisted.classroom,
         });
       }
       setFilterInitialized(true);
     }
-  }, [filterInitialized, dashboardLoading, allLogs]);
+  }, [filterInitialized, optionsLoading, filterOptions.gradeLevels, filterOptions.classrooms, filterOptions.subjects]);
 
   // Persist filter when user changes it (sync with Dashboard)
   useEffect(() => {
@@ -166,14 +119,6 @@ export default function Consultant() {
     }
   }, [filterInitialized, contextFilter.subject, contextFilter.gradeLevel, contextFilter.classroom]);
 
-  // Filter logs by context to prevent Data Leakage
-  const filteredLogs = allLogs.filter(log => {
-    const matchSubject = !contextFilter.subject || log.subject === contextFilter.subject;
-    const matchGrade = !contextFilter.gradeLevel || log.grade_level === contextFilter.gradeLevel;
-    const matchClass = !contextFilter.classroom || String(log.classroom) === contextFilter.classroom;
-    return matchSubject && matchGrade && matchClass;
-  });
-  
   const filterKey = `${contextFilter.subject || ""}|${contextFilter.gradeLevel || ""}|${contextFilter.classroom || ""}`;
 
   // Reset chat state when filter changes to prevent context drift.
@@ -319,29 +264,27 @@ export default function Consultant() {
       }
       const controller = new AbortController();
       const timeoutId = window.setTimeout(() => controller.abort(), 30_000);
-      const resp = await fetch(chatUrl, {
-        method: "POST",
-        headers: await getEdgeFunctionHeaders(),
-        body: JSON.stringify({
+      const result = await invokeEdgeJson<AiChatResponse>(
+        chatUrl,
+        {
           messages: [...messages, userMsg],
           context,
           audience: "teacher",
-        }),
-        signal: controller.signal,
-      });
+        },
+        { signal: controller.signal }
+      );
       window.clearTimeout(timeoutId);
-
-      const data = await resp.json().catch(() => ({}));
       const content =
-        (data as { content?: string }).content ??
-        (data as { error?: string }).error ??
-        `Error ${resp.status}`;
+        result.data?.content ??
+        result.data?.error ??
+        result.errorMessage ??
+        `Error ${result.status}`;
 
       // TEMP DEBUG: Log validation failures for ai-chat fallback
-      if ((data as any).source === "fallback" && (data as any).meta?.validationFailed) {
+      if (result.data?.source === "fallback" && result.data.meta?.validationFailed) {
         const debugInfo = {
-          reason: (data as any).meta?.reason,
-          requestId: (data as any).meta?.requestId,
+          reason: result.data.meta?.reason,
+          requestId: result.data.meta?.requestId,
           question: text,
           timestamp: new Date().toISOString(),
         };
@@ -350,7 +293,7 @@ export default function Consultant() {
         toast.error(`Validation: ${debugInfo.reason}`);
       }
 
-      if (!resp.ok) {
+      if (!result.ok) {
         toast.error(content);
       }
 
@@ -420,57 +363,18 @@ export default function Consultant() {
     const context = contextLines.join("\n");
 
     try {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: await getAiExamGenHeaders(),
-        body: JSON.stringify({ gradeLevel, classroom, subject, unit: selectedUnit, context }),
-      });
-
-      if (!res.ok || !res.body) {
-        const err = (await res.json().catch(() => ({}))) as {
-          error?: string;
-          message?: string;
-          content?: string;
-        };
-        const detail =
-          (typeof err.error === "string" && err.error) ||
-          (typeof err.message === "string" && err.message) ||
-          (typeof err.content === "string" && err.content) ||
-          `HTTP ${res.status}`;
-        toast.error(detail || "เกิดข้อผิดพลาดในการสร้างข้อสอบ");
-        setExamLoading(false);
-        return;
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const data = line.slice(6).trim();
-          if (data === "[DONE]") continue;
-          try {
-            const parsed = JSON.parse(data);
-            const delta = parsed.choices?.[0]?.delta?.content ?? "";
-            if (delta) {
-              setExamContent((prev) => prev + delta);
-              setTimeout(() => examBottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
-            }
-          } catch {
-            // ignore malformed SSE chunk
-          }
+      await streamEdgeContent(
+        url,
+        { gradeLevel, classroom, subject, unit: selectedUnit, context },
+        (chunk) => {
+          setExamContent((prev) => prev + chunk);
+          setTimeout(() => examBottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
         }
-      }
+      );
     } catch (e) {
       console.error("Exam gen error:", e);
-      toast.error("เกิดข้อผิดพลาดในการเชื่อมต่อ AI");
+      const msg = e instanceof Error ? e.message : "เกิดข้อผิดพลาดในการเชื่อมต่อ AI";
+      toast.error(msg);
     } finally {
       setExamLoading(false);
     }
@@ -484,7 +388,7 @@ export default function Consultant() {
     setTimeout(() => setExamCopied(false), 2000);
   };
 
-  if (!dashboardLoading && allLogs.length === 0) {
+  if (!optionsLoading && filterOptions.subjects.length === 0) {
     return (
       <AppLayout>
         <div className="flex flex-col items-center justify-center min-h-[50vh] gap-6">

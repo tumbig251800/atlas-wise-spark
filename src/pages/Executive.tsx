@@ -102,7 +102,7 @@ export default function Executive() {
 
   // Build academic term list from logs
   const academicTerms = useMemo(() => {
-    return [...new Set(allLogs.map((l) => (l as any).academic_term).filter(Boolean) as string[])].sort().reverse();
+    return [...new Set(allLogs.map((l) => l.academic_term).filter(Boolean) as string[])].sort().reverse();
   }, [allLogs]);
 
   // Build teacher name list from teacher_name field in logs (not from profiles)
@@ -129,7 +129,7 @@ export default function Executive() {
       if (filters.classroom && String(l.classroom ?? "") !== String(filters.classroom ?? "")) return false;
       if (filters.subject && l.subject !== filters.subject) return false;
       if (filters.teacherName && l.teacher_name !== filters.teacherName) return false;
-      if (filters.academicTerm && (l as any).academic_term !== filters.academicTerm) return false;
+      if (filters.academicTerm && l.academic_term !== filters.academicTerm) return false;
       return true;
     });
   }, [allLogs, filters]);

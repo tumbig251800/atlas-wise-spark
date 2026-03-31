@@ -4,7 +4,7 @@ import { Headphones, Presentation, ImageIcon, Loader2, Copy, Check } from "lucid
 import { supabase } from "@/lib/atlasSupabase";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
-import { getEdgeFunctionHeaders, getAiLessonPlanUrl } from "@/lib/edgeFunctionFetch";
+import { getAiLessonPlanUrl, streamEdgeContent } from "@/lib/edgeFunctionFetch";
 
 interface Props {
   lessonContent: string;
@@ -30,57 +30,15 @@ export function AddonPrompts({ lessonContent }: Props) {
         setLoading(null);
         return;
       }
-      const resp = await fetch(chatUrl, {
-        method: "POST",
-        headers: await getEdgeFunctionHeaders(),
-        body: JSON.stringify({ addonType, topic: lessonContent }),
-      });
-
-      if (!resp.ok || !resp.body) {
-        const raw = await resp.text().catch(() => "");
-        const msg = (() => {
-          try {
-            const j = JSON.parse(raw) as { error?: string; message?: string };
-            return j.error || j.message || raw;
-          } catch {
-            return raw;
-          }
-        })();
-        toast.error(msg || "เกิดข้อผิดพลาดในการสร้างเนื้อหาเสริม");
-        throw new Error("Failed");
-      }
-
-      const reader = resp.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
       let result = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        let idx: number;
-        while ((idx = buffer.indexOf("\n")) !== -1) {
-          let line = buffer.slice(0, idx);
-          buffer = buffer.slice(idx + 1);
-          if (line.endsWith("\r")) line = line.slice(0, -1);
-          if (!line.startsWith("data: ")) continue;
-          const json = line.slice(6).trim();
-          if (json === "[DONE]") break;
-          try {
-            const parsed = JSON.parse(json);
-            const c = parsed.choices?.[0]?.delta?.content;
-            if (c) {
-              result += c;
-              setResults((prev) => ({ ...prev, [addonType]: result }));
-            }
-          } catch {}
-        }
-      }
+      await streamEdgeContent(chatUrl, { addonType, topic: lessonContent }, (chunk) => {
+        result += chunk;
+        setResults((prev) => ({ ...prev, [addonType]: result }));
+      });
     } catch (e) {
       console.error(e);
-      toast.error("เกิดข้อผิดพลาดในการสร้างเนื้อหาเสริม");
+      const msg = e instanceof Error ? e.message : "เกิดข้อผิดพลาดในการสร้างเนื้อหาเสริม";
+      toast.error(msg);
     } finally {
       setLoading(null);
     }

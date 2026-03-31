@@ -31,8 +31,6 @@ import { useToast } from "@/hooks/use-toast";
 
 const BOM = "\uFEFF";
 
-const db = supabase as any;
-
 export function AllInOneImporter() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -128,7 +126,7 @@ export function AllInOneImporter() {
     if (!user) return;
     setClearing(true);
     try {
-      const { error } = await db
+      const { error } = await supabase
         .from("unit_assessments")
         .delete()
         .eq("teacher_id", user.id);

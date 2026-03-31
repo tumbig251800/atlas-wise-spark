@@ -23,7 +23,9 @@ export default function Login() {
       if (!raw) return;
       setRecoverInfo(raw);
       sessionStorage.removeItem("atlas_auth_recover");
-    } catch {}
+    } catch (error) {
+      console.warn("Failed to read recover info", error);
+    }
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -41,10 +43,11 @@ export default function Login() {
         await signIn(email, password);
         navigate("/");
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "ไม่สามารถเข้าสู่ระบบได้";
       toast({
         title: "เกิดข้อผิดพลาด",
-        description: err.message,
+        description: message,
         variant: "destructive",
       });
     } finally {

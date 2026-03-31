@@ -32,8 +32,14 @@ export interface DiagnosticFilter {
   classroom?: string;
 }
 
-export function useDiagnosticData(filter?: DiagnosticFilter) {
+interface DiagnosticQueryOptions {
+  contextFirst?: boolean;
+}
+
+export function useDiagnosticData(filter?: DiagnosticFilter, options?: DiagnosticQueryOptions) {
   const { user } = useAuth();
+  const contextFirst = options?.contextFirst === true;
+  const hasCompleteContext = Boolean(filter?.subject && filter?.gradeLevel && filter?.classroom);
 
   const filterKey = filter
     ? `${filter.subject ?? ""}|${filter.gradeLevel ?? ""}|${filter.classroom ?? ""}`
@@ -42,41 +48,48 @@ export function useDiagnosticData(filter?: DiagnosticFilter) {
   const eventsQuery = useQuery({
     queryKey: ["diagnostic-events", user?.id, filterKey],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("diagnostic_events")
-        .select("*")
-        .order("created_at", { ascending: false });
+      let q = supabase.from("diagnostic_events").select("*");
+      if (contextFirst && filter?.subject && filter?.gradeLevel && filter?.classroom) {
+        q = q
+          .eq("subject", filter.subject)
+          .eq("grade_level", filter.gradeLevel)
+          .eq("classroom", filter.classroom);
+      }
+      const { data, error } = await q.order("created_at", { ascending: false });
       if (error) throw error;
       return data as DiagnosticEvent[];
     },
-    enabled: !!user,
+    enabled: !!user && (!contextFirst || hasCompleteContext),
   });
 
   const strikesQuery = useQuery({
     queryKey: ["strike-counters", user?.id, filterKey],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("strike_counter")
-        .select("*")
-        .order("last_updated", { ascending: false });
+      let q = supabase.from("strike_counter").select("*");
+      if (contextFirst && filter?.subject) {
+        q = q.eq("subject", filter.subject);
+      }
+      const { data, error } = await q.order("last_updated", { ascending: false });
       if (error) throw error;
       return data as StrikeCounter[];
     },
-    enabled: !!user,
+    enabled: !!user && (!contextFirst || hasCompleteContext),
   });
 
   const pivotEventsQuery = useQuery({
     queryKey: ["pivot-events", user?.id, filterKey],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("pivot_events")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(20);
+      let q = supabase.from("pivot_events").select("*");
+      if (contextFirst && filter?.subject && filter?.gradeLevel && filter?.classroom) {
+        q = q
+          .eq("subject", filter.subject)
+          .eq("class_id", `${filter.gradeLevel}/${filter.classroom}`);
+      }
+      const { data, error } = await q.order("created_at", { ascending: false }).limit(20);
       if (error) throw error;
       return data as PivotEvent[];
     },
-    enabled: !!user,
+    enabled: !!user && (!contextFirst || hasCompleteContext),
   });
 
   const allDiagnosticEvents = eventsQuery.data ?? [];

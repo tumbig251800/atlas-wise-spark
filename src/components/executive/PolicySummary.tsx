@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Loader2 } from "lucide-react";
-import { getEdgeFunctionHeaders, getAiSummaryUrl } from "@/lib/edgeFunctionFetch";
+import { getAiSummaryUrl, invokeEdgeJson } from "@/lib/edgeFunctionFetch";
 import type { TeachingLog } from "@/hooks/useDashboardData";
 import ReactMarkdown from "react-markdown";
 import { ValidationDisclaimer } from "@/components/shared/ValidationDisclaimer";
@@ -44,19 +44,17 @@ Mastery ตามชั้น: ${Object.entries(gradeSummary).map(([g, v]) => `$
     `.trim();
 
     try {
-      const res = await fetch(getAiSummaryUrl(), {
-        method: "POST",
-        headers: await getEdgeFunctionHeaders(),
-        body: JSON.stringify({ logs_summary: logsSummary, mode: "executive" }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const msg = (data as { error?: string })?.error ?? `HTTP ${res.status}`;
+      const result = await invokeEdgeJson<{ summary?: string; validation?: SummaryValidation }>(
+        getAiSummaryUrl(),
+        { logs_summary: logsSummary, mode: "executive" }
+      );
+      if (!result.ok) {
+        const msg = result.errorMessage ?? `HTTP ${result.status}`;
         setSummary(`❌ ${msg}`);
         return;
       }
-      setSummary((data as { summary?: string })?.summary || "ไม่สามารถสร้างสรุปได้");
-      setValidation((data as { validation?: SummaryValidation })?.validation ?? null);
+      setSummary(result.data?.summary || "ไม่สามารถสร้างสรุปได้");
+      setValidation(result.data?.validation ?? null);
     } catch (e) {
       console.error("PolicySummary error:", e);
       const msg = e instanceof Error ? e.message : "เกิดข้อผิดพลาดในการสร้างสรุป";

@@ -10,7 +10,7 @@ interface Step2Props {
     activityMode: "active" | "passive" | "constructive" | null;
     keyIssue: string;
   };
-  onChange: (field: string, value: any) => void;
+  onChange: (field: string, value: unknown) => void;
   errors: Record<string, string>;
 }
 

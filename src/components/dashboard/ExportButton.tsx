@@ -7,7 +7,7 @@ interface ExportButtonProps {
   logs: TeachingLog[];
 }
 
-const safe = (val: any, fallback = "[N/A]"): string => {
+const safe = (val: unknown, fallback = "[N/A]"): string => {
   if (val === null || val === undefined || String(val).trim() === "") return fallback;
   return String(val);
 };

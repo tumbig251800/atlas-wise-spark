@@ -230,13 +230,22 @@ serve(async (req) => {
       .order("teaching_date", { ascending: false })
       .limit(20);
 
+    interface HistoricalLog {
+      id: string;
+      topic?: string;
+      mastery_score: number;
+      teaching_date: string;
+      major_gap: string;
+      classroom?: string;
+    }
+
     const matchedHistoryLogs = (historyLogs || []).filter(
-      (h: any) => normalizeClassroom(h.classroom || "") === cleanClassroom
+      (h: HistoricalLog) => normalizeClassroom(h.classroom || "") === cleanClassroom
     );
 
     // 3. Deterministic Topic Normalization (v1.4 - Lookup Table + Fuzzy Match)
     const currentTopic = log.topic || "";
-    const historicalTopics = matchedHistoryLogs.map((h: any) => h.topic || "");
+    const historicalTopics = matchedHistoryLogs.map((h: HistoricalLog) => h.topic || "");
     const normalizedTopic = await normalizeTopic(
       currentTopic,
       historicalTopics,
@@ -244,14 +253,14 @@ serve(async (req) => {
     );
 
     // Build trend for same normalized topic
-    const sameTopicLogs = matchedHistoryLogs.filter((h: any) => {
+    const sameTopicLogs = matchedHistoryLogs.filter((h: HistoricalLog) => {
       const ht = (h.topic || "").trim().toLowerCase();
       return ht === normalizedTopic || ht === currentTopic.trim().toLowerCase();
     });
 
     const trend: MasteryTrend = {
-      scores: sameTopicLogs.map((h: any) => h.mastery_score).reverse(),
-      dates: sameTopicLogs.map((h: any) => h.teaching_date).reverse(),
+      scores: sameTopicLogs.map((h: HistoricalLog) => h.mastery_score).reverse(),
+      dates: sameTopicLogs.map((h: HistoricalLog) => h.teaching_date).reverse(),
       sameNormalizedTopic: sameTopicLogs.length > 0,
     };
 
@@ -291,7 +300,7 @@ serve(async (req) => {
     const classId = `${log.grade_level}/${cleanClassroom}`;
     const gapRate = classSize > 0 ? (remedialIds.length / classSize) * 100 : 0;
 
-    let classStrikeResult: any = null;
+    let classStrikeResult: { action: string; strike_count: number; pivot_event_id?: string; evidence_refs?: string[] } | null = null;
     try {
       const { data, error: rpcError } = await supabase.rpc("update_class_strike", {
         p_teacher_id: log.teacher_id,
@@ -386,7 +395,7 @@ serve(async (req) => {
         .eq("teaching_log_id", logId)
         .not("student_id", "is", null);
 
-      const existingStudentIds = new Set((existingStudentRows || []).map((r: any) => r.student_id));
+      const existingStudentIds = new Set((existingStudentRows || []).map((r: { student_id: string }) => r.student_id));
       const newStudentIds = remedialIds.filter((sid: string) => !existingStudentIds.has(sid));
 
       if (newStudentIds.length > 0) {
@@ -480,7 +489,7 @@ serve(async (req) => {
 
 // ─── Upsert Strike Counter ───
 async function upsertStrike(
-  supabase: any,
+  supabase: ReturnType<typeof createClient>,
   params: {
     teacher_id: string;
     scope: string;

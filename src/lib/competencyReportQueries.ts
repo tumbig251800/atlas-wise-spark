@@ -12,7 +12,9 @@ import {
   type CapabilityKey2026,
 } from "@/lib/capabilityConstants2026";
 
-const db = supabase as any;
+const db = supabase as unknown as {
+  from: (table: string) => ReturnType<typeof supabase.from>;
+};
 
 const CAP_COLS =
   "reading_score,writing_score,calculating_score,sci_tech_score,social_civic_score,economy_finance_score,health_score,art_culture_score";

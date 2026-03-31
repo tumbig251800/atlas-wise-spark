@@ -84,8 +84,9 @@ export function ReassignTeacherDialog({ log, open, onOpenChange, onSuccess }: Re
       onSuccess(log.id, selectedTeacherId, newName);
       toast({ title: "เปลี่ยนครูสำเร็จ", description: `เปลี่ยนเป็น ${newName} แล้ว` });
       onOpenChange(false);
-    } catch (err: any) {
-      toast({ title: "เกิดข้อผิดพลาด", description: err.message, variant: "destructive" });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "ไม่สามารถเปลี่ยนครูผู้สอนได้";
+      toast({ title: "เกิดข้อผิดพลาด", description: message, variant: "destructive" });
     } finally {
       setSaving(false);
       setSelectedTeacherId("");

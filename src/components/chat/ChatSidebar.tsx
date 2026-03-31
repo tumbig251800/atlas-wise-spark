@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { getEdgeFunctionHeaders, getAiChatUrl } from "@/lib/edgeFunctionFetch";
+import { getEdgeFunctionHeaders, getAiChatUrl, invokeEdgeJson } from "@/lib/edgeFunctionFetch";
 
 type Msg = { id: string; role: "user" | "assistant"; content: string };
 
@@ -101,41 +101,28 @@ export function ChatSidebar({ open, onOpenChange, context, audience = "teacher" 
           tokenRef = payload?.ref ?? null;
           tokenIss = payload?.iss ?? null;
         }
-      } catch {}
+      } catch (error) {
+        console.warn("Cannot decode token payload", error);
+      }
       setLastDebug(
         `rid=${requestId} status=starting url=${chatUrl} authLen=${token.length} ref=${tokenRef ?? "-"} iss=${tokenIss ? tokenIss.replace("https://", "").slice(0, 28) : "-"}`
       );
-      const resp = await fetch(chatUrl, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
+      const result = await invokeEdgeJson<{ content?: string; error?: string }>(
+        chatUrl,
+        {
           messages: [...messages, userMsg],
           context: context || "",
           audience,
-        }),
-        signal: controller.signal,
-      });
+        },
+        { signal: controller.signal }
+      );
       window.clearTimeout(timeoutId);
+      const content = result.data?.content ?? result.errorMessage ?? `Error ${result.status}`;
 
-      const raw = await resp.text();
-      const data = (() => {
-        try {
-          return JSON.parse(raw) as unknown;
-        } catch {
-          return {};
-        }
-      })();
-      const content =
-        (data as { content?: string }).content ??
-        (data as { error?: string }).error ??
-        `Error ${resp.status}`;
-
-      if (!resp.ok) {
-        toast.error(content);
-      }
+      if (!result.ok) toast.error(content);
 
       // If gateway says Invalid JWT, force user to re-login (stale cross-project session).
-      if (resp.status === 401 && raw.includes("Invalid JWT")) {
+      if (result.status === 401 && (result.errorMessage || "").includes("Invalid JWT")) {
         const authHeader = String(headers.Authorization || "");
         // best-effort: include token ref/iss in recovery for easier debugging
         const tokenParts = authHeader.toLowerCase().startsWith("bearer ")
@@ -150,13 +137,17 @@ export function ChatSidebar({ open, onOpenChange, context, audience = "teacher" 
             const payload = JSON.parse(json) as { ref?: string; iss?: string };
             tokenRef = payload?.ref ?? "-";
             tokenIss = payload?.iss ?? "-";
-          } catch {}
+          } catch (error) {
+            console.warn("Cannot decode token from 401 response", error);
+          }
         }
         let apikeyPrefix = "-";
         try {
           const apikey = String(headers.apikey || "");
           apikeyPrefix = apikey ? apikey.slice(0, 16) : "-";
-        } catch {}
+        } catch (error) {
+          console.warn("Cannot read apikey header", error);
+        }
 
         try {
           sessionStorage.setItem(
@@ -167,7 +158,7 @@ export function ChatSidebar({ open, onOpenChange, context, audience = "teacher" 
                 requestId,
                 url: chatUrl,
                 lastDebug,
-                raw: raw.slice(0, 200),
+                raw: String(result.errorMessage || "").slice(0, 200),
                 tokenRef,
                 tokenIss,
                 apikeyPrefix,
@@ -175,13 +166,15 @@ export function ChatSidebar({ open, onOpenChange, context, audience = "teacher" 
               ts: Date.now(),
             })
           );
-        } catch {}
+        } catch (error) {
+          console.warn("Cannot persist auth recovery metadata", error);
+        }
         setAssistant(
           "เซสชันไม่ถูกต้อง (Invalid JWT). หยุดการเด้งไป login เพื่อให้ตรวจสอบ token ได้ก่อนครับ"
         );
       } else {
       setLastDebug(
-        `rid=${requestId} status=${resp.status} url=${chatUrl} raw=${raw ? raw.slice(0, 160) : "(empty)"}`
+        `rid=${requestId} status=${result.status} url=${chatUrl} raw=${result.errorMessage ? result.errorMessage.slice(0, 160) : "(ok)"}`
       );
         setAssistant(content || "ไม่สามารถรับคำตอบได้ กรุณาลองใหม่อีกครั้งครับ");
       }
