@@ -66,7 +66,11 @@ function buildExecutiveChatContext(logs: TeachingLog[], filters: ExecFilters): s
     if (!strategyMap.has(strat)) strategyMap.set(strat, []);
     strategyMap.get(strat)!.push(nextMastery);
   }
+  const isLowerPrimary = /ป\.?[12](\b|\/)/.test(filters.gradeLevel || "");
   let strategySummary = "\n\n[STRATEGY OUTCOME SUMMARY]\n(คำนวณจากข้อมูลจริงใน context — ใช้แทนการวิเคราะห์ cross-REF)\n";
+  if (isLowerPrimary) {
+    strategySummary += "⚠️ ป.1–ป.2 OVERRIDE: ข้อมูลนี้ใช้สังเกตผลลัพธ์เท่านั้น แม้ Peer Tutor จะมีค่าเฉลี่ยสูง ห้ามแนะนำเป็น primary strategy สำหรับทักษะพื้นฐาน — ยึด [CLASSROOM APPROPRIATENESS] ก่อนเสมอ\n";
+  }
   if (strategyMap.size === 0) {
     strategySummary += "ไม่มีข้อมูล strategy ที่มีผลลัพธ์ติดตาม";
   } else {
