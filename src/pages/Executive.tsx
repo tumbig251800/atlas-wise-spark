@@ -25,6 +25,12 @@ function extractValidIdsFromCsv(csv: string | null): string[] {
     .filter((s) => s && s !== "[None]" && s !== "[N/A]" && /^\d{4,5}$/.test(s));
 }
 
+function toActivityLabel(mode: string | null): string {
+  if (mode === "passive") return "Passive";
+  if (mode === "constructive") return "Constructive";
+  return "Active";
+}
+
 function buildExecutiveChatContext(logs: TeachingLog[], filters: ExecFilters): string {
   if (logs.length === 0) return "ไม่พบข้อมูลการสอนที่ตรงกับตัวกรองนี้";
 
@@ -49,7 +55,7 @@ function buildExecutiveChatContext(logs: TeachingLog[], filters: ExecFilters): s
       const remedialIds = extractValidIdsFromCsv(l.remedial_ids);
       const remedialCount = remedialIds.length;
       const total = l.total_students ?? 0;
-      return `${refId} วันที่: ${l.teaching_date} | วิชา: ${l.subject} | ห้อง: ${l.grade_level}/${l.classroom} | หัวข้อ: ${l.topic || "ไม่ระบุ"} | Mastery: ${l.mastery_score}/5 | Gap: ${l.major_gap} | Remedial: ${remedialCount}/${total} | Strategy: ${l.next_strategy || "ไม่ระบุ"} | Issue: ${l.key_issue || "ไม่ระบุ"}`;
+      return `${refId} วันที่: ${l.teaching_date} | วิชา: ${l.subject} | ห้อง: ${l.grade_level}/${l.classroom} | หัวข้อ: ${l.topic || "ไม่ระบุ"} | Activity: ${toActivityLabel(l.activity_mode)} | Mastery: ${l.mastery_score}/5 | Gap: ${l.major_gap} | Remedial: ${remedialCount}/${total} | Strategy: ${l.next_strategy || "ไม่ระบุ"} | Issue: ${l.key_issue || "ไม่ระบุ"}`;
     })
     .join("\n");
 
@@ -80,13 +86,31 @@ function buildExecutiveChatContext(logs: TeachingLog[], filters: ExecFilters): s
     }
   }
 
+  // Pre-compute gap distribution
+  const gapCount = new Map<string, number>();
+  for (const log of slice) {
+    const gap = log.major_gap;
+    if (!gap) continue;
+    gapCount.set(gap, (gapCount.get(gap) ?? 0) + 1);
+  }
+  let gapSummary = "\n\n[GAP DISTRIBUTION]\n(นับจาก context จริง — ใช้วิเคราะห์ pattern ก่อนแนะนำ)\n";
+  if (gapCount.size === 0) {
+    gapSummary += "ไม่มีข้อมูล Gap";
+  } else {
+    const total = slice.length;
+    for (const [gap, count] of gapCount) {
+      const pct = ((count / total) * 100).toFixed(0);
+      gapSummary += `${gap}-Gap: ${count} คาบ (${pct}%)\n`;
+    }
+  }
+
   const scopeAssertion = filters.subject
     ? `\n\n## [CRITICAL - ANSWER SCOPE]\nตอบเฉพาะวิชา: ${filters.subject} เท่านั้น\nห้ามกล่าวถึง วิชาอื่นที่ไม่ตรงกับตัวกรองนี้เด็ดขาด`
     : `\n\n## [CRITICAL - ANSWER SCOPE]\nตอบได้เฉพาะข้อมูลที่อยู่ใน [REF-X] เท่านั้น (ตามตัวกรองที่เลือก)`;
 
   const filterInfo = `\n\n## [ACTIVE FILTER]\nวิชา: ${filters.subject || "ทั้งหมด"}\nระดับชั้น: ${filters.gradeLevel || "ทั้งหมด"}\nห้อง: ${filters.classroom || "ทั้งหมด"}\n⚠️ AI ต้องตอบเฉพาะข้อมูลที่อยู่ใน [REF-X] เท่านั้น ห้ามนำข้อมูลวิชาอื่นมาปน`;
 
-  return baseContext + strategySummary + scopeAssertion + filterInfo;
+  return baseContext + strategySummary + gapSummary + scopeAssertion + filterInfo;
 }
 
 export default function Executive() {
