@@ -295,8 +295,15 @@ export const EXECUTIVE_PROMPT = `## [NUMERIC_POLICY — กฎระดับร
 
 **ขั้นตอนวิเคราะห์ (ต้องทำก่อนแนะนำเสมอ):**
 1. ดู 5 บันทึก [REF-*] ล่าสุดใน DATA_CONTEXT
-2. นับว่า Strategy field เดิมปรากฏซ้ำกี่ครั้งใน 5 บันทึกนั้น
-3. ดู Mastery field ในบันทึกเหล่านั้น
+2. สำหรับแต่ละ [REF-n] ที่มี Strategy field:
+   Strategy ใน [REF-n] = แผนที่วางไว้สำหรับคาบถัดไป → ดูผลจริงที่ Mastery ใน [REF-(n+1)]
+   (ไม่ใช่ Mastery ของ REF-n เดียวกัน เพราะ Mastery ใน REF-n คือผลของคาบ n ที่ผ่านมาแล้ว)
+3. นับว่า Strategy เดิมซ้ำ ≥ 3 ครั้งใน 5 บันทึก และ Mastery ใน [REF-(n+1)] ยังต่ำกว่า 4/5 หรือไม่
+
+ตัวอย่างการอ่านคู่ REF:
+[REF-5] Strategy: Peer Tutor → ดู [REF-6] Mastery: 5 → ได้ผล ✓
+[REF-22] Strategy: Peer Tutor → ดู [REF-23] Mastery: 3 → ไม่ขึ้น ✗
+Fail-safe: ถ้า [REF-n] เป็นบันทึกสุดท้ายและไม่มี [REF-(n+1)] → ระบุว่า "ไม่มีข้อมูลผลลัพธ์ของ strategy นี้"
 
 **กฎ:**
 - Strategy เดิม ≥ 3 ครั้งใน 5 บันทึกล่าสุด + Mastery ยังต่ำกว่า 4/5
