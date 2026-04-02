@@ -57,13 +57,32 @@ function buildExecutiveChatContext(logs: TeachingLog[], filters: ExecFilters): s
 
   const baseContext = `## ข้อมูลการสอนที่กรองแล้ว (${logs.length} คาบ)\nMastery เฉลี่ย: ${avgMastery}/5\n\n### รายละเอียด (ใช้ [REF-X] อ้างอิงเสมอ):\n${sessionDetails}${guardNote}`;
 
+  // Pre-compute strategy effectiveness: slice[i].next_strategy → slice[i+1].mastery_score
+  const strategyMap = new Map<string, number[]>();
+  for (let i = 0; i < slice.length - 1; i++) {
+    const strat = slice[i].next_strategy;
+    if (!strat || strat === "ไม่ระบุ") continue;
+    const nextMastery = slice[i + 1].mastery_score;
+    if (!strategyMap.has(strat)) strategyMap.set(strat, []);
+    strategyMap.get(strat)!.push(nextMastery);
+  }
+  let strategySummary = "\n\n[STRATEGY OUTCOME SUMMARY]\n(คำนวณจากข้อมูลจริงใน context — ใช้แทนการวิเคราะห์ cross-REF)\n";
+  if (strategyMap.size === 0) {
+    strategySummary += "ไม่มีข้อมูล strategy ที่มีผลลัพธ์ติดตาม";
+  } else {
+    for (const [strat, scores] of strategyMap) {
+      const avg = (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1);
+      strategySummary += `${strat}: ใช้ ${scores.length} ครั้ง → Mastery คาบถัดไป: ${scores.join(",")} → เฉลี่ย ${avg}\n`;
+    }
+  }
+
   const scopeAssertion = filters.subject
     ? `\n\n## [CRITICAL - ANSWER SCOPE]\nตอบเฉพาะวิชา: ${filters.subject} เท่านั้น\nห้ามกล่าวถึง วิชาอื่นที่ไม่ตรงกับตัวกรองนี้เด็ดขาด`
     : `\n\n## [CRITICAL - ANSWER SCOPE]\nตอบได้เฉพาะข้อมูลที่อยู่ใน [REF-X] เท่านั้น (ตามตัวกรองที่เลือก)`;
 
   const filterInfo = `\n\n## [ACTIVE FILTER]\nวิชา: ${filters.subject || "ทั้งหมด"}\nระดับชั้น: ${filters.gradeLevel || "ทั้งหมด"}\nห้อง: ${filters.classroom || "ทั้งหมด"}\n⚠️ AI ต้องตอบเฉพาะข้อมูลที่อยู่ใน [REF-X] เท่านั้น ห้ามนำข้อมูลวิชาอื่นมาปน`;
 
-  return baseContext + scopeAssertion + filterInfo;
+  return baseContext + strategySummary + scopeAssertion + filterInfo;
 }
 
 export default function Executive() {
