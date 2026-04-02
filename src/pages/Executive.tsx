@@ -75,7 +75,7 @@ function buildExecutiveChatContext(logs: TeachingLog[], filters: ExecFilters): s
   const isLowerPrimary = /ป\.?[12](\b|\/)/.test(filters.gradeLevel || "");
   let strategySummary = "\n\n[STRATEGY OUTCOME SUMMARY]\n(คำนวณจากข้อมูลจริงใน context — ใช้แทนการวิเคราะห์ cross-REF)\n";
   if (isLowerPrimary) {
-    strategySummary += "⚠️ ป.1–ป.2 OVERRIDE: ข้อมูลนี้ใช้สังเกตผลลัพธ์เท่านั้น แม้ Peer Tutor จะมีค่าเฉลี่ยสูง ห้ามแนะนำเป็น primary strategy สำหรับทักษะพื้นฐาน — ยึด [CLASSROOM APPROPRIATENESS] ก่อนเสมอ\n";
+    strategySummary += "⚠️ ป.1–ป.2 NOTE: ถ้าแนะนำ Peer Tutor ต้องระบุเงื่อนไขเสมอ: (1) ครูดูแลใกล้ชิดตลอด (2) tutor ต้องเข้าใจเนื้อหานั้นแน่นแล้ว — ดู [CLASSROOM APPROPRIATENESS]\n";
   }
   if (strategyMap.size === 0) {
     strategySummary += "ไม่มีข้อมูล strategy ที่มีผลลัพธ์ติดตาม";
