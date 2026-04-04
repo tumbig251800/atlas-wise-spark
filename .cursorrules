@@ -1,0 +1,132 @@
+# ATLAS — Cursor Rules
+# อ่านก่อนทำอะไรทุกครั้ง
+
+## โปรเจคต์คืออะไร
+ATLAS คือระบบช่วยครูบันทึกและวิเคราะห์การสอน (Teaching Log, Competency Report, Executive Dashboard, AI Chat, Lesson Plan)
+กลุ่มเป้าหมาย: ครูและผู้บริหารโรงเรียนในไทย UI ภาษาไทยทั้งหมด
+
+## Stack
+- Frontend: React + TypeScript + Vite
+- UI: Tailwind CSS + shadcn/ui (Radix UI)
+- Backend: Supabase (PostgreSQL + RLS + Edge Functions)
+- AI: Gemini via Supabase Edge Functions (ไม่ใช่ OpenAI)
+- Auth: Supabase Auth
+
+## Conventions — ห้ามเดา ต้องทำตามนี้เท่านั้น
+
+### Imports
+```typescript
+import { supabase } from "@/lib/atlasSupabase"   // ← ใช้ตัวนี้เสมอ ไม่ใช่ createClient ตรงๆ
+import { useAuth } from "@/hooks/useAuth"          // ← role อยู่ที่นี่: { user, role }
+import { useToast } from "@/hooks/use-toast"       // ← toast ทุกที่
+```
+
+### Path alias
+`@/` → `src/`
+
+### mastery_score
+scale **1–5** (integer) ไม่ใช่ 0–100 ห้ามสับสน
+Red Zone threshold = ≤ 2.5 (ครอบคลุม score 1 และ 2)
+
+### Role
+`"teacher"` | `"director"` — ดึงจาก `useAuth()`
+director เห็น Executive Dashboard + Trend Alerts
+teacher ไม่เห็น
+
+### localStorage keys ที่ใช้อยู่
+- `atlas_smart_persist`
+- `atlas_draft_log`
+- `atlas_competency_report_filters`
+
+### React Query
+- ใช้ `@tanstack/react-query` เสมอ สำหรับ data fetching
+- invalidate ด้วย `queryClient.invalidateQueries({ queryKey: [...] })`
+
+### Rate Limit (อย่าเพิ่ม logic ใหม่ — ใช้ RPC เดิม)
+- ai-lesson-plan: 10 วินาที/user
+- ai-chat: 4 วินาที/user
+- ทั้งคู่ใช้ `check_and_set_rate_limit(p_user_id, p_function_name, p_limit_seconds)` RPC
+
+## โครงสร้างไฟล์ที่สำคัญ
+
+```
+src/
+├── pages/
+│   ├── TeachingLog.tsx        # form 4 ขั้นตอน + submit + diagnostic
+│   ├── Executive.tsx          # dashboard ผู้บริหาร + trend alerts
+│   ├── CompetencyReport.tsx   # radar chart + บันทึกสมรรถนะ
+│   ├── LessonPlan.tsx         # AI lesson plan (streaming)
+│   └── Consultant.tsx         # AI Chat (Peer Tutor + Analytics)
+├── components/
+│   ├── teaching-log/          # Step1General, Step2Quality, Step3Gap, Step4Action
+│   ├── executive/             # charts, filters, PolicySummary, StrikeEscalation
+│   ├── competency/            # ActiveClassroomAssessment, CompetencyRadarChart, StudentSelector
+│   ├── AppSidebar.tsx         # sidebar + red dot alert badge
+│   ├── AppLayout.tsx          # layout wrapper ทุกหน้าใช้
+│   └── ErrorBoundary.tsx      # ครอบทั้งแอป — class component
+├── hooks/
+│   ├── useAuth.ts             # { user, role, signOut }
+│   ├── useDashboardData.ts    # executive data
+│   ├── useCompetencyReport.ts # student list + competency data
+│   └── useTrendAlerts.ts      # Falling Down + Red Zone alerts (director only)
+├── domain/
+│   ├── consultantContext.ts   # build prompt สำหรับ AI Chat
+│   └── executiveLogsSummary.ts
+├── lib/
+│   ├── atlasSupabase.ts       # supabase client (ใช้ตัวนี้เสมอ)
+│   └── capabilityConstants2026.ts  # 8 สมรรถนะ: reading, writing, calculating, sci_tech, social_civic, economy_finance, health, art_culture
+└── types/
+
+supabase/
+├── functions/
+│   ├── ai-chat/               # Gemini chat + rate limit 4s
+│   ├── ai-lesson-plan/        # streaming lesson plan + rate limit 10s + retry
+│   ├── ai-summary/
+│   ├── atlas-diagnostic/      # fire-and-forget หลัง save teaching log
+│   └── ai-exam-gen/
+└── migrations/
+```
+
+## Tables หลัก (Supabase project: ebyelctqcdhjmqujeskx, region: ap-southeast-1)
+
+| Table | ใช้ทำอะไร |
+|-------|-----------|
+| `teaching_logs` | บันทึกการสอนรายคาบ |
+| `unit_assessments` | ผลประเมิน competency รายนักเรียน (8 สมรรถนะ) |
+| `lesson_plan_snapshots` | context snapshot สำหรับ lesson plan |
+| `ai_rate_limits` | rate limit per user per function |
+
+## TeachingLogForm shape (อ้างอิงเสมอเมื่อแตะ form)
+```typescript
+{
+  teachingDate, gradeLevel, classroom, subject, learningUnit, topic,
+  totalStudents, masteryScore,           // 1–5
+  activityMode: "active" | "passive" | "constructive",
+  keyIssue,
+  majorGap: "k-gap" | "p-gap" | "a-gap" | "a2-gap" | "system-gap" | "success",
+  classroomManagement, healthCareStatus, healthCareIds,
+  remedialIds, remedialStatuses: Record<id, "pass" | "stay">,
+  nextStrategy, reflection
+}
+```
+
+## Concurrency Guards — อย่าลบออก
+
+TeachingLog.tsx มี:
+- `if (submitting) return` ป้องกัน double-submit
+- `diagnosticCalledRef` (useRef<Set<string>>) ป้องกัน diagnostic ยิงซ้ำ
+- `setTimeout 500ms` ก่อน invoke atlas-diagnostic
+
+LessonPlan.tsx มี:
+- `loadingRef` (useRef<boolean>) ป้องกัน concurrent generate
+
+## สิ่งที่ยัง defer อยู่ (อย่าทำโดยไม่ถาม)
+- Draft sync across devices
+- Unit / E2E tests
+- Parent Portal (role `parent`)
+- Voice-to-Log
+
+## เมื่อจะเพิ่ม feature ใหม่
+1. อ่าน `PROJECT_CONTEXT.md` ที่รากโปรเจคก่อนเสมอ
+2. ถ้าแตะ Edge Function → อย่าลืม deploy: `node_modules/supabase/bin/supabase functions deploy <name> --project-ref ebyelctqcdhjmqujeskx`
+3. ถ้าเพิ่ม table/column → สร้าง migration file ใน `supabase/migrations/` ด้วย timestamp prefix
