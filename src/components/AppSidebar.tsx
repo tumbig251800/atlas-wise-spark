@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Brain, ClipboardList, BarChart3, Upload, MessageSquare, Building2, LogOut, Settings, History, BookOpen, FileBarChart, Home, Radar } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTrendAlerts } from "@/hooks/useTrendAlerts";
 
 const teacherMenuItems = [
   { title: "หน้าแรก", url: "/", icon: Home },
@@ -45,6 +46,7 @@ export function AppSidebar() {
   const { role, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { hasAlerts } = useTrendAlerts();
 
   const menuItems = role === "director" ? directorMenuItems : teacherMenuItems;
 
@@ -80,6 +82,9 @@ export function AppSidebar() {
                   >
                     <item.icon className="h-4 w-4" />
                     <span>{item.title}</span>
+                    {item.url === "/executive" && hasAlerts && (
+                      <span className="ml-auto h-2 w-2 rounded-full bg-red-500 shrink-0" />
+                    )}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}

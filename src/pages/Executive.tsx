@@ -17,6 +17,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import type { TeachingLog } from "@/hooks/useDashboardData";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
+import { useTrendAlerts } from "@/hooks/useTrendAlerts";
+import { AlertTriangle, TrendingDown } from "lucide-react";
 
 function extractValidIdsFromCsv(csv: string | null): string[] {
   return String(csv ?? "")
@@ -119,6 +121,7 @@ export default function Executive() {
   const [barGroupBy, setBarGroupBy] = useState<"grade" | "subject">("grade");
   const { diagnosticEvents, strikes, isLoading: diagLoading } = useDiagnosticData();
   const [adminChatOpen, setAdminChatOpen] = useState(false);
+  const { alerts, hasAlerts, fallingCount, redzoneCount } = useTrendAlerts();
 
   // Fetch all logs (director RLS sees all)
   const { data: allLogs = [], isLoading } = useQuery({
@@ -228,6 +231,48 @@ export default function Executive() {
     <AppLayout>
       <div className="space-y-6">
         <h1 className="text-2xl font-bold">ภาพรวมผู้บริหาร</h1>
+
+        {/* Trend Alerts Banner */}
+        {hasAlerts && (
+          <div className="rounded-lg border border-orange-300 bg-orange-50 p-4 space-y-3">
+            <div className="flex items-center gap-2 font-semibold text-orange-800">
+              <AlertTriangle className="h-5 w-5 shrink-0" />
+              <span>พบสัญญาณเตือน {alerts.length} รายการ</span>
+              <span className="ml-auto flex gap-2 text-xs font-normal">
+                {fallingCount > 0 && (
+                  <span className="rounded-full bg-orange-200 px-2 py-0.5 text-orange-800">
+                    ⬇ ดิ่ง {fallingCount}
+                  </span>
+                )}
+                {redzoneCount > 0 && (
+                  <span className="rounded-full bg-red-100 px-2 py-0.5 text-red-700">
+                    🔴 จมปลัก {redzoneCount}
+                  </span>
+                )}
+              </span>
+            </div>
+            <ul className="space-y-1.5">
+              {alerts.map((alert, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-orange-800">
+                  {alert.type === "falling"
+                    ? <TrendingDown className="h-4 w-4 shrink-0 mt-0.5 text-orange-600" />
+                    : <span className="shrink-0 mt-0.5">🔴</span>
+                  }
+                  <span>
+                    <span className="font-medium">{alert.gradeLevel}/{alert.classroom}</span>
+                    {" วิชา"}<span className="font-medium">{alert.subject}</span>
+                    {alert.teacherName && <span className="text-orange-600"> ({alert.teacherName})</span>}
+                    {" — "}
+                    {alert.type === "falling"
+                      ? `mastery ลดต่อเนื่อง 3 คาบ: ${alert.scores.join(" → ")}/5`
+                      : `mastery ≤ 50% ติดกัน 3 คาบ: ${alert.scores.join(" → ")}/5`
+                    }
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {/* Admin chat: side-sheet Q&A (Phase 1 UI-only; context builder comes in Phase 2) */}
         <div className="flex justify-end">
