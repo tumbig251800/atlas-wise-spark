@@ -1,8 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { validateAiChatOutput } from "../_shared/aiChatValidator.ts";
 import { validateAssistantSafety } from "../_shared/aiChatSafetyGuard.ts";
 import { requireAtlasUser } from "../_shared/atlasAuth.ts";
 import { buildSystemPrompt } from "../_shared/aiChatPrompts.ts";
+
+const RATE_LIMIT_SECONDS = 4; // conversational — faster than lesson plan (10s)
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -147,6 +150,26 @@ serve(async (req) => {
     if (!auth.ok) {
       return respond(auth.error, "fallback", auth.status, buildMeta(requestId));
     }
+
+    // --- Rate limit (atomic, 1 req / RATE_LIMIT_SECONDS per user) ---
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+    const { data: allowed } = await supabaseAdmin.rpc("check_and_set_rate_limit", {
+      p_user_id: auth.userId,
+      p_function_name: "ai-chat",
+      p_limit_seconds: RATE_LIMIT_SECONDS,
+    });
+    if (!allowed) {
+      return respond(
+        `กรุณารอ ${RATE_LIMIT_SECONDS} วินาทีก่อนถามอีกครั้ง`,
+        "fallback",
+        429,
+        buildMeta(requestId)
+      );
+    }
+    // --- End rate limit ---
 
     const body = await req.json().catch(() => ({})) as {
       messages?: unknown;
