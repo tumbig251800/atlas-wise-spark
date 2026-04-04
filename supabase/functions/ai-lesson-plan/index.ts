@@ -38,34 +38,25 @@ serve(async (req) => {
       });
     }
 
-    // --- Rate limit check (per user, 1 req / RATE_LIMIT_SECONDS) ---
+    // --- Rate limit check (atomic, per user, 1 req / RATE_LIMIT_SECONDS) ---
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
-    const { data: rateData } = await supabaseAdmin
-      .from("ai_rate_limits")
-      .select("last_request_at")
-      .eq("user_id", auth.userId)
-      .eq("function_name", "ai-lesson-plan")
-      .maybeSingle();
-
-    if (rateData?.last_request_at) {
-      const secondsSinceLast = (Date.now() - new Date(rateData.last_request_at).getTime()) / 1000;
-      if (secondsSinceLast < RATE_LIMIT_SECONDS) {
-        const wait = Math.ceil(RATE_LIMIT_SECONDS - secondsSinceLast);
-        return new Response(
-          JSON.stringify({ error: `กรุณารอ ${wait} วินาทีก่อนขอแผนการสอนใหม่` }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-    }
-    // Record this request timestamp
-    await supabaseAdmin.from("ai_rate_limits").upsert({
-      user_id: auth.userId,
-      function_name: "ai-lesson-plan",
-      last_request_at: new Date().toISOString(),
+    const { data: allowed, error: rpcError } = await supabaseAdmin.rpc("check_and_set_rate_limit", {
+      p_user_id: auth.userId,
+      p_function_name: "ai-lesson-plan",
+      p_limit_seconds: RATE_LIMIT_SECONDS,
     });
+    if (rpcError) {
+      console.error("Rate limit RPC error:", rpcError);
+    }
+    if (!allowed) {
+      return new Response(
+        JSON.stringify({ error: `กรุณารอ ${RATE_LIMIT_SECONDS} วินาทีก่อนขอแผนการสอนใหม่` }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
     // --- End rate limit ---
 
     const rawBody = await req.json();
