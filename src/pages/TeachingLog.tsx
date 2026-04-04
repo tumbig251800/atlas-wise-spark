@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { cleanClassroomData } from "@/lib/utils";
 import { AppLayout } from "@/components/AppLayout";
 import { StepProgress } from "@/components/teaching-log/StepProgress";
@@ -69,6 +69,7 @@ export default function TeachingLog() {
   const [submitting, setSubmitting] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [teacherName, setTeacherName] = useState("");
+  const diagnosticCalledRef = useRef<Set<string>>(new Set());
 
   // Fetch teacher name from profile
   useEffect(() => {
@@ -206,6 +207,7 @@ export default function TeachingLog() {
   };
 
   const handleSubmit = async () => {
+    if (submitting) return;
     if (!user) {
       toast({ title: "กรุณาเข้าสู่ระบบ", variant: "destructive" });
       return;
@@ -240,15 +242,20 @@ export default function TeachingLog() {
       if (error) throw error;
 
       // Call diagnostic engine asynchronously (don't block submit)
-      if (logData?.id) {
-        supabase.functions.invoke("atlas-diagnostic", {
-          body: {
-            logId: logData.id,
-            remedialStatuses: Object.entries(form.remedialStatuses).map(
-              ([studentId, status]) => ({ studentId, status })
-            ),
-          },
-        }).catch((err) => console.error("Diagnostic engine error:", err));
+      // Dedup by logId to prevent double-invoke on rapid re-renders
+      if (logData?.id && !diagnosticCalledRef.current.has(logData.id)) {
+        const logId = logData.id;
+        diagnosticCalledRef.current.add(logId);
+        setTimeout(() => {
+          supabase.functions.invoke("atlas-diagnostic", {
+            body: {
+              logId,
+              remedialStatuses: Object.entries(form.remedialStatuses).map(
+                ([studentId, status]) => ({ studentId, status })
+              ),
+            },
+          }).catch((err) => console.error("Diagnostic engine error:", err));
+        }, 500);
       }
 
       toast({ title: "✅ บันทึกสำเร็จ!", description: "ข้อมูลการสอนถูกบันทึกเรียบร้อยแล้ว" });

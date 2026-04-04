@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { requireAtlasUser } from "../_shared/atlasAuth.ts";
 import { parseLessonPlanBody } from "../_shared/lessonPlanRequest.ts";
 import {
@@ -6,6 +7,8 @@ import {
   buildMainLessonSystemPrompt,
   getAddonSystemPrompt,
 } from "../_shared/lessonPlanPrompts.ts";
+
+const RATE_LIMIT_SECONDS = 10;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -34,6 +37,36 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // --- Rate limit check (per user, 1 req / RATE_LIMIT_SECONDS) ---
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+    const { data: rateData } = await supabaseAdmin
+      .from("ai_rate_limits")
+      .select("last_request_at")
+      .eq("user_id", auth.userId)
+      .eq("function_name", "ai-lesson-plan")
+      .maybeSingle();
+
+    if (rateData?.last_request_at) {
+      const secondsSinceLast = (Date.now() - new Date(rateData.last_request_at).getTime()) / 1000;
+      if (secondsSinceLast < RATE_LIMIT_SECONDS) {
+        const wait = Math.ceil(RATE_LIMIT_SECONDS - secondsSinceLast);
+        return new Response(
+          JSON.stringify({ error: `กรุณารอ ${wait} วินาทีก่อนขอแผนการสอนใหม่` }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+    // Record this request timestamp
+    await supabaseAdmin.from("ai_rate_limits").upsert({
+      user_id: auth.userId,
+      function_name: "ai-lesson-plan",
+      last_request_at: new Date().toISOString(),
+    });
+    // --- End rate limit ---
 
     const rawBody = await req.json();
     const parsed = parseLessonPlanBody(rawBody);
@@ -66,35 +99,45 @@ serve(async (req) => {
     const userContent = addonType ? topic : buildLessonPlanUserContent(v);
 
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}`;
-    const response = await fetch(geminiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: systemPrompt }] },
-        contents: [{ role: "user", parts: [{ text: userContent }] }],
-        generationConfig: { temperature: 0 },
-      }),
+    const geminiBody = JSON.stringify({
+      system_instruction: { parts: [{ text: systemPrompt }] },
+      contents: [{ role: "user", parts: [{ text: userContent }] }],
+      generationConfig: { temperature: 0 },
     });
 
-    if (!response.ok) {
-      const t = await response.text();
-      console.error("Gemini lesson plan error:", response.status, t);
-      if (response.status === 429) {
+    // Retry up to 3 attempts on Gemini 429 with exponential backoff
+    let response: Response | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      response = await fetch(geminiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: geminiBody,
+      });
+      if (response.status !== 429) break;
+      if (attempt < 2) {
+        await new Promise((r) => setTimeout(r, (attempt + 1) * 1000));
+      }
+    }
+
+    if (!response!.ok) {
+      const t = await response!.text();
+      console.error("Gemini lesson plan error:", response!.status, t);
+      if (response!.status === 429) {
         return new Response(JSON.stringify({ error: "คำขอมากเกินไป กรุณารอสักครู่" }), {
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (response.status === 402) {
+      if (response!.status === 402) {
         return new Response(JSON.stringify({ error: "เครดิต AI หมด" }), {
           status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (response.status === 400 || response.status === 403) {
+      if (response!.status === 400 || response!.status === 403) {
         return new Response(JSON.stringify({ error: "GEMINI_API_KEY ไม่ถูกต้อง กรุณาตรวจสอบใน Supabase" }), {
           status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      return new Response(JSON.stringify({ error: `Gemini error (${response.status}). ดู Supabase Logs สำหรับรายละเอียด` }), {
+      return new Response(JSON.stringify({ error: `Gemini error (${response!.status}). ดู Supabase Logs สำหรับรายละเอียด` }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -104,7 +147,7 @@ serve(async (req) => {
     const decoder = new TextDecoder();
     const stream = new ReadableStream({
       async start(controller) {
-        const reader = response.body!.getReader();
+        const reader = response!.body!.getReader();
         try {
           while (true) {
             const { done, value } = await reader.read();

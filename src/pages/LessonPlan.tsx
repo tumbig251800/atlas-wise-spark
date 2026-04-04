@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
@@ -43,6 +43,7 @@ export default function LessonPlan() {
   const [config, setConfig] = useState<LessonPlanConfig>(initialLessonPlanConfig);
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(false);
+  const loadingRef = useRef(false);
 
   const [gradeLevels, setGradeLevels] = useState<string[]>([]);
   const [classrooms, setClassrooms] = useState<string[]>([]);
@@ -66,6 +67,8 @@ export default function LessonPlan() {
   }, []);
 
   const generate = useCallback(async () => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     setLoading(true);
     setContent("");
 
@@ -101,6 +104,7 @@ export default function LessonPlan() {
       const msg = e instanceof Error ? e.message : "เกิดข้อผิดพลาดในการสร้างแผนการสอน";
       toast.error(msg);
     } finally {
+      loadingRef.current = false;
       setLoading(false);
     }
   }, [config]);
