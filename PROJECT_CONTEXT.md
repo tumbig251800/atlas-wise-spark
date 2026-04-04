@@ -1,6 +1,6 @@
 # PROJECT_CONTEXT.md
 > ไฟล์นี้สำหรับให้ AI ทุกตัวที่ร่วมพัฒนาโปรเจคต์นี้อ่าน เพื่อให้ทำงานต่อเนื่องได้โดยไม่ต้องอธิบายซ้ำ
-> อัปเดตล่าสุด: 2026-04-04
+> อัปเดตล่าสุด: 2026-04-04 (session 2 — pre-launch fixes)
 
 ---
 
@@ -111,11 +111,39 @@ atlas-wise-spark/
 - **`src/components/AppSidebar.tsx`**: Red dot 🔴 บนเมนู "ภาพรวมผู้บริหาร" เมื่อมี alert
 - ไม่ต้องสร้าง DB table ใหม่ — คำนวณจาก teaching_logs ที่มีอยู่
 
+### Pre-Launch Fixes (2026-04-04 session 2) ✅
+- **Error Boundary** (`src/components/ErrorBoundary.tsx`, `src/App.tsx`):
+  - Class component with `componentDidCatch` — แสดง card สีแดง + ปุ่ม "โหลดหน้าใหม่" แทน white screen
+  - ครอบ `<Suspense>` ใน App.tsx — Auth/QueryClient context ยังทำงานได้เมื่อ crash
+- **ActiveClassroomAssessment wired to DB** (`src/pages/CompetencyReport.tsx`):
+  - ปุ่ม "บันทึกสมรรถนะ" (แสดงเมื่อเลือกนักเรียน + filter ครบ)
+  - Sheet side panel: input หน่วยการเรียน + checklist 8 สมรรถนะ
+  - onSave: SELECT check → INSERT หรือ UPDATE `unit_assessments` → invalidate query → toast
+  - ก่อนหน้า: `onSave` เป็น orphan callback ที่ไม่ได้ต่อ DB (data loss bug)
+- **Rate limit ai-chat** (`supabase/functions/ai-chat/index.ts`):
+  - 4 วินาที/user (atomic) ใช้ `check_and_set_rate_limit()` RPC เดิม
+  - deploy ขึ้น Supabase แล้ว
+
+---
+
+## สถานะแอป ณ 2026-04-04
+
+**🟢 พร้อม launch ให้ครูใช้งานจริงแล้ว**
+- Core features ครบ
+- Concurrency/reliability fixes ทำแล้ว
+- Error Boundary คุ้มครองทุกหน้า
+- Data loss bug (ActiveClassroomAssessment) แก้แล้ว
+- Rate limit ทั้ง ai-lesson-plan และ ai-chat
+
+**สิ่งที่ defer หลัง launch:**
+- Draft sync across devices (ตอนนี้ localStorage = device-specific)
+- ไม่มี unit/E2E test coverage
+
 ---
 
 ## Roadmap — สิ่งที่ต้องพัฒนาต่อ
 
-### Phase A — รอเปิดเทอม (ทำได้ทันที)
+### Phase A — รอเปิดเทอม
 
 #### Priority 1a: ปุ่ม "คัดลอกจากคาบล่าสุด" ⏳
 - **Goal**: ลด friction การกรอก form ซ้ำทุกคาบ
@@ -137,9 +165,6 @@ atlas-wise-spark/
 #### Priority 3: Student Portfolio ⏳
 - **3a**: Mastery trend line chart ใน `CompetencyReport.tsx` (data จาก `teaching_logs`)
 - **3b**: At-risk badge ข้างชื่อนักเรียน (remedialStatus `stay` ≥ 2 ครั้ง)
-- **3c**: Wire `ActiveClassroomAssessment` → `upsert unit_assessments` จริง
-  - form มี logic ครบแล้ว (`onSave` callback) แต่ยัง orphan (ไม่ได้ save จริงลง DB)
-  - **สำคัญ**: นี่คือ bug ที่ต้องแก้ก่อนเปิดเทอม
 
 ---
 
@@ -154,8 +179,9 @@ atlas-wise-spark/
 ## จุดที่ต้องระวังเมื่อพัฒนาต่อ
 
 ### Rate Limit
-- `ai-lesson-plan` มี rate limit 10 วินาที/user ผ่าน `check_and_set_rate_limit()` RPC
-- ถ้าจะเพิ่ม rate limit ให้ edge function อื่น (เช่น ai-chat) → ใช้ function เดิม เปลี่ยนแค่ `p_function_name`
+- `ai-lesson-plan`: 10 วินาที/user
+- `ai-chat`: 4 วินาที/user
+- ทั้งคู่ใช้ `check_and_set_rate_limit()` RPC (atomic) — ถ้าจะเพิ่ม function อื่น เปลี่ยนแค่ `p_function_name`
 
 ### Diagnostic Engine
 - `atlas-diagnostic` ถูกยิงหลัง save teaching log ทุกครั้ง (fire-and-forget)
