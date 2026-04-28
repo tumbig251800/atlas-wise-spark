@@ -330,7 +330,7 @@ serve(async (req) => {
       return respond("ไม่พบข้อมูลจำนวนนักเรียนในระบบ", "fast_guard", 200, buildMeta(requestId));
     }
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
     let response: Response | null = null;
     for (let attempt = 0; attempt <= GEMINI_MAX_429_RETRIES; attempt += 1) {
       const controller = new AbortController();
