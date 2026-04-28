@@ -1,6 +1,6 @@
 # PROJECT_CONTEXT.md
 > ไฟล์นี้สำหรับให้ AI ทุกตัวที่ร่วมพัฒนาโปรเจคต์นี้อ่าน เพื่อให้ทำงานต่อเนื่องได้โดยไม่ต้องอธิบายซ้ำ
-> อัปเดตล่าสุด: 2026-04-04 (session 2 — pre-launch fixes)
+> อัปเดตล่าสุด: 2026-04-28 (session 3 — Gemini API secret name fix)
 
 ---
 
@@ -110,6 +110,11 @@ atlas-wise-spark/
 - **`src/pages/Executive.tsx`**: Orange banner ด้านบน แสดง alert พร้อมชื่อครู + score sequence
 - **`src/components/AppSidebar.tsx`**: Red dot 🔴 บนเมนู "ภาพรวมผู้บริหาร" เมื่อมี alert
 - ไม่ต้องสร้าง DB table ใหม่ — คำนวณจาก teaching_logs ที่มีอยู่
+
+### API Secret Configuration (2026-04-28 session 3) ✅
+- **Fixed secret name mismatch**: Edge functions (ai-chat, ai-lesson-plan, ai-summary) now correctly read `LOVABLE_API_KEY` from Supabase Secrets instead of non-existent `GEMINI_API_KEY`
+- Model name also fixed in same session: gemini-2.0-flash → gemini-1.5-flash-latest
+- All functions redeployed with corrections
 
 ### Pre-Launch Fixes (2026-04-04 session 2) ✅
 - **Error Boundary** (`src/components/ErrorBoundary.tsx`, `src/App.tsx`):

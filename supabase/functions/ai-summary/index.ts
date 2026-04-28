@@ -54,12 +54,12 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const logs_summary = body?.logs_summary ?? "ไม่มีข้อมูล";
     const mode = body?.mode ?? "default";
-    const rawKey = Deno.env.get("GEMINI_API_KEY") ?? "";
+    const rawKey = Deno.env.get("LOVABLE_API_KEY") ?? "";
     const GEMINI_API_KEY = rawKey.replace(/[^\x20-\x7E]/g, "").trim();
-    if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not configured");
+    if (!GEMINI_API_KEY) throw new Error("LOVABLE_API_KEY is not configured in Supabase Secrets");
 
     const systemContent = mode === "executive" ? executivePrompt : defaultPrompt;
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
 
     const response = await fetch(geminiUrl, {
       method: "POST",
@@ -82,7 +82,7 @@ serve(async (req) => {
       }
       if (response.status === 400 || response.status === 403) {
         return new Response(
-          JSON.stringify({ error: "GEMINI_API_KEY ไม่ถูกต้อง กรุณาตรวจสอบใน Supabase Edge Functions → Secrets" }),
+          JSON.stringify({ error: "LOVABLE_API_KEY ไม่ถูกต้อง กรุณาตรวจสอบใน Supabase Edge Functions → Secrets" }),
           { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }

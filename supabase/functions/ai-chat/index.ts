@@ -203,9 +203,9 @@ serve(async (req) => {
     const priorAssistantCount = messages.filter((m) => m.role === "assistant").length;
     const isFirstAssistantTurn = priorAssistantCount === 0;
 
-    const rawKey = Deno.env.get("GEMINI_API_KEY") ?? "";
+    const rawKey = Deno.env.get("LOVABLE_API_KEY") ?? "";
     const GEMINI_API_KEY = rawKey.replace(/[^\x20-\x7E]/g, "").trim();
-    if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not configured");
+    if (!GEMINI_API_KEY) throw new Error("LOVABLE_API_KEY is not configured in Supabase Secrets");
 
     const greetingPreamble = buildGreetingAudiencePreamble(audience, isFirstAssistantTurn);
 
@@ -330,7 +330,7 @@ serve(async (req) => {
       return respond("ไม่พบข้อมูลจำนวนนักเรียนในระบบ", "fast_guard", 200, buildMeta(requestId));
     }
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
     let response: Response | null = null;
     for (let attempt = 0; attempt <= GEMINI_MAX_429_RETRIES; attempt += 1) {
       const controller = new AbortController();
@@ -401,7 +401,7 @@ serve(async (req) => {
       }
       if (response.status === 400 || response.status === 403) {
         return respond(
-          "GEMINI_API_KEY ไม่ถูกต้อง กรุณาตรวจสอบใน Supabase Edge Functions → Secrets",
+          "LOVABLE_API_KEY ไม่ถูกต้องหรือไม่ได้ตั้งค่า กรุณาตรวจสอบใน Supabase Edge Functions → Secrets",
           "fallback",
           401,
           buildMeta(requestId)
@@ -456,10 +456,10 @@ serve(async (req) => {
     let status = 500;
     let fallbackMsg = "เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณาลองใหม่อีกครั้ง";
     
-    if (errorMsg.includes("GEMINI_API_KEY is not configured")) {
+    if (errorMsg.includes("LOVABLE_API_KEY is not configured")) {
       status = 503;
-      fallbackMsg = "ระบบยังไม่ได้ตั้งค่า GEMINI_API_KEY กรุณาตรวจสอบใน Supabase Secrets";
-      console.error("MISSING_GEMINI_KEY", "GEMINI_API_KEY is missing.");
+      fallbackMsg = "ระบบยังไม่ได้ตั้งค่า LOVABLE_API_KEY กรุณาตรวจสอบใน Supabase Secrets";
+      console.error("MISSING_LOVABLE_API_KEY", "LOVABLE_API_KEY is missing.");
     } else if (errorMsg.includes("fetch failed") || errorMsg.includes("network")) {
       status = 502;
       fallbackMsg = "เครือข่ายของ AI Gateway มีปัญหา (502 Bad Gateway) กรุณาลองใหม่ครับ";

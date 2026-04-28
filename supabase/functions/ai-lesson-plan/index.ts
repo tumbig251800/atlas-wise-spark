@@ -88,9 +88,9 @@ serve(async (req) => {
     }
     const v = parsed.value;
     const { planType, topic, gradeLevel, classroom, subject, learningUnit, hours, addonType, includeWorksheets } = v;
-    const rawKey = Deno.env.get("GEMINI_API_KEY") ?? "";
+    const rawKey = Deno.env.get("LOVABLE_API_KEY") ?? "";
     const GEMINI_API_KEY = rawKey.replace(/[^\x20-\x7E]/g, "").trim();
-    if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not configured");
+    if (!GEMINI_API_KEY) throw new Error("LOVABLE_API_KEY is not configured in Supabase Secrets");
 
     const systemPrompt = addonType
       ? getAddonSystemPrompt(addonType)
@@ -108,7 +108,7 @@ serve(async (req) => {
 
     const userContent = addonType ? topic : buildLessonPlanUserContent(v);
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}`;
     const geminiBody = JSON.stringify({
       system_instruction: { parts: [{ text: systemPrompt }] },
       contents: [{ role: "user", parts: [{ text: userContent }] }],
@@ -136,7 +136,7 @@ serve(async (req) => {
 
     if (!response!.ok) {
       const t = await response!.text();
-      console.error("Gemini lesson plan error:", response!.status, t);
+      console.error("Gemini lesson plan error: status=" + response!.status + ", body=" + t);
       if (response!.status === 429) {
         return new Response(JSON.stringify({ error: "คำขอมากเกินไป กรุณารอสักครู่" }), {
           status: 429,
@@ -153,7 +153,7 @@ serve(async (req) => {
         });
       }
       if (response!.status === 400 || response!.status === 403) {
-        return new Response(JSON.stringify({ error: "GEMINI_API_KEY ไม่ถูกต้อง กรุณาตรวจสอบใน Supabase" }), {
+        return new Response(JSON.stringify({ error: "LOVABLE_API_KEY ไม่ถูกต้องหรือไม่ได้ตั้งค่า กรุณาตรวจสอบใน Supabase Secrets" }), {
           status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
