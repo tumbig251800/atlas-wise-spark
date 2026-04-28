@@ -16,9 +16,20 @@ interface ExecutiveSummaryProps {
 
 export function ExecutiveSummary({ logs, colorCounts, activeStrikeCount }: ExecutiveSummaryProps) {
   const summaryText = buildExecutiveLogsSummary(logs, colorCounts, activeStrikeCount);
+  const summaryScopeKey = [
+    logs.length,
+    logs[0]?.id ?? "",
+    logs[logs.length - 1]?.id ?? "",
+    colorCounts?.red ?? 0,
+    colorCounts?.orange ?? 0,
+    colorCounts?.yellow ?? 0,
+    colorCounts?.blue ?? 0,
+    colorCounts?.green ?? 0,
+    activeStrikeCount ?? 0,
+  ].join("|");
 
   const { data, isLoading } = useQuery({
-    queryKey: ["executive-summary", summaryText],
+    queryKey: ["executive-summary", summaryScopeKey],
     queryFn: async () => {
       const result = await invokeEdgeJson<{ summary?: string; validation?: SummaryValidation }>(
         getAiSummaryUrl(),
@@ -31,7 +42,11 @@ export function ExecutiveSummary({ logs, colorCounts, activeStrikeCount }: Execu
       };
     },
     enabled: logs.length > 0,
-    staleTime: 5 * 60 * 1000, // cache 5 mins
+    staleTime: 30 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
 
   if (logs.length === 0) return null;

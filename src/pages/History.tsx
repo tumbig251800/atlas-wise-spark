@@ -5,6 +5,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -24,8 +25,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
-import { Link } from "react-router-dom";
-import { History as HistoryIcon, Eye, BookOpen, Trash2, Loader2, UserCog, MessageSquare } from "lucide-react";
+import { History as HistoryIcon, Eye, BookOpen, Trash2, Loader2, UserCog, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { ReassignTeacherDialog } from "@/components/history/ReassignTeacherDialog";
@@ -76,6 +76,10 @@ export default function History() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [clearingAll, setClearingAll] = useState(false);
   const [reassignLog, setReassignLog] = useState<TeachingLog | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportFromDate, setExportFromDate] = useState("");
+  const [exportToDate, setExportToDate] = useState("");
+  const [exportLoading, setExportLoading] = useState(false);
   const { toast } = useToast();
   const { user, role } = useAuth();
   const isDirector = role === "director";
@@ -195,6 +199,92 @@ export default function History() {
     }
   };
 
+  const buildExportTxt = (rows: TeachingLog[]) => {
+    const blocks = rows.map((log, idx) => {
+      const gap = gapConfig[log.major_gap]?.label ?? log.major_gap;
+      const activity = activityModeLabel[log.activity_mode] ?? log.activity_mode;
+      return [
+        `รายการที่ ${idx + 1}`,
+        `วันที่สอน: ${formatDate(log.teaching_date)}`,
+        `วิชา: ${log.subject ?? "-"}`,
+        `ระดับชั้น/ห้อง: ${log.grade_level ?? "-"} / ${log.classroom ?? "-"}`,
+        `หน่วยการเรียนรู้: ${log.learning_unit ?? "-"}`,
+        `หัวข้อ: ${log.topic ?? "-"}`,
+        `จำนวนนักเรียน: ${log.total_students ?? "-"}`,
+        `Mastery: ${log.mastery_score ?? "-"}/5`,
+        `Gap: ${gap}`,
+        `รูปแบบกิจกรรม: ${activity}`,
+        `Key Issue: ${log.key_issue ?? "-"}`,
+        `Next Strategy: ${log.next_strategy ?? "-"}`,
+        `Reflection: ${log.reflection ?? "-"}`,
+      ].join("\n");
+    });
+
+    return [
+      "ATLAS - บันทึกหลังสอนของฉัน",
+      `ผู้ใช้: ${user?.email ?? "-"}`,
+      `จำนวนรายการ: ${rows.length}`,
+      `ช่วงวันที่: ${exportFromDate || "ทั้งหมด"} ถึง ${exportToDate || "ทั้งหมด"}`,
+      "",
+      blocks.join("\n\n------------------------------\n\n"),
+      "",
+    ].join("\n");
+  };
+
+  const downloadMyLogsTxt = async (loadAll: boolean) => {
+    if (!user?.id) return;
+    setExportLoading(true);
+    try {
+      let query = supabase
+        .from("teaching_logs")
+        .select("*")
+        .eq("teacher_id", user.id)
+        .order("teaching_date", { ascending: false });
+
+      if (!loadAll) {
+        if (exportFromDate) query = query.gte("teaching_date", exportFromDate);
+        if (exportToDate) query = query.lte("teaching_date", exportToDate);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const rows = data ?? [];
+      if (rows.length === 0) {
+        toast({
+          title: "ไม่พบข้อมูล",
+          description: "ไม่พบบันทึกหลังสอนตามเงื่อนไขที่เลือก",
+        });
+        return;
+      }
+
+      const txt = buildExportTxt(rows);
+      const blob = new Blob([txt], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const stamp = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `atlas-my-teaching-logs-${stamp}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "ดาวน์โหลดสำเร็จ",
+        description: `ดาวน์โหลดบันทึก ${rows.length} รายการแล้ว`,
+      });
+    } catch (err: unknown) {
+      toast({
+        title: "ดาวน์โหลดไม่สำเร็จ",
+        description: err instanceof Error ? err.message : "ไม่สามารถดาวน์โหลดได้",
+        variant: "destructive",
+      });
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
   const filterOptions: HistoryFilterOptions = useMemo(() => {
     const subjects = [...new Set(logs.map((l) => l.subject))].filter(Boolean).sort();
     const gradeLevels = [...new Set(logs.map((l) => l.grade_level))].filter(Boolean).sort();
@@ -224,33 +314,46 @@ export default function History() {
                 <HistoryIcon className="h-6 w-6 text-primary" />
                 <h1 className="text-2xl font-bold text-foreground">ประวัติการสอน</h1>
               </div>
-              {logs.length > 0 && user && (
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="outline" size="sm" className="gap-2 text-destructive hover:text-destructive" disabled={clearingAll}>
-                      {clearingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                      ล้างทั้งหมด
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>ยืนยันการล้างประวัติ</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        จะลบประวัติการสอนของคุณทั้งหมด ({logs.length} รายการ) พร้อมข้อมูลวินิจฉัยและซ่อมเสริมที่เกี่ยวข้อง ไม่สามารถกู้คืนได้
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={handleClearAll}
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      >
+              <div className="flex items-center gap-2">
+                {user && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => setExportOpen(true)}
+                  >
+                    <Download className="h-4 w-4" />
+                    ดาวน์โหลดบันทึกของฉัน
+                  </Button>
+                )}
+                {logs.length > 0 && user && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="outline" size="sm" className="gap-2 text-destructive hover:text-destructive" disabled={clearingAll}>
+                        {clearingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                         ล้างทั้งหมด
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              )}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>ยืนยันการล้างประวัติ</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          จะลบประวัติการสอนของคุณทั้งหมด ({logs.length} รายการ) พร้อมข้อมูลวินิจฉัยและซ่อมเสริมที่เกี่ยวข้อง ไม่สามารถกู้คืนได้
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleClearAll}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          ล้างทั้งหมด
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+              </div>
             </div>
 
             {loading ? (
@@ -273,18 +376,6 @@ export default function History() {
                     options={filterOptions}
                     isDirector={isDirector}
                   />
-                  {filteredLogs.length > 0 &&
-                    filters.subject &&
-                    filters.gradeLevel &&
-                    filters.classroom && (
-                      <Link
-                        to="/consultant"
-                        className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
-                      >
-                        <MessageSquare className="h-4 w-4" />
-                        ไปถามพีท ({filters.subject} {filters.gradeLevel}/{filters.classroom})
-                      </Link>
-                    )}
                 </div>
                 {filteredLogs.length === 0 ? (
                   <Card>
@@ -468,6 +559,50 @@ export default function History() {
               );
             }}
           />
+
+          <Dialog open={exportOpen} onOpenChange={setExportOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>ดาวน์โหลดบันทึกของฉัน</DialogTitle>
+                <DialogDescription>
+                  เลือกช่วงวันที่แล้วดาวน์โหลดเป็นไฟล์ .txt หรือกดโหลดทั้งหมด
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <label className="text-sm text-muted-foreground">ตั้งแต่วันที่</label>
+                  <Input
+                    type="date"
+                    value={exportFromDate}
+                    onChange={(e) => setExportFromDate(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm text-muted-foreground">ถึงวันที่</label>
+                  <Input
+                    type="date"
+                    value={exportToDate}
+                    onChange={(e) => setExportToDate(e.target.value)}
+                  />
+                </div>
+                <div className="flex items-center gap-2 pt-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => downloadMyLogsTxt(true)}
+                    disabled={exportLoading}
+                  >
+                    โหลดทั้งหมด
+                  </Button>
+                  <Button
+                    onClick={() => downloadMyLogsTxt(false)}
+                    disabled={exportLoading}
+                  >
+                    {exportLoading ? "กำลังดาวน์โหลด..." : "ดาวน์โหลด .txt"}
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </main>
       </div>
     </SidebarProvider>

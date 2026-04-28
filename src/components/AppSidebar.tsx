@@ -13,7 +13,7 @@ import {
   SidebarFooter,
   SidebarHeader,
 } from "@/components/ui/sidebar";
-import { Brain, ClipboardList, BarChart3, Upload, MessageSquare, Building2, LogOut, Settings, History, BookOpen, FileBarChart, Home, Radar } from "lucide-react";
+import { Brain, ClipboardList, BarChart3, Upload, Building2, LogOut, Settings, History, BookOpen, FileBarChart, Home, Radar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTrendAlerts } from "@/hooks/useTrendAlerts";
 
@@ -25,7 +25,6 @@ const teacherMenuItems = [
   { title: "รายงานสมรรถนะ", url: "/smart-report", icon: FileBarChart },
   { title: "สมรรถนะรายบุคคล", url: "/competency-report", icon: Radar },
   { title: "อัปโหลด CSV", url: "/upload", icon: Upload },
-  { title: "AI ที่ปรึกษา", url: "/consultant", icon: MessageSquare },
 ];
 
 const directorMenuItems = [
@@ -38,7 +37,6 @@ const directorMenuItems = [
   { title: "รายงานสมรรถนะ", url: "/smart-report", icon: FileBarChart },
   { title: "สมรรถนะรายบุคคล", url: "/competency-report", icon: Radar },
   { title: "อัปโหลด CSV", url: "/upload", icon: Upload },
-  { title: "AI ที่ปรึกษา", url: "/consultant", icon: MessageSquare },
   { title: "Admin Settings", url: "/admin", icon: Settings },
 ];
 

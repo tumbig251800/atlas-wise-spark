@@ -3,6 +3,7 @@
  * Keeps only printable ASCII (0x20-0x7E) to avoid control chars and invalid Unicode.
  */
 import { supabase, ATLAS_AUTH_STORAGE_KEY, ATLAS_URL, ATLAS_ANON_KEY } from "@/lib/atlasSupabase";
+import { AiQueueFullError, enqueueAiRequest } from "@/lib/aiRequestQueue";
 
 const PROJECT_REF = import.meta.env.VITE_SUPABASE_PROJECT_ID || "ebyelctqcdhjmqujeskx";
 
@@ -173,6 +174,8 @@ export interface EdgeJsonResult<T> {
   errorMessage: string | null;
 }
 
+const TOO_MANY_REQUESTS_MESSAGE = "คำขอมากเกินไป กรุณารอสักครู่";
+
 function parseEdgeErrorText(raw: string, fallback: string): string {
   if (!raw) return fallback;
   try {
@@ -183,47 +186,126 @@ function parseEdgeErrorText(raw: string, fallback: string): string {
   }
 }
 
+const TOO_MANY_REQUESTS_RETRIES = 2;
+const BACKOFF_BASE_MS = 5_000;
+const BACKOFF_MAX_MS = 10_000;
+
+function getBackoffMs(attempt: number): number {
+  return Math.min(BACKOFF_BASE_MS * 2 ** attempt, BACKOFF_MAX_MS);
+}
+
+function parseRetryAfterMs(retryAfter: string | null): number | null {
+  if (!retryAfter) return null;
+  const seconds = Number(retryAfter);
+  if (Number.isFinite(seconds) && seconds > 0) return Math.floor(seconds * 1000);
+  const ts = Date.parse(retryAfter);
+  if (!Number.isNaN(ts)) return Math.max(0, ts - Date.now());
+  return null;
+}
+
+function createAbortError(): Error {
+  try {
+    return new DOMException("The operation was aborted.", "AbortError");
+  } catch {
+    const err = new Error("The operation was aborted.");
+    err.name = "AbortError";
+    return err;
+  }
+}
+
+async function delayWithAbort(ms: number, signal?: AbortSignal): Promise<void> {
+  if (!signal) {
+    await new Promise((resolve) => setTimeout(resolve, ms));
+    return;
+  }
+  if (signal.aborted) throw createAbortError();
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      signal.removeEventListener("abort", onAbort);
+      reject(createAbortError());
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
 export async function invokeEdgeJson<T>(
   url: string,
   payload: unknown,
   init?: { signal?: AbortSignal }
 ): Promise<EdgeJsonResult<T>> {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: await getEdgeFunctionHeaders(),
-    body: JSON.stringify(payload),
-    signal: init?.signal,
-  });
-
-  const raw = await response.text();
-  if (!response.ok) {
-    return {
-      ok: false,
-      status: response.status,
-      data: null,
-      errorMessage: parseEdgeErrorText(raw, `HTTP ${response.status}`),
-    };
-  }
-
-  if (!raw.trim()) {
-    return { ok: true, status: response.status, data: null, errorMessage: null };
-  }
-
   try {
-    return {
-      ok: true,
-      status: response.status,
-      data: JSON.parse(raw) as T,
-      errorMessage: null,
-    };
-  } catch {
-    return {
-      ok: false,
-      status: response.status,
-      data: null,
-      errorMessage: "รูปแบบข้อมูลจากเซิร์ฟเวอร์ไม่ถูกต้อง",
-    };
+    for (let attempt = 0; attempt <= TOO_MANY_REQUESTS_RETRIES; attempt += 1) {
+      const response = await enqueueAiRequest(async () =>
+        fetch(url, {
+          method: "POST",
+          headers: await getEdgeFunctionHeaders(),
+          body: JSON.stringify(payload),
+          signal: init?.signal,
+        })
+      );
+
+      const raw = await response.text();
+      if (response.status === 429 && attempt < TOO_MANY_REQUESTS_RETRIES) {
+        const retryAfterMs = parseRetryAfterMs(response.headers.get("retry-after"));
+        await delayWithAbort(retryAfterMs ?? getBackoffMs(attempt), init?.signal);
+        continue;
+      }
+
+      if (!response.ok) {
+        return {
+          ok: false,
+          status: response.status,
+          data: null,
+          errorMessage:
+            response.status === 429
+              ? TOO_MANY_REQUESTS_MESSAGE
+              : parseEdgeErrorText(raw, `HTTP ${response.status}`),
+        };
+      }
+
+      if (!raw.trim()) {
+        return { ok: true, status: response.status, data: null, errorMessage: null };
+      }
+
+      try {
+        return {
+          ok: true,
+          status: response.status,
+          data: JSON.parse(raw) as T,
+          errorMessage: null,
+        };
+      } catch {
+        return {
+          ok: false,
+          status: response.status,
+          data: null,
+          errorMessage: "รูปแบบข้อมูลจากเซิร์ฟเวอร์ไม่ถูกต้อง",
+        };
+      }
+    }
+  } catch (error) {
+    if (error instanceof AiQueueFullError) {
+      return {
+        ok: false,
+        status: 429,
+        data: null,
+        errorMessage: error.message,
+      };
+    }
+    throw error;
   }
+
+  return {
+    ok: false,
+    status: 429,
+    data: null,
+    errorMessage: TOO_MANY_REQUESTS_MESSAGE,
+  };
 }
 
 export async function streamEdgeContent(
@@ -231,15 +313,39 @@ export async function streamEdgeContent(
   payload: unknown,
   onChunk: (chunk: string) => void
 ): Promise<void> {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: await getEdgeFunctionHeaders(),
-    body: JSON.stringify(payload),
-  });
+  let response: Response | null = null;
 
+  try {
+    for (let attempt = 0; attempt <= TOO_MANY_REQUESTS_RETRIES; attempt += 1) {
+      response = await enqueueAiRequest(async () =>
+        fetch(url, {
+          method: "POST",
+          headers: await getEdgeFunctionHeaders(),
+          body: JSON.stringify(payload),
+        })
+      );
+
+      if (response.status === 429 && attempt < TOO_MANY_REQUESTS_RETRIES) {
+        const retryAfterMs = parseRetryAfterMs(response.headers.get("retry-after"));
+        await delayWithAbort(retryAfterMs ?? getBackoffMs(attempt));
+        continue;
+      }
+      break;
+    }
+  } catch (error) {
+    if (error instanceof AiQueueFullError) {
+      throw new Error(error.message);
+    }
+    throw error;
+  }
+
+  if (!response) throw new Error("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้");
   if (!response.ok || !response.body) {
     const raw = await response.text().catch(() => "");
-    const message = parseEdgeErrorText(raw, `HTTP ${response.status}`);
+    const message =
+      response.status === 429
+        ? TOO_MANY_REQUESTS_MESSAGE
+        : parseEdgeErrorText(raw, `HTTP ${response.status}`);
     throw new Error(message);
   }
 

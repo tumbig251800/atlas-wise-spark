@@ -44,7 +44,11 @@ export default function Login() {
         navigate("/");
       }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "ไม่สามารถเข้าสู่ระบบได้";
+      const rawMessage = err instanceof Error ? err.message : "ไม่สามารถเข้าสู่ระบบได้";
+      const message =
+        rawMessage.toLowerCase().includes("failed to fetch")
+          ? "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ (Supabase อาจถูกพักโครงการหรือเครือข่ายมีปัญหา) กรุณาตรวจสอบ Project Status ใน Supabase Dashboard แล้วลองใหม่"
+          : rawMessage;
       toast({
         title: "เกิดข้อผิดพลาด",
         description: message,

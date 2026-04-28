@@ -1,5 +1,29 @@
 # ATLAS — Cursor Rules
-# อ่านก่อนทำอะไรทุกครั้ง
+
+## ทุกเซสชันแชทใหม่ — ทำก่อนตอบหรือแก้ไข
+
+1. อ่าน **`.cursorrules`** (ไฟล์นี้) และ **`PROJECT_CONTEXT.md`** (รากโปรเจค) ก่อน แล้วจึงตอบ/แก้ไข
+
+### แนะนำให้แนบไฟล์ตามงาน (Attach)
+
+| งาน | ไฟล์ |
+|-----|------|
+| Teaching Log | `src/pages/TeachingLog.tsx`, `src/components/teaching-log/Step1General.tsx` |
+| Executive | `src/pages/Executive.tsx`, `src/hooks/useTrendAlerts.ts` |
+| Competency | `src/pages/CompetencyReport.tsx`, `src/components/competency/ActiveClassroomAssessment.tsx` |
+| AI Chat | `supabase/functions/ai-chat/index.ts`, `src/domain/consultantContext.ts` |
+| Lesson Plan | `supabase/functions/ai-lesson-plan/index.ts`, `src/pages/LessonPlan.tsx` |
+| Feature ใหม่ | **`PROJECT_CONTEXT.md`** เสมอ |
+
+### Prompt เริ่มต้น (คัดลอกเป็นข้อความแรกในแชทได้)
+
+```text
+อ่าน .cursorrules และ PROJECT_CONTEXT.md ก่อน แล้วจึงตอบ/แก้ไข
+```
+
+---
+
+# อ่านก่อนทำอะไรทุกครั้ง (รายละเอียด)
 
 ## โปรเจคต์คืออะไร
 ATLAS คือระบบช่วยครูบันทึกและวิเคราะห์การสอน (Teaching Log, Competency Report, Executive Dashboard, AI Chat, Lesson Plan)

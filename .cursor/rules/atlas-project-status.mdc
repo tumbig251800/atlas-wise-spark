@@ -5,6 +5,10 @@ alwaysApply: true
 
 # ATLAS Teaching System - Project Status
 
+## ทุกเซสชันแชทใหม่
+- อ่าน **`.cursorrules`** และ **`PROJECT_CONTEXT.md`** ก่อนตอบหรือแก้โค้ด
+- แนบไฟล์ตามตารางงาน → ไฟล์ใน **`.cursorrules`** (Teaching Log / Executive / Competency / AI Chat / Lesson Plan); งาน feature ใหม่แนบ **`PROJECT_CONTEXT.md`**
+
 ## Project Overview
 ATLAS = Adaptive Teaching & Learning Analytics System
 - Tech Stack: React + TypeScript + Vite + Supabase + Deno Edge Functions

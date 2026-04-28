@@ -17,6 +17,7 @@ if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 **ถ้าไม่มีค่า `LOVABLE_API_KEY` ใน Supabase Edge Function Secrets** → จะ throw Error → ส่งกลับ **500** ทันที
 
 **แก้ไข:**
+
 1. ไปที่ [Supabase Dashboard](https://supabase.com/dashboard) → เลือกโปรเจกต์ ATLAS
 2. Settings → Edge Functions → **Secrets**
 3. เพิ่ม/แก้ไข `LOVABLE_API_KEY` = **Gemini API Key** จาก [Google AI Studio](https://aistudio.google.com/apikey)
@@ -27,6 +28,7 @@ if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 ## 2. AI Gateway (ai.gateway.lovable.dev) ตอบผิดพลาด
 
 ฟังก์ชันเรียก:
+
 ```
 https://ai.gateway.lovable.dev/v1/chat/completions
 ```
@@ -34,12 +36,15 @@ https://ai.gateway.lovable.dev/v1/chat/completions
 ถ้า Gateway ตอบไม่ใช่ 2xx (ยกเว้น 429, 402, 401/403 ที่มีข้อความเฉพาะ) → จะ return **500** พร้อมข้อความ `AI gateway error (status). ดู Supabase Logs สำหรับรายละเอียด`
 
 **กรณีที่จัดการไว้แล้ว:**
-| Status | ข้อความที่ผู้ใช้เห็น |
-|--------|------------------------|
-| 429 | คำขอมากเกินไป กรุณารอสักครู่ |
-| 402 | เครดิต AI หมด กรุณาเติมเครดิต |
+
+
+| Status  | ข้อความที่ผู้ใช้เห็น          |
+| ------- | ----------------------------- |
+| 429     | คำขอมากเกินไป กรุณารอสักครู่  |
+| 402     | เครดิต AI หมด กรุณาเติมเครดิต |
 | 401/403 | API Key ไม่ถูกต้องหรือหมดอายุ |
-| อื่นๆ | 500 + AI gateway error |
+| อื่นๆ   | 500 + AI gateway error        |
+
 
 **ตรวจสอบ:** ดู **Supabase Logs** ของฟังก์ชัน ai-chat — จะมี `console.error("AI gateway error:", status, body)` บอกสาเหตุจริง
 
@@ -63,12 +68,14 @@ const { messages, context } = await req.json();
 
 ## รายการตรวจสอบ (Checklist)
 
-| # | รายการ | วิธีตรวจ |
-|---|--------|----------|
-| 1 | LOVABLE_API_KEY ใน Supabase | Supabase Dashboard → Project → Edge Functions → Secrets |
-| 2 | Gemini API Key ใช้งานได้ | สร้างใหม่ที่ [Google AI Studio](https://aistudio.google.com/apikey) ถ้าสงสัยหมดอายุ |
-| 3 | VITE_SUPABASE_URL ใน .env | เปิดไฟล์ `.env` ในโปรเจกต์ ตรวจว่ามีค่าถูกต้อง |
-| 4 | Logs ของ ai-chat | Supabase Dashboard → Edge Functions → ai-chat → Logs (ดู error message จริง) |
+
+| #   | รายการ                      | วิธีตรวจ                                                                            |
+| --- | --------------------------- | ----------------------------------------------------------------------------------- |
+| 1   | LOVABLE_API_KEY ใน Supabase | Supabase Dashboard → Project → Edge Functions → Secrets                             |
+| 2   | Gemini API Key ใช้งานได้    | สร้างใหม่ที่ [Google AI Studio](https://aistudio.google.com/apikey) ถ้าสงสัยหมดอายุ |
+| 3   | VITE_SUPABASE_URL ใน .env   | เปิดไฟล์ `.env` ในโปรเจกต์ ตรวจว่ามีค่าถูกต้อง                                      |
+| 4   | Logs ของ ai-chat            | Supabase Dashboard → Edge Functions → ai-chat → Logs (ดู error message จริง)        |
+
 
 ---
 

@@ -9,12 +9,24 @@ import {
 } from "../_shared/lessonPlanPrompts.ts";
 
 const RATE_LIMIT_SECONDS = 10;
+const GEMINI_MAX_429_RETRIES = 2;
+const GEMINI_BACKOFF_BASE_MS = 5000;
+const GEMINI_BACKOFF_MAX_MS = 10000;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
+
+function parseRetryAfterMs(retryAfter: string | null): number | null {
+  if (!retryAfter) return null;
+  const seconds = Number(retryAfter);
+  if (Number.isFinite(seconds) && seconds > 0) return Math.floor(seconds * 1000);
+  const ts = Date.parse(retryAfter);
+  if (!Number.isNaN(ts)) return Math.max(0, ts - Date.now());
+  return null;
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -54,7 +66,14 @@ serve(async (req) => {
     if (!allowed) {
       return new Response(
         JSON.stringify({ error: `กรุณารอ ${RATE_LIMIT_SECONDS} วินาทีก่อนขอแผนการสอนใหม่` }),
-        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        {
+          status: 429,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+            "Retry-After": String(RATE_LIMIT_SECONDS),
+          },
+        }
       );
     }
     // --- End rate limit ---
@@ -96,18 +115,23 @@ serve(async (req) => {
       generationConfig: { temperature: 0 },
     });
 
-    // Retry up to 3 attempts on Gemini 429 with exponential backoff
+    // Retry on Gemini 429 with Retry-After support.
     let response: Response | null = null;
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt <= GEMINI_MAX_429_RETRIES; attempt++) {
       response = await fetch(geminiUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: geminiBody,
       });
-      if (response.status !== 429) break;
-      if (attempt < 2) {
-        await new Promise((r) => setTimeout(r, (attempt + 1) * 1000));
-      }
+      if (response.status !== 429 || attempt >= GEMINI_MAX_429_RETRIES) break;
+      const retryAfterMs = parseRetryAfterMs(response.headers.get("retry-after"));
+      const expBackoffMs = Math.min(
+        GEMINI_BACKOFF_BASE_MS * 2 ** attempt,
+        GEMINI_BACKOFF_MAX_MS
+      );
+      const delayMs = Math.max(1000, retryAfterMs ?? expBackoffMs);
+      console.warn(`GEMINI_429_RETRY lesson-plan attempt=${attempt + 1} delay_ms=${delayMs}`);
+      await new Promise((r) => setTimeout(r, delayMs));
     }
 
     if (!response!.ok) {
@@ -115,7 +139,12 @@ serve(async (req) => {
       console.error("Gemini lesson plan error:", response!.status, t);
       if (response!.status === 429) {
         return new Response(JSON.stringify({ error: "คำขอมากเกินไป กรุณารอสักครู่" }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 429,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+            "Retry-After": String(RATE_LIMIT_SECONDS),
+          },
         });
       }
       if (response!.status === 402) {

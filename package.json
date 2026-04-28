@@ -20,7 +20,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:regression-ai-chat": "python3 scripts/regression-ai-chat.py",
-    "test:regression-lesson-plan": "node scripts/regression-ai-lesson-plan.mjs"
+    "test:regression-lesson-plan": "node scripts/regression-ai-lesson-plan.mjs",
+    "test:atlas-diagnostic-jwt": "node scripts/test-atlas-diagnostic-jwt.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
