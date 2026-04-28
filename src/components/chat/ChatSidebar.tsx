@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { getEdgeFunctionHeaders, getAiChatUrl, invokeEdgeJson } from "@/lib/edgeFunctionFetch";
 
 type Msg = { id: string; role: "user" | "assistant"; content: string };
+const CHAT_REQUEST_TIMEOUT_MS = 60_000;
 
 function genId() {
   return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -68,6 +69,7 @@ export function ChatSidebar({ open, onOpenChange, context, audience = "teacher" 
       );
     };
 
+    let timeoutId: number | null = null;
     try {
       const chatUrl = getAiChatUrl();
       if (!chatUrl) {
@@ -83,7 +85,7 @@ export function ChatSidebar({ open, onOpenChange, context, audience = "teacher" 
       // Make sure user sees a trace even if request is blocked (CORS/preflight/etc.)
       setLastDebug(`rid=${requestId} status=starting url=${chatUrl}`);
       const controller = new AbortController();
-      const timeoutId = window.setTimeout(() => controller.abort(), 30_000);
+      timeoutId = window.setTimeout(() => controller.abort(), CHAT_REQUEST_TIMEOUT_MS);
       const headers = await getEdgeFunctionHeaders();
       headers["x-request-id"] = requestId;
       const authHeader = String(headers.Authorization || "");
@@ -116,7 +118,6 @@ export function ChatSidebar({ open, onOpenChange, context, audience = "teacher" 
         },
         { signal: controller.signal }
       );
-      window.clearTimeout(timeoutId);
       const content = result.data?.content ?? result.errorMessage ?? `Error ${result.status}`;
 
       if (!result.ok) toast.error(content);
@@ -190,6 +191,7 @@ export function ChatSidebar({ open, onOpenChange, context, audience = "teacher" 
       setLastDebug(`error=${msg}`);
       setAssistant(msg);
     } finally {
+      if (timeoutId !== null) window.clearTimeout(timeoutId);
       setIsLoading(false);
       sendingRef.current = false;
     }

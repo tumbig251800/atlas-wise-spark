@@ -6,11 +6,28 @@ import { requireAtlasUser } from "../_shared/atlasAuth.ts";
 import { buildSystemPrompt } from "../_shared/aiChatPrompts.ts";
 
 const RATE_LIMIT_SECONDS = 4; // conversational — faster than lesson plan (10s)
+const GEMINI_MAX_429_RETRIES = 2;
+const GEMINI_BACKOFF_BASE_MS = 2000;
+const GEMINI_BACKOFF_MAX_MS = 10000;
+const GEMINI_REQUEST_TIMEOUT_MS = 40_000;
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-request-id, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
+
+function parseRetryAfterMs(retryAfter: string | null): number | null {
+  if (!retryAfter) return null;
+  const seconds = Number(retryAfter);
+  if (Number.isFinite(seconds) && seconds > 0) return Math.floor(seconds * 1000);
+  const ts = Date.parse(retryAfter);
+  if (!Number.isNaN(ts)) return Math.max(0, ts - Date.now());
+  return null;
+}
+
+async function waitMs(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 type AiChatResponse = {
   ok: boolean;
@@ -30,10 +47,14 @@ function respond(
   meta?: AiChatResponse["meta"]
 ): Response {
   const body: AiChatResponse = { ok: status < 400, content, source, meta };
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
+  const headers: Record<string, string> = {
+    ...corsHeaders,
+    "Content-Type": "application/json",
+  };
+  if (status === 429) {
+    headers["Retry-After"] = String(RATE_LIMIT_SECONDS);
+  }
+  return new Response(JSON.stringify(body), { status, headers });
 }
 
 /** When true, validation fallback appends (debug: reason) to user-visible content. */
@@ -310,32 +331,53 @@ serve(async (req) => {
     }
 
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 25_000);
-    let response: Response;
-    try {
-      response = await fetch(geminiUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: systemContent }] },
-          contents: contents.length > 0 ? contents : [{ role: "user", parts: [{ text: "สวัสดีครับ" }] }],
-          generationConfig: { temperature: 0 },
-        }),
-        signal: controller.signal,
-      });
-    } catch (e) {
-      if (e instanceof Error && e.name === "AbortError") {
-        return respond(
-          "พีทใช้เวลานานเกินไป กรุณาลองถามใหม่อีกครั้งครับ",
-          "fallback",
-          504,
-          buildMeta(requestId)
-        );
+    let response: Response | null = null;
+    for (let attempt = 0; attempt <= GEMINI_MAX_429_RETRIES; attempt += 1) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), GEMINI_REQUEST_TIMEOUT_MS);
+      try {
+        response = await fetch(geminiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: systemContent }] },
+            contents: contents.length > 0 ? contents : [{ role: "user", parts: [{ text: "สวัสดีครับ" }] }],
+            generationConfig: { temperature: 0 },
+          }),
+          signal: controller.signal,
+        });
+      } catch (e) {
+        if (e instanceof Error && e.name === "AbortError") {
+          return respond(
+            "พีทใช้เวลานานเกินไป กรุณาลองถามใหม่อีกครั้งครับ",
+            "fallback",
+            504,
+            buildMeta(requestId)
+          );
+        }
+        throw e;
+      } finally {
+        clearTimeout(timeoutId);
       }
-      throw e;
-    } finally {
-      clearTimeout(timeoutId);
+
+      if (response.status !== 429 || attempt >= GEMINI_MAX_429_RETRIES) break;
+      const retryAfterMs = parseRetryAfterMs(response.headers.get("retry-after"));
+      const expBackoffMs = Math.min(
+        GEMINI_BACKOFF_BASE_MS * 2 ** attempt,
+        GEMINI_BACKOFF_MAX_MS
+      );
+      const delayMs = Math.max(1000, retryAfterMs ?? expBackoffMs);
+      console.warn(`GEMINI_429_RETRY attempt=${attempt + 1} delay_ms=${delayMs}`);
+      await waitMs(delayMs);
+    }
+
+    if (!response) {
+      return respond(
+        "เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณาลองใหม่อีกครั้ง",
+        "fallback",
+        502,
+        buildMeta(requestId)
+      );
     }
 
     if (!response.ok) {
