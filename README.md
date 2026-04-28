@@ -1,5 +1,24 @@
 # ATLAS Teaching System
 
+## สถานะปัจจุบัน | Current Status
+
+**อัปเดต: 28 เมษายน 2569**
+
+| รายการ | สถานะ |
+|--------|-------|
+| Production URL | [https://atlas-wise-spark.vercel.app](https://atlas-wise-spark.vercel.app) |
+| Deploy platform | Vercel (linked: `tumbigmans-projects/atlas-wise-spark`) |
+| GitHub repo | [tumbig251800/atlas-wise-spark](https://github.com/tumbig251800/atlas-wise-spark) |
+| Supabase project | `ebyelctqcdhjmqujeskx` (atlas_prod) |
+| ระยะการพัฒนา | **พร้อมทดสอบกับครู** — ส่งลิงก์ให้ครูได้เลย |
+| คู่มือครู | ยังไม่ได้จัดทำ (กำหนดทำก่อนอบรม) |
+| อบรมครู | ยังไม่ได้นัด |
+
+**สิ่งที่ต้องทำต่อ**
+- [ ] จัดทำคู่มือการใช้งานสำหรับครู
+- [ ] นัดอบรมครู
+- [ ] รวบรวม feedback จากครูหลังทดสอบ
+
 > **⚠️ Note on UI / Preview Sync:** ถ้าแสดงผลหน้า `/lesson-plan` เป็น UI แบบเก่า (เช่น มีช่อง Snapshot หรือ placeholder รวม ป. กับ ม.) ให้ยึด Code ใน Repo นี้เป็นหลัก (Source of Truth) รบกวนรัน `npm run dev` จาก root repo -> ทำ Hard Refresh -> เปิดใน Chrome ภายนอกที่ `http://localhost:8080/lesson-plan` และสังเกตให้มั่นใจว่าแท็บเบราว์เซอร์ชื่อ "ATLAS Teaching System"
 
 ATLAS (Adaptive Teaching & Learning Analytics System) is a web app that helps teachers and school leaders record teaching outcomes, analyze classroom signals, and generate AI-assisted teaching plans.
