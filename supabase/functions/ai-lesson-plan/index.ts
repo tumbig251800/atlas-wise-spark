@@ -180,7 +180,11 @@ serve(async (req) => {
             for (const line of lines) {
               if (!line.startsWith("data: ")) continue;
               const jsonStr = line.slice(6).trim();
-              if (!jsonStr || jsonStr === "[DONE]") continue;
+              if (!jsonStr) continue;
+              if (jsonStr === "[DONE]") {
+                controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+                break;
+              }
               try {
                 const parsed = JSON.parse(jsonStr);
                 const text = parsed?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
