@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Brain } from "lucide-react";
 
 const TOTAL_SECONDS = 30;
 
@@ -60,147 +61,6 @@ function useMatrixRain(canvasRef: React.RefObject<HTMLCanvasElement>) {
   }, []);
 }
 
-// AI Face SVG — futuristic robot head
-function AIFace({ seconds, online }: { seconds: number; online: boolean }) {
-  const elapsed = TOTAL_SECONDS - seconds;
-  const p = elapsed / TOTAL_SECONDS; // 0→1
-
-  const eyeColor = online ? "#00ff41" : seconds < 8 ? "#aaff00" : "#00ff41";
-  const scanX = (w: number) => Math.max(3, w * p);
-
-  return (
-    <svg width="260" height="310" viewBox="0 0 260 310" className="drop-shadow-[0_0_32px_#00ff41]">
-      <defs>
-        <filter id="glow">
-          <feGaussianBlur stdDeviation="3" result="b" />
-          <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
-        </filter>
-        <filter id="glow2">
-          <feGaussianBlur stdDeviation="6" result="b" />
-          <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
-        </filter>
-        <linearGradient id="headGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#001800" />
-          <stop offset="100%" stopColor="#000a00" />
-        </linearGradient>
-        <linearGradient id="eyeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#003300" />
-          <stop offset="100%" stopColor={eyeColor} />
-        </linearGradient>
-        <clipPath id="eyeL"><rect x="62" y="108" width="54" height="18" rx="3" /></clipPath>
-        <clipPath id="eyeR"><rect x="144" y="108" width="54" height="18" rx="3" /></clipPath>
-      </defs>
-
-      {/* ── OUTER HALO ── */}
-      <ellipse cx="130" cy="138" rx="118" ry="132" fill="none" stroke="#00ff41" strokeWidth="0.4" opacity="0.2" strokeDasharray="4 8" />
-      <ellipse cx="130" cy="138" rx="112" ry="126" fill="none" stroke="#00ff41" strokeWidth="0.3" opacity="0.15" />
-
-      {/* ── HEAD SILHOUETTE ── */}
-      {/* Main head shape — angular geometric */}
-      <path
-        d="M80,22 L50,50 L42,90 L42,175 L55,215 L78,248 L108,265 L130,270 L152,265 L182,248 L205,215 L218,175 L218,90 L210,50 L180,22 Z"
-        fill="url(#headGrad)"
-        stroke="#00ff41"
-        strokeWidth="1.5"
-        filter="url(#glow)"
-      />
-
-      {/* ── FOREHEAD CHIP / NEURAL PANEL ── */}
-      <rect x="90" y="28" width="80" height="28" rx="4" fill="rgba(0,30,0,0.85)" stroke="#005500" strokeWidth="1" />
-      {/* Chip loading bar */}
-      <rect x="94" y="32" width={scanX(72)} height="8" rx="2" fill="#00ff41" opacity="0.35" />
-      {/* Chip dots */}
-      {[102, 116, 130, 144, 158].map((x, i) => (
-        <circle key={i} cx={x} cy="48" r="2.5"
-          fill={elapsed > i * 5 ? eyeColor : "#002200"}
-          filter={elapsed > i * 5 ? "url(#glow)" : undefined}
-        />
-      ))}
-
-      {/* ── TEMPLE LINES (left) ── */}
-      {[95, 115, 135, 155, 175].map((y, i) => (
-        <line key={i} x1="42" y1={y} x2={58 + (i % 2) * 4} y2={y}
-          stroke="#00ff41" strokeWidth="0.7" opacity="0.4" />
-      ))}
-      {/* ── TEMPLE LINES (right) ── */}
-      {[95, 115, 135, 155, 175].map((y, i) => (
-        <line key={i} x1={202 - (i % 2) * 4} y1={y} x2="218" y2={y}
-          stroke="#00ff41" strokeWidth="0.7" opacity="0.4" />
-      ))}
-
-      {/* ── EAR PANELS ── */}
-      <rect x="30" y="110" width="14" height="50" rx="3" fill="rgba(0,20,0,0.9)" stroke="#004400" strokeWidth="1" />
-      <rect x="33" y="114" width="6" height="6" rx="1" fill={p > 0.3 ? eyeColor : "#002200"} opacity="0.8" />
-      <rect x="33" y="124" width="6" height="4" rx="1" fill={p > 0.6 ? eyeColor : "#002200"} opacity="0.6" />
-      <rect x="216" y="110" width="14" height="50" rx="3" fill="rgba(0,20,0,0.9)" stroke="#004400" strokeWidth="1" />
-      <rect x="221" y="114" width="6" height="6" rx="1" fill={p > 0.3 ? eyeColor : "#002200"} opacity="0.8" />
-      <rect x="221" y="124" width="6" height="4" rx="1" fill={p > 0.6 ? eyeColor : "#002200"} opacity="0.6" />
-
-      {/* ── LEFT EYE — scanner bar ── */}
-      <rect x="62" y="108" width="54" height="18" rx="3" fill="rgba(0,8,0,0.95)" stroke={eyeColor} strokeWidth="1.2" filter="url(#glow)" />
-      <rect x="64" y="110" width={scanX(50)} height="14" rx="2" fill={`url(#eyeGrad)`} clipPath="url(#eyeL)" />
-      {!online && <rect x={64 + scanX(50) - 2} y="110" width="3" height="14" fill="white" opacity="0.7" clipPath="url(#eyeL)" />}
-      {/* Eye glow overlay */}
-      <rect x="62" y="108" width="54" height="18" rx="3" fill={eyeColor} opacity="0.06" />
-
-      {/* ── RIGHT EYE — scanner bar ── */}
-      <rect x="144" y="108" width="54" height="18" rx="3" fill="rgba(0,8,0,0.95)" stroke={eyeColor} strokeWidth="1.2" filter="url(#glow)" />
-      <rect x="146" y="110" width={scanX(50)} height="14" rx="2" fill={`url(#eyeGrad)`} clipPath="url(#eyeR)" />
-      {!online && <rect x={146 + scanX(50) - 2} y="110" width="3" height="14" fill="white" opacity="0.7" clipPath="url(#eyeR)" />}
-      <rect x="144" y="108" width="54" height="18" rx="3" fill={eyeColor} opacity="0.06" />
-
-      {/* ── NOSE BRIDGE ── */}
-      <rect x="124" y="132" width="12" height="32" rx="5" fill="rgba(0,25,0,0.6)" stroke="#003300" strokeWidth="0.8" />
-      <circle cx="130" cy="166" r="3" fill="#00aa00" opacity="0.5" />
-
-      {/* ── CHEEK CIRCUITS ── */}
-      <line x1="62" y1="145" x2="78" y2="145" stroke="#005500" strokeWidth="1" />
-      <line x1="78" y1="145" x2="78" y2="158" stroke="#005500" strokeWidth="1" />
-      <circle cx="78" cy="158" r="2" fill={p > 0.4 ? "#00ff41" : "#002200"} />
-      <line x1="198" y1="145" x2="182" y2="145" stroke="#005500" strokeWidth="1" />
-      <line x1="182" y1="145" x2="182" y2="158" stroke="#005500" strokeWidth="1" />
-      <circle cx="182" cy="158" r="2" fill={p > 0.4 ? "#00ff41" : "#002200"} />
-
-      {/* ── MOUTH — data bar ── */}
-      <rect x="84" y="182" width="92" height="22" rx="4" fill="rgba(0,12,0,0.9)" stroke="#004400" strokeWidth="1" />
-      <rect x="87" y="185" width={scanX(86)} height="8" rx="2" fill={eyeColor} opacity="0.55" />
-      <rect x="87" y="196" width={scanX(60)} height="5" rx="2" fill="#00aa00" opacity="0.35" />
-
-      {/* ── CHIN DETAILS ── */}
-      <line x1="100" y1="210" x2="130" y2="210" stroke="#004400" strokeWidth="1" />
-      <line x1="130" y1="210" x2="160" y2="210" stroke="#004400" strokeWidth="1" />
-      <circle cx="130" cy="210" r="3" fill={p > 0.7 ? eyeColor : "#002200"} />
-      <line x1="110" y1="225" x2="130" y2="235" stroke="#003300" strokeWidth="0.8" />
-      <line x1="150" y1="225" x2="130" y2="235" stroke="#003300" strokeWidth="0.8" />
-
-      {/* ── CIRCUIT TRACES OUTSIDE HEAD ── */}
-      <polyline points="42,100 18,88 10,88" fill="none" stroke="#003300" strokeWidth="0.8" />
-      <circle cx="10" cy="88" r="2" fill={p > 0.2 ? "#00ff41" : "#002200"} opacity="0.7" />
-      <polyline points="42,170 18,182 10,182" fill="none" stroke="#003300" strokeWidth="0.8" />
-      <circle cx="10" cy="182" r="2" fill={p > 0.5 ? "#00ff41" : "#002200"} opacity="0.7" />
-      <polyline points="218,100 242,88 250,88" fill="none" stroke="#003300" strokeWidth="0.8" />
-      <circle cx="250" cy="88" r="2" fill={p > 0.2 ? "#00ff41" : "#002200"} opacity="0.7" />
-      <polyline points="218,170 242,182 250,182" fill="none" stroke="#003300" strokeWidth="0.8" />
-      <circle cx="250" cy="182" r="2" fill={p > 0.5 ? "#00ff41" : "#002200"} opacity="0.7" />
-
-      {/* ── ONLINE ✓ overlay ── */}
-      {online && (
-        <text x="130" y="168" textAnchor="middle" fill="#00ff41" fontSize="36"
-          fontFamily="monospace" filter="url(#glow2)">✓</text>
-      )}
-
-      {/* ── ATLAS Intelligence LABEL ── */}
-      <text x="130" y="292" textAnchor="middle" fill="#00ff41" fontSize="18"
-        fontFamily="monospace" fontWeight="bold" letterSpacing="4" filter="url(#glow)">
-        ATLAS
-      </text>
-      <text x="130" y="308" textAnchor="middle" fill="#00bb33" fontSize="10"
-        fontFamily="monospace" letterSpacing="3">
-        Intelligence
-      </text>
-    </svg>
-  );
-}
 
 export default function Launch() {
   const navigate = useNavigate();
@@ -284,9 +144,77 @@ export default function Launch() {
           </p>
         </div>
 
-        {/* AI Face */}
-        <div className={online ? "animate-pulse" : ""}>
-          <AIFace seconds={seconds} online={online} />
+        {/* Brain icon — with animated rings */}
+        <div className="relative flex items-center justify-center my-2">
+          {/* Outermost slow-spin ring */}
+          <div
+            className="absolute rounded-full border border-green-900"
+            style={{
+              width: 220, height: 220,
+              borderStyle: "dashed",
+              animation: "spin 12s linear infinite",
+            }}
+          />
+          {/* Middle counter-spin ring */}
+          <div
+            className="absolute rounded-full border border-green-800"
+            style={{
+              width: 180, height: 180,
+              borderStyle: "dashed",
+              animation: "spin 7s linear infinite reverse",
+              opacity: 0.6,
+            }}
+          />
+          {/* Inner ring */}
+          <div
+            className="absolute rounded-full border border-green-700"
+            style={{ width: 148, height: 148, opacity: 0.4 }}
+          />
+
+          {/* Brain circle container */}
+          <div
+            className="relative flex items-center justify-center rounded-full bg-black border border-green-500"
+            style={{
+              width: 120, height: 120,
+              boxShadow: online
+                ? "0 0 60px #00ff41, 0 0 120px rgba(0,255,65,0.4), inset 0 0 30px rgba(0,255,65,0.1)"
+                : "0 0 30px #00ff41, 0 0 60px rgba(0,255,65,0.2), inset 0 0 20px rgba(0,255,65,0.05)",
+            }}
+          >
+            <Brain
+              style={{
+                width: 56, height: 56,
+                color: online ? "#00ff41" : "#00cc33",
+                filter: "drop-shadow(0 0 10px #00ff41) drop-shadow(0 0 20px rgba(0,255,65,0.5))",
+              }}
+            />
+          </div>
+
+          {/* Tick marks on outer ring */}
+          <svg className="absolute" width={220} height={220} viewBox="0 0 220 220" style={{ pointerEvents: "none" }}>
+            {Array.from({ length: 16 }, (_, i) => {
+              const a = (i * 22.5 - 90) * (Math.PI / 180);
+              const r1 = 104, r2 = 110;
+              return (
+                <line key={i}
+                  x1={110 + r1 * Math.cos(a)} y1={110 + r1 * Math.sin(a)}
+                  x2={110 + r2 * Math.cos(a)} y2={110 + r2 * Math.sin(a)}
+                  stroke="#00ff41" strokeWidth={i % 4 === 0 ? 2 : 0.8} opacity={i % 4 === 0 ? 0.7 : 0.3}
+                />
+              );
+            })}
+          </svg>
+        </div>
+
+        {/* ATLAS Intelligence label */}
+        <div className="text-center -mt-1">
+          <p
+            className="text-green-400 text-xl font-bold tracking-[0.3em]"
+            style={{ textShadow: "0 0 12px #00ff41" }}
+          >
+            ATLAS
+          </p>
+          <p className="text-green-700 text-[10px] tracking-[0.25em]">Intelligence</p>
         </div>
 
         {online ? (
