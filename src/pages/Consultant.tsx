@@ -478,7 +478,7 @@ export default function Consultant() {
               className="min-w-0"
               triggerClassName="w-[70px]"
             />
-            {availableTerms.length > 1 && (
+            {availableTerms.length > 0 && (
               <Select value={selectedTerm} onValueChange={setSelectedTerm}>
                 <SelectTrigger className="h-8 w-[110px] text-xs">
                   <SelectValue placeholder="ภาคเรียน" />
@@ -601,12 +601,19 @@ export default function Consultant() {
             )].sort();
             return (
               <div className="flex flex-col gap-4 py-4">
-                <p className="text-sm text-muted-foreground">
-                  เลือกหน่วยการเรียนรู้ที่ต้องการออกข้อสอบ
-                  <span className="ml-1 text-xs bg-muted px-1.5 py-0.5 rounded">
-                    {filteredLogs.length} คาบ
-                  </span>
-                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    เลือกหน่วยการเรียนรู้ที่ต้องการออกข้อสอบ
+                    <span className="ml-1 text-xs bg-muted px-1.5 py-0.5 rounded">
+                      {filteredLogs.length} คาบ
+                    </span>
+                  </p>
+                  {selectedTerm && (
+                    <span className="text-xs font-medium bg-primary/10 text-primary px-2 py-1 rounded-md">
+                      ภาคเรียน {selectedTerm}
+                    </span>
+                  )}
+                </div>
                 <Select value={selectedUnit} onValueChange={setSelectedUnit}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="-- เลือกหน่วยการเรียนรู้ --" />
