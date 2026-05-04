@@ -1,5 +1,25 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { cleanClassroomData } from "@/lib/utils";
+
+function getAcademicTerm(dateStr: string): string {
+  const date = new Date(dateStr);
+  const month = date.getMonth() + 1;
+  const ceYear = date.getFullYear();
+  let term: number;
+  let thaiYear: number;
+  if (month >= 5 && month <= 9) {
+    term = 1; thaiYear = ceYear + 543;
+  } else if (month >= 11) {
+    term = 2; thaiYear = ceYear + 543;
+  } else if (month <= 3) {
+    term = 2; thaiYear = (ceYear - 1) + 543;
+  } else {
+    // April / October — break months, assign nearest semester
+    term = month === 4 ? 1 : 1;
+    thaiYear = ceYear + 543;
+  }
+  return `${thaiYear}-${term}`;
+}
 import { AppLayout } from "@/components/AppLayout";
 import { StepProgress } from "@/components/teaching-log/StepProgress";
 import { Step1General } from "@/components/teaching-log/Step1General";
@@ -237,6 +257,7 @@ export default function TeachingLog() {
         remedial_ids: form.remedialIds.trim() || null,
         next_strategy: form.nextStrategy || null,
         reflection: form.reflection.trim() || null,
+        academic_term: getAcademicTerm(form.teachingDate),
       }).select("id").single();
 
       if (error) throw error;

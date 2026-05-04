@@ -58,6 +58,9 @@ export default function Consultant() {
   const prevFilterKeyRef = useRef<string | null>(null);
   const didInitFilterKeyRef = useRef(false);
 
+  // Academic term filter
+  const [selectedTerm, setSelectedTerm] = useState<string>("");
+
   // Exam generation state
   const [examDialogOpen, setExamDialogOpen] = useState(false);
   const [examContent, setExamContent] = useState("");
@@ -77,7 +80,7 @@ export default function Consultant() {
 
   const { filterOptions, isLoading: optionsLoading } = useDashboardFilterOptions();
   const {
-    logs: filteredLogs,
+    logs: allLogs,
     hasCompleteContext,
     isLoading: logsLoading,
   } = useContextFirstTeachingLogs(contextFilter);
@@ -87,6 +90,10 @@ export default function Consultant() {
   );
 
   const dataLoading = optionsLoading || (hasCompleteContext && (logsLoading || diagnosticLoading));
+
+  // Derive available terms from loaded logs, auto-select latest when logs change
+  const availableTerms = [...new Set(allLogs.map(l => l.academic_term).filter(Boolean) as string[])].sort().reverse();
+  const filteredLogs = selectedTerm ? allLogs.filter(l => l.academic_term === selectedTerm) : allLogs;
 
   // Auto-initialize from persisted Dashboard filter only.
   useEffect(() => {
@@ -107,6 +114,18 @@ export default function Consultant() {
       setFilterInitialized(true);
     }
   }, [filterInitialized, optionsLoading, filterOptions.gradeLevels, filterOptions.classrooms, filterOptions.subjects]);
+
+  // Auto-select latest term when logs load or filter changes
+  useEffect(() => {
+    if (availableTerms.length > 0 && !selectedTerm) {
+      setSelectedTerm(availableTerms[0]);
+    }
+  }, [availableTerms.join(",")]);
+
+  // Reset term selection when subject/grade/classroom filter changes
+  useEffect(() => {
+    setSelectedTerm("");
+  }, [contextFilter.subject, contextFilter.gradeLevel, contextFilter.classroom]);
 
   // Persist filter when user changes it (sync with Dashboard)
   useEffect(() => {
@@ -459,6 +478,18 @@ export default function Consultant() {
               className="min-w-0"
               triggerClassName="w-[70px]"
             />
+            {availableTerms.length > 1 && (
+              <Select value={selectedTerm} onValueChange={setSelectedTerm}>
+                <SelectTrigger className="h-8 w-[110px] text-xs">
+                  <SelectValue placeholder="ภาคเรียน" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableTerms.map(t => (
+                    <SelectItem key={t} value={t} className="text-xs">{t}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-md whitespace-nowrap shrink-0">
               {filteredLogs.length} คาบ
             </span>
