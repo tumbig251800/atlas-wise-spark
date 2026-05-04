@@ -61,9 +61,9 @@ serve(async (req) => {
 
     const { gradeLevel, classroom, subject, unit, topic, context, numQuestions } = await req.json();
 
-    const rawKey = Deno.env.get("GEMINI_API_KEY") ?? "";
+    const rawKey = Deno.env.get("LOVABLE_API_KEY") ?? "";
     const GEMINI_API_KEY = rawKey.replace(/[^\x20-\x7E]/g, "").trim();
-    if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not configured");
+    if (!GEMINI_API_KEY) throw new Error("LOVABLE_API_KEY is not configured in Supabase Secrets");
 
     const questionCount = numQuestions || 10;
 
@@ -81,7 +81,7 @@ ${context}
 - ออกข้อสอบให้ครอบคลุม Gap ที่พบในบันทึก (K-Gap, P-Gap, A-Gap)`;
 
     // Use Gemini API directly
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}`;
 
     const response = await fetch(geminiUrl, {
       method: "POST",
@@ -107,7 +107,7 @@ ${context}
         });
       }
       if (response.status === 400 || response.status === 403) {
-        return new Response(JSON.stringify({ error: "GEMINI_API_KEY ไม่ถูกต้อง กรุณาตรวจสอบ" }), {
+        return new Response(JSON.stringify({ error: "LOVABLE_API_KEY ไม่ถูกต้องหรือไม่ได้ตั้งค่า กรุณาตรวจสอบใน Supabase Secrets" }), {
           status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }

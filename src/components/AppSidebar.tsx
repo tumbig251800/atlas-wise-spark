@@ -13,7 +13,7 @@ import {
   SidebarFooter,
   SidebarHeader,
 } from "@/components/ui/sidebar";
-import { Brain, ClipboardList, BarChart3, Upload, Building2, LogOut, Settings, History, BookOpen, FileBarChart, Home, Radar } from "lucide-react";
+import { Brain, ClipboardList, BarChart3, Upload, Building2, LogOut, Settings, History, BookOpen, FileBarChart, Home, Radar, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTrendAlerts } from "@/hooks/useTrendAlerts";
 
@@ -22,6 +22,7 @@ const teacherMenuItems = [
   { title: "บันทึกหลังสอน", url: "/log", icon: ClipboardList },
   { title: "ประวัติการสอน", url: "/history", icon: History },
   { title: "สร้างแผนการสอน", url: "/lesson-plan", icon: BookOpen },
+  { title: "AI ที่ปรึกษา & ข้อสอบ", url: "/consultant", icon: Bot },
   { title: "รายงานสมรรถนะ", url: "/smart-report", icon: FileBarChart },
   { title: "สมรรถนะรายบุคคล", url: "/competency-report", icon: Radar },
   { title: "อัปโหลด CSV", url: "/upload", icon: Upload },
@@ -34,6 +35,7 @@ const directorMenuItems = [
   { title: "บันทึกหลังสอน", url: "/log", icon: ClipboardList },
   { title: "ประวัติการสอน", url: "/history", icon: History },
   { title: "สร้างแผนการสอน", url: "/lesson-plan", icon: BookOpen },
+  { title: "AI ที่ปรึกษา & ข้อสอบ", url: "/consultant", icon: Bot },
   { title: "รายงานสมรรถนะ", url: "/smart-report", icon: FileBarChart },
   { title: "สมรรถนะรายบุคคล", url: "/competency-report", icon: Radar },
   { title: "อัปโหลด CSV", url: "/upload", icon: Upload },

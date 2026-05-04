@@ -21,6 +21,7 @@ const History = lazy(() => import("./pages/History"));
 const LessonPlan = lazy(() => import("./pages/LessonPlan"));
 const SmartReportView = lazy(() => import("./pages/SmartReportView"));
 const CompetencyReport = lazy(() => import("./pages/CompetencyReport"));
+const Consultant = lazy(() => import("./pages/Consultant"));
 
 const queryClient = new QueryClient();
 
@@ -105,6 +106,14 @@ const App = () => (
                 element={
                   <ProtectedRoute allowedRoles={["teacher", "director"]}>
                     <CompetencyReport />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/consultant"
+                element={
+                  <ProtectedRoute allowedRoles={["teacher", "director"]}>
+                    <Consultant />
                   </ProtectedRoute>
                 }
               />
