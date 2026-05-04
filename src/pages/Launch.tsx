@@ -60,128 +60,144 @@ function useMatrixRain(canvasRef: React.RefObject<HTMLCanvasElement>) {
   }, []);
 }
 
-// AI Face SVG — radar scanner
+// AI Face SVG — futuristic robot head
 function AIFace({ seconds, online }: { seconds: number; online: boolean }) {
   const elapsed = TOTAL_SECONDS - seconds;
-  const scanDeg = (elapsed / TOTAL_SECONDS) * 360 * 3; // 3 full rotations
-  const sweepRad = (scanDeg % 360) * (Math.PI / 180);
+  const p = elapsed / TOTAL_SECONDS; // 0→1
 
-  const eyeGlow = online ? "#00ff41" : seconds < 10 ? "#ffff00" : "#00cc33";
-  const eyePulse = online || seconds < 5;
-
-  // Scan line endpoint
-  const R = 82;
-  const sx = 100 + R * Math.cos(sweepRad - Math.PI / 2);
-  const sy = 100 + R * Math.sin(sweepRad - Math.PI / 2);
-
-  // Tick marks
-  const ticks = Array.from({ length: 24 }, (_, i) => {
-    const a = (i * 15 - 90) * (Math.PI / 180);
-    const r1 = i % 2 === 0 ? 88 : 85;
-    return {
-      x1: 100 + r1 * Math.cos(a),
-      y1: 100 + r1 * Math.sin(a),
-      x2: 100 + 92 * Math.cos(a),
-      y2: 100 + 92 * Math.sin(a),
-      major: i % 6 === 0,
-    };
-  });
+  const eyeColor = online ? "#00ff41" : seconds < 8 ? "#aaff00" : "#00ff41";
+  const scanX = (w: number) => Math.max(3, w * p);
 
   return (
-    <svg width="220" height="220" viewBox="0 0 200 200" className="drop-shadow-[0_0_24px_#00ff41]">
-      {/* Defs: gradient, glow */}
+    <svg width="260" height="310" viewBox="0 0 260 310" className="drop-shadow-[0_0_32px_#00ff41]">
       <defs>
-        <radialGradient id="faceGrad" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#001a00" />
-          <stop offset="100%" stopColor="#000800" />
-        </radialGradient>
         <filter id="glow">
-          <feGaussianBlur stdDeviation="2.5" result="blur" />
-          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+          <feGaussianBlur stdDeviation="3" result="b" />
+          <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
         </filter>
-        {/* Sweep gradient */}
-        <radialGradient id="sweepGrad" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#00ff41" stopOpacity="0.3" />
-          <stop offset="100%" stopColor="#00ff41" stopOpacity="0" />
-        </radialGradient>
+        <filter id="glow2">
+          <feGaussianBlur stdDeviation="6" result="b" />
+          <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+        </filter>
+        <linearGradient id="headGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#001800" />
+          <stop offset="100%" stopColor="#000a00" />
+        </linearGradient>
+        <linearGradient id="eyeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="#003300" />
+          <stop offset="100%" stopColor={eyeColor} />
+        </linearGradient>
+        <clipPath id="eyeL"><rect x="62" y="108" width="54" height="18" rx="3" /></clipPath>
+        <clipPath id="eyeR"><rect x="144" y="108" width="54" height="18" rx="3" /></clipPath>
       </defs>
 
-      {/* Outer decorative rings */}
-      <circle cx="100" cy="100" r="95" fill="none" stroke="#003300" strokeWidth="0.5" strokeDasharray="2 6" />
-      <circle cx="100" cy="100" r="92" fill="none" stroke="#004400" strokeWidth="0.3" />
+      {/* ── OUTER HALO ── */}
+      <ellipse cx="130" cy="138" rx="118" ry="132" fill="none" stroke="#00ff41" strokeWidth="0.4" opacity="0.2" strokeDasharray="4 8" />
+      <ellipse cx="130" cy="138" rx="112" ry="126" fill="none" stroke="#00ff41" strokeWidth="0.3" opacity="0.15" />
 
-      {/* Tick marks */}
-      {ticks.map((t, i) => (
-        <line
-          key={i} x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2}
-          stroke="#00ff41" strokeWidth={t.major ? 1.5 : 0.7} opacity={t.major ? 0.6 : 0.3}
-        />
-      ))}
-
-      {/* Scan sweep (radar fan) */}
-      {!online && (
-        <path
-          d={`M100,100 L${sx},${sy} A82,82 0 0,0 ${100 + R * Math.cos(sweepRad - Math.PI / 2 - 0.8)},${100 + R * Math.sin(sweepRad - Math.PI / 2 - 0.8)} Z`}
-          fill="#00ff41" opacity="0.08"
-        />
-      )}
-
-      {/* Middle ring */}
-      <circle cx="100" cy="100" r="82" fill="none" stroke="#005500" strokeWidth="0.8" />
-
-      {/* Face base */}
-      <circle cx="100" cy="100" r="58" fill="url(#faceGrad)" stroke="#00ff41" strokeWidth="1.5" filter="url(#glow)" />
-
-      {/* Inner cross-hairs */}
-      <line x1="100" y1="42" x2="100" y2="55" stroke="#00ff41" strokeWidth="0.6" opacity="0.4" />
-      <line x1="100" y1="145" x2="100" y2="158" stroke="#00ff41" strokeWidth="0.6" opacity="0.4" />
-      <line x1="42" y1="100" x2="55" y2="100" stroke="#00ff41" strokeWidth="0.6" opacity="0.4" />
-      <line x1="145" y1="100" x2="158" y2="100" stroke="#00ff41" strokeWidth="0.6" opacity="0.4" />
-
-      {/* Eyes */}
-      <ellipse cx="82" cy="92" rx="9" ry="6" fill={eyeGlow} opacity="0.15" />
-      <ellipse cx="118" cy="92" rx="9" ry="6" fill={eyeGlow} opacity="0.15" />
-      <ellipse cx="82" cy="92" rx="7" ry="4.5" fill="none" stroke={eyeGlow} strokeWidth="1.2" filter="url(#glow)" />
-      <ellipse cx="118" cy="92" rx="7" ry="4.5" fill="none" stroke={eyeGlow} strokeWidth="1.2" filter="url(#glow)" />
-      {/* Pupils */}
-      <ellipse cx="82" cy="92" rx="3" ry="3" fill={eyeGlow} opacity={eyePulse ? 0.9 : 0.6} filter="url(#glow)" />
-      <ellipse cx="118" cy="92" rx="3" ry="3" fill={eyeGlow} opacity={eyePulse ? 0.9 : 0.6} filter="url(#glow)" />
-
-      {/* Nose bridge — circuit line */}
-      <line x1="100" y1="96" x2="100" y2="106" stroke="#005500" strokeWidth="1" />
-      <circle cx="100" cy="107" r="1.5" fill="#00aa00" />
-
-      {/* Mouth — progress bar */}
-      <rect x="76" y="115" width="48" height="5" rx="2.5" fill="#002200" />
-      <rect
-        x="76" y="115"
-        width={online ? 48 : Math.max(2, 48 * (elapsed / TOTAL_SECONDS))}
-        height="5" rx="2.5"
-        fill={eyeGlow}
+      {/* ── HEAD SILHOUETTE ── */}
+      {/* Main head shape — angular geometric */}
+      <path
+        d="M80,22 L50,50 L42,90 L42,175 L55,215 L78,248 L108,265 L130,270 L152,265 L182,248 L205,215 L218,175 L218,90 L210,50 L180,22 Z"
+        fill="url(#headGrad)"
+        stroke="#00ff41"
+        strokeWidth="1.5"
         filter="url(#glow)"
       />
 
-      {/* Ear circuit lines */}
-      <line x1="42" y1="88" x2="55" y2="88" stroke="#005500" strokeWidth="0.8" />
-      <line x1="42" y1="112" x2="55" y2="112" stroke="#005500" strokeWidth="0.8" />
-      <line x1="145" y1="88" x2="158" y2="88" stroke="#005500" strokeWidth="0.8" />
-      <line x1="145" y1="112" x2="158" y2="112" stroke="#005500" strokeWidth="0.8" />
-
-      {/* Scan line (radar sweep) */}
-      {!online && (
-        <line
-          x1="100" y1="100" x2={sx} y2={sy}
-          stroke="#00ff41" strokeWidth="1" opacity="0.7"
-          filter="url(#glow)"
+      {/* ── FOREHEAD CHIP / NEURAL PANEL ── */}
+      <rect x="90" y="28" width="80" height="28" rx="4" fill="rgba(0,30,0,0.85)" stroke="#005500" strokeWidth="1" />
+      {/* Chip loading bar */}
+      <rect x="94" y="32" width={scanX(72)} height="8" rx="2" fill="#00ff41" opacity="0.35" />
+      {/* Chip dots */}
+      {[102, 116, 130, 144, 158].map((x, i) => (
+        <circle key={i} cx={x} cy="48" r="2.5"
+          fill={elapsed > i * 5 ? eyeColor : "#002200"}
+          filter={elapsed > i * 5 ? "url(#glow)" : undefined}
         />
+      ))}
+
+      {/* ── TEMPLE LINES (left) ── */}
+      {[95, 115, 135, 155, 175].map((y, i) => (
+        <line key={i} x1="42" y1={y} x2={58 + (i % 2) * 4} y2={y}
+          stroke="#00ff41" strokeWidth="0.7" opacity="0.4" />
+      ))}
+      {/* ── TEMPLE LINES (right) ── */}
+      {[95, 115, 135, 155, 175].map((y, i) => (
+        <line key={i} x1={202 - (i % 2) * 4} y1={y} x2="218" y2={y}
+          stroke="#00ff41" strokeWidth="0.7" opacity="0.4" />
+      ))}
+
+      {/* ── EAR PANELS ── */}
+      <rect x="30" y="110" width="14" height="50" rx="3" fill="rgba(0,20,0,0.9)" stroke="#004400" strokeWidth="1" />
+      <rect x="33" y="114" width="6" height="6" rx="1" fill={p > 0.3 ? eyeColor : "#002200"} opacity="0.8" />
+      <rect x="33" y="124" width="6" height="4" rx="1" fill={p > 0.6 ? eyeColor : "#002200"} opacity="0.6" />
+      <rect x="216" y="110" width="14" height="50" rx="3" fill="rgba(0,20,0,0.9)" stroke="#004400" strokeWidth="1" />
+      <rect x="221" y="114" width="6" height="6" rx="1" fill={p > 0.3 ? eyeColor : "#002200"} opacity="0.8" />
+      <rect x="221" y="124" width="6" height="4" rx="1" fill={p > 0.6 ? eyeColor : "#002200"} opacity="0.6" />
+
+      {/* ── LEFT EYE — scanner bar ── */}
+      <rect x="62" y="108" width="54" height="18" rx="3" fill="rgba(0,8,0,0.95)" stroke={eyeColor} strokeWidth="1.2" filter="url(#glow)" />
+      <rect x="64" y="110" width={scanX(50)} height="14" rx="2" fill={`url(#eyeGrad)`} clipPath="url(#eyeL)" />
+      {!online && <rect x={64 + scanX(50) - 2} y="110" width="3" height="14" fill="white" opacity="0.7" clipPath="url(#eyeL)" />}
+      {/* Eye glow overlay */}
+      <rect x="62" y="108" width="54" height="18" rx="3" fill={eyeColor} opacity="0.06" />
+
+      {/* ── RIGHT EYE — scanner bar ── */}
+      <rect x="144" y="108" width="54" height="18" rx="3" fill="rgba(0,8,0,0.95)" stroke={eyeColor} strokeWidth="1.2" filter="url(#glow)" />
+      <rect x="146" y="110" width={scanX(50)} height="14" rx="2" fill={`url(#eyeGrad)`} clipPath="url(#eyeR)" />
+      {!online && <rect x={146 + scanX(50) - 2} y="110" width="3" height="14" fill="white" opacity="0.7" clipPath="url(#eyeR)" />}
+      <rect x="144" y="108" width="54" height="18" rx="3" fill={eyeColor} opacity="0.06" />
+
+      {/* ── NOSE BRIDGE ── */}
+      <rect x="124" y="132" width="12" height="32" rx="5" fill="rgba(0,25,0,0.6)" stroke="#003300" strokeWidth="0.8" />
+      <circle cx="130" cy="166" r="3" fill="#00aa00" opacity="0.5" />
+
+      {/* ── CHEEK CIRCUITS ── */}
+      <line x1="62" y1="145" x2="78" y2="145" stroke="#005500" strokeWidth="1" />
+      <line x1="78" y1="145" x2="78" y2="158" stroke="#005500" strokeWidth="1" />
+      <circle cx="78" cy="158" r="2" fill={p > 0.4 ? "#00ff41" : "#002200"} />
+      <line x1="198" y1="145" x2="182" y2="145" stroke="#005500" strokeWidth="1" />
+      <line x1="182" y1="145" x2="182" y2="158" stroke="#005500" strokeWidth="1" />
+      <circle cx="182" cy="158" r="2" fill={p > 0.4 ? "#00ff41" : "#002200"} />
+
+      {/* ── MOUTH — data bar ── */}
+      <rect x="84" y="182" width="92" height="22" rx="4" fill="rgba(0,12,0,0.9)" stroke="#004400" strokeWidth="1" />
+      <rect x="87" y="185" width={scanX(86)} height="8" rx="2" fill={eyeColor} opacity="0.55" />
+      <rect x="87" y="196" width={scanX(60)} height="5" rx="2" fill="#00aa00" opacity="0.35" />
+
+      {/* ── CHIN DETAILS ── */}
+      <line x1="100" y1="210" x2="130" y2="210" stroke="#004400" strokeWidth="1" />
+      <line x1="130" y1="210" x2="160" y2="210" stroke="#004400" strokeWidth="1" />
+      <circle cx="130" cy="210" r="3" fill={p > 0.7 ? eyeColor : "#002200"} />
+      <line x1="110" y1="225" x2="130" y2="235" stroke="#003300" strokeWidth="0.8" />
+      <line x1="150" y1="225" x2="130" y2="235" stroke="#003300" strokeWidth="0.8" />
+
+      {/* ── CIRCUIT TRACES OUTSIDE HEAD ── */}
+      <polyline points="42,100 18,88 10,88" fill="none" stroke="#003300" strokeWidth="0.8" />
+      <circle cx="10" cy="88" r="2" fill={p > 0.2 ? "#00ff41" : "#002200"} opacity="0.7" />
+      <polyline points="42,170 18,182 10,182" fill="none" stroke="#003300" strokeWidth="0.8" />
+      <circle cx="10" cy="182" r="2" fill={p > 0.5 ? "#00ff41" : "#002200"} opacity="0.7" />
+      <polyline points="218,100 242,88 250,88" fill="none" stroke="#003300" strokeWidth="0.8" />
+      <circle cx="250" cy="88" r="2" fill={p > 0.2 ? "#00ff41" : "#002200"} opacity="0.7" />
+      <polyline points="218,170 242,182 250,182" fill="none" stroke="#003300" strokeWidth="0.8" />
+      <circle cx="250" cy="182" r="2" fill={p > 0.5 ? "#00ff41" : "#002200"} opacity="0.7" />
+
+      {/* ── ONLINE ✓ overlay ── */}
+      {online && (
+        <text x="130" y="168" textAnchor="middle" fill="#00ff41" fontSize="36"
+          fontFamily="monospace" filter="url(#glow2)">✓</text>
       )}
 
-      {/* ONLINE checkmark */}
-      {online && (
-        <text x="100" y="104" textAnchor="middle" fill="#00ff41" fontSize="20" fontFamily="monospace" filter="url(#glow)">
-          ✓
-        </text>
-      )}
+      {/* ── ATLAS Intelligence LABEL ── */}
+      <text x="130" y="292" textAnchor="middle" fill="#00ff41" fontSize="18"
+        fontFamily="monospace" fontWeight="bold" letterSpacing="4" filter="url(#glow)">
+        ATLAS
+      </text>
+      <text x="130" y="308" textAnchor="middle" fill="#00bb33" fontSize="10"
+        fontFamily="monospace" letterSpacing="3">
+        Intelligence
+      </text>
     </svg>
   );
 }
