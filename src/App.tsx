@@ -22,6 +22,7 @@ const LessonPlan = lazy(() => import("./pages/LessonPlan"));
 const SmartReportView = lazy(() => import("./pages/SmartReportView"));
 const CompetencyReport = lazy(() => import("./pages/CompetencyReport"));
 const Consultant = lazy(() => import("./pages/Consultant"));
+const Launch = lazy(() => import("./pages/Launch"));
 
 const queryClient = new QueryClient();
 
@@ -36,6 +37,7 @@ const App = () => (
           <Suspense fallback={<RouteFallback />}>
             <Routes>
               <Route path="/" element={<Index />} />
+              <Route path="/launch" element={<Launch />} />
               <Route path="/login" element={<Login />} />
               <Route
                 path="/log"
