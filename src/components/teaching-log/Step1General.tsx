@@ -1,4 +1,5 @@
 import { format } from "date-fns";
+import { useState, useEffect } from "react";
 import { CalendarIcon, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -52,6 +53,16 @@ const SUBJECTS = [
 
 export function Step1General({ data, onChange, errors, teacherName }: Step1Props) {
   const dateValue = data.teachingDate ? new Date(data.teachingDate) : new Date();
+
+  // Local state prevents parent re-renders from interrupting typing
+  const [rawStudents, setRawStudents] = useState(data.totalStudents?.toString() ?? "");
+  const [localUnit, setLocalUnit] = useState(data.learningUnit);
+  const [localTopic, setLocalTopic] = useState(data.topic);
+
+  // Sync down from parent only when parent resets (e.g. after submit)
+  useEffect(() => { setRawStudents(data.totalStudents?.toString() ?? ""); }, [data.totalStudents]);
+  useEffect(() => { setLocalUnit(data.learningUnit); }, [data.learningUnit]);
+  useEffect(() => { setLocalTopic(data.topic); }, [data.topic]);
 
   return (
     <div className="space-y-4">
@@ -114,18 +125,31 @@ export function Step1General({ data, onChange, errors, teacherName }: Step1Props
         {errors.classroom && <p className="text-xs text-destructive" data-error>{errors.classroom}</p>}
       </div>
 
-      {/* Total Students */}
+      {/* Total Students — text+inputMode avoids the number-spinner jumping issue */}
       <div className="space-y-2">
         <Label>จำนวนนักเรียนทั้งหมดในคาบนี้ <span className="text-destructive">*</span></Label>
         <Input
-          type="number"
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
           placeholder="เช่น 35"
-          min={1}
-          max={60}
-          value={data.totalStudents ?? ""}
+          value={rawStudents}
           onChange={(e) => {
-            const val = e.target.value;
-            onChange("totalStudents", val === "" ? null : Math.min(60, Math.max(1, parseInt(val) || 0)));
+            const raw = e.target.value.replace(/[^0-9]/g, "");
+            setRawStudents(raw);
+            const num = parseInt(raw);
+            onChange("totalStudents", isNaN(num) ? null : Math.min(60, num));
+          }}
+          onBlur={() => {
+            const num = parseInt(rawStudents);
+            if (!isNaN(num)) {
+              const clamped = Math.min(60, Math.max(1, num));
+              setRawStudents(clamped.toString());
+              onChange("totalStudents", clamped);
+            } else {
+              setRawStudents("");
+              onChange("totalStudents", null);
+            }
           }}
           className={cn(errors.totalStudents && "border-destructive")}
         />
@@ -151,8 +175,12 @@ export function Step1General({ data, onChange, errors, teacherName }: Step1Props
         <Label>หน่วยการเรียนรู้ <span className="text-destructive">*</span></Label>
         <Input
           placeholder="เช่น หน่วยที่ 3 เศษส่วน"
-          value={data.learningUnit}
-          onChange={(e) => onChange("learningUnit", e.target.value)}
+          value={localUnit}
+          autoComplete="off"
+          onChange={(e) => {
+            setLocalUnit(e.target.value);
+            onChange("learningUnit", e.target.value);
+          }}
           className={cn(errors.learningUnit && "border-destructive")}
           maxLength={200}
         />
@@ -164,8 +192,12 @@ export function Step1General({ data, onChange, errors, teacherName }: Step1Props
         <Label>เรื่องที่สอน <span className="text-destructive">*</span></Label>
         <Input
           placeholder="เช่น การบวกเศษส่วน"
-          value={data.topic}
-          onChange={(e) => onChange("topic", e.target.value)}
+          value={localTopic}
+          autoComplete="off"
+          onChange={(e) => {
+            setLocalTopic(e.target.value);
+            onChange("topic", e.target.value);
+          }}
           className={cn(errors.topic && "border-destructive")}
           maxLength={200}
         />
