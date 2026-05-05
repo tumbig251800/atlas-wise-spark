@@ -52,7 +52,7 @@ const SUBJECTS = [
 ];
 
 export function Step1General({ data, onChange, errors, teacherName }: Step1Props) {
-  const dateValue = data.teachingDate ? new Date(data.teachingDate) : new Date();
+  const dateValue = data.teachingDate ? new Date(`${data.teachingDate}T00:00:00`) : new Date();
 
   // Local state prevents parent re-renders from interrupting typing
   const [rawStudents, setRawStudents] = useState(data.totalStudents?.toString() ?? "");
@@ -89,7 +89,13 @@ export function Step1General({ data, onChange, errors, teacherName }: Step1Props
             <Calendar
               mode="single"
               selected={dateValue}
-              onSelect={(d) => d && onChange("teachingDate", d.toISOString().split("T")[0])}
+              onSelect={(d) => {
+                if (!d) return;
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, "0");
+                const day = String(d.getDate()).padStart(2, "0");
+                onChange("teachingDate", `${y}-${m}-${day}`);
+              }}
               initialFocus
               className="p-3 pointer-events-auto"
             />

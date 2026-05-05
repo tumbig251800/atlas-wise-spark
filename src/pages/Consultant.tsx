@@ -27,6 +27,7 @@ import {
   streamEdgeContent,
 } from "@/lib/edgeFunctionFetch";
 import { buildContextWithCitation, buildQwrMetricsBlock } from "@/domain/consultantContext";
+import { ExportDocButton } from "@/components/lesson-plan/ExportDocButton";
 
 type Msg = { id: string; role: "user" | "assistant"; content: string };
 
@@ -576,20 +577,28 @@ export default function Consultant() {
                 )}
               </DialogTitle>
               {examStep === "generating" && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={copyExam}
-                  disabled={!examContent || examLoading}
-                  className="gap-1.5 mr-6"
-                >
-                  {examCopied ? (
-                    <Check className="h-4 w-4 text-green-500" />
-                  ) : (
-                    <Copy className="h-4 w-4" />
+                <div className="flex flex-wrap items-center justify-end gap-2 mr-6 shrink-0">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={copyExam}
+                    disabled={!examContent || examLoading}
+                    className="gap-1.5"
+                  >
+                    {examCopied ? (
+                      <Check className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
+                    {examCopied ? "คัดลอกแล้ว" : "คัดลอก"}
+                  </Button>
+                  {examContent && !examLoading && (
+                    <ExportDocButton
+                      content={examContent}
+                      title={`ข้อสอบ-${contextFilter.subject}-${contextFilter.gradeLevel}`}
+                    />
                   )}
-                  {examCopied ? "คัดลอกแล้ว" : "คัดลอก"}
-                </Button>
+                </div>
               )}
             </div>
           </DialogHeader>
