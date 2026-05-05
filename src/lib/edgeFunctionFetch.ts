@@ -190,6 +190,10 @@ const TOO_MANY_REQUESTS_RETRIES = 2;
 const BACKOFF_BASE_MS = 5_000;
 const BACKOFF_MAX_MS = 10_000;
 
+/** Idle timeout between stream chunks (lesson plan SSE) — resets on each byte read or each onChunk */
+const STREAM_IDLE_MS = 30_000;
+const STREAM_IDLE_MESSAGE = "การสร้างใช้เวลานานเกินไป กรุณาลองใหม่";
+
 function getBackoffMs(attempt: number): number {
   return Math.min(BACKOFF_BASE_MS * 2 ** attempt, BACKOFF_MAX_MS);
 }
@@ -314,6 +318,25 @@ export async function streamEdgeContent(
   onChunk: (chunk: string) => void
 ): Promise<void> {
   let response: Response | null = null;
+  const streamAbort = new AbortController();
+  let idleTimer: ReturnType<typeof setTimeout> | null = null;
+  let idleTimedOut = false;
+
+  const disarmIdle = () => {
+    if (idleTimer !== null) {
+      clearTimeout(idleTimer);
+      idleTimer = null;
+    }
+  };
+
+  const armIdle = () => {
+    disarmIdle();
+    idleTimer = setTimeout(() => {
+      idleTimer = null;
+      idleTimedOut = true;
+      streamAbort.abort();
+    }, STREAM_IDLE_MS);
+  };
 
   try {
     for (let attempt = 0; attempt <= TOO_MANY_REQUESTS_RETRIES; attempt += 1) {
@@ -322,6 +345,7 @@ export async function streamEdgeContent(
           method: "POST",
           headers: await getEdgeFunctionHeaders(),
           body: JSON.stringify(payload),
+          signal: streamAbort.signal,
         })
       );
 
@@ -335,6 +359,9 @@ export async function streamEdgeContent(
   } catch (error) {
     if (error instanceof AiQueueFullError) {
       throw new Error(error.message);
+    }
+    if (idleTimedOut) {
+      throw new Error(STREAM_IDLE_MESSAGE);
     }
     throw error;
   }
@@ -353,10 +380,25 @@ export async function streamEdgeContent(
   const decoder = new TextDecoder();
   let buffer = "";
 
+  armIdle();
+
   try {
-    while (true) {
-      const { done, value } = await reader.read();
+    readLoop: while (true) {
+      let readResult: ReadableStreamReadResult<Uint8Array>;
+      try {
+        readResult = await reader.read();
+      } catch (readErr) {
+        if (idleTimedOut) throw new Error(STREAM_IDLE_MESSAGE);
+        const name = readErr instanceof Error ? readErr.name : "";
+        if (name === "AbortError" && idleTimedOut) throw new Error(STREAM_IDLE_MESSAGE);
+        throw readErr;
+      }
+
+      armIdle();
+
+      const { done, value } = readResult;
       if (done) break;
+
       buffer += decoder.decode(value, { stream: true });
 
       let idx: number;
@@ -374,14 +416,23 @@ export async function streamEdgeContent(
         try {
           const parsed = JSON.parse(json) as { choices?: Array<{ delta?: { content?: string } }> };
           const content = parsed.choices?.[0]?.delta?.content;
-          if (content) onChunk(content);
+          if (content) {
+            onChunk(content);
+            armIdle();
+          }
         } catch (error) {
           console.warn("Invalid SSE chunk received", error);
         }
       }
-      if (streamEnded) break;
+      if (streamEnded) break readLoop;
     }
+  } catch (error) {
+    if (idleTimedOut || (error instanceof Error && error.message === STREAM_IDLE_MESSAGE)) {
+      throw new Error(STREAM_IDLE_MESSAGE);
+    }
+    throw error;
   } finally {
-    reader.cancel();
+    disarmIdle();
+    reader.cancel().catch(() => {});
   }
 }

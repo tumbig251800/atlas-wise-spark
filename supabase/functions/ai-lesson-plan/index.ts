@@ -168,11 +168,22 @@ serve(async (req) => {
     const stream = new ReadableStream({
       async start(controller) {
         const reader = response!.body!.getReader();
+        let sentDone = false;
+        const sendDone = () => {
+          if (sentDone) return;
+          sentDone = true;
+          try {
+            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          } catch (e) {
+            console.warn("ai-lesson-plan: enqueue [DONE] failed", e);
+          }
+        };
+
         try {
-          while (true) {
+          outer: while (true) {
             const { done, value } = await reader.read();
             if (done) {
-              controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+              sendDone();
               break;
             }
             const chunk = decoder.decode(value);
@@ -182,8 +193,8 @@ serve(async (req) => {
               const jsonStr = line.slice(6).trim();
               if (!jsonStr) continue;
               if (jsonStr === "[DONE]") {
-                controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-                break;
+                sendDone();
+                break outer;
               }
               try {
                 const parsed = JSON.parse(jsonStr);
@@ -200,7 +211,12 @@ serve(async (req) => {
         } catch (e) {
           console.error("ai-lesson-plan stream error:", e);
         } finally {
-          controller.close();
+          sendDone();
+          try {
+            controller.close();
+          } catch {
+            // ignore double-close / already errored
+          }
         }
       },
     });
