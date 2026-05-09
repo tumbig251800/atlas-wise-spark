@@ -15,3 +15,7 @@ verify_jwt = false
 
 [functions.ai-exam-gen]
 verify_jwt = false
+
+# atlas-mcp: auth handled internally via ATLAS_MCP_API_KEY secret
+[functions.atlas-mcp]
+verify_jwt = false
