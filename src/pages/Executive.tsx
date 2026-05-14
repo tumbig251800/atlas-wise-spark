@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { sortClassrooms } from "@/lib/utils";
 import { AppLayout } from "@/components/AppLayout";
 import { supabase } from "@/lib/atlasSupabase";
 import { useAuth } from "@/hooks/useAuth";
@@ -140,7 +141,7 @@ export default function Executive() {
   const classrooms = useMemo(() => {
     let base = allLogs;
     if (filters.gradeLevel) base = base.filter((l) => l.grade_level === filters.gradeLevel);
-    return [...new Set(base.map((l) => String(l.classroom ?? "")))].filter(Boolean).sort();
+    return sortClassrooms([...new Set(base.map((l) => String(l.classroom ?? "")))].filter(Boolean));
   }, [allLogs, filters.gradeLevel]);
 
   const subjects = useMemo(() => {

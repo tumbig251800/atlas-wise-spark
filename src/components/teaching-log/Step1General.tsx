@@ -25,7 +25,7 @@ interface Step1Props {
 }
 
 const GRADES = ["ป.1", "ป.2", "ป.3", "ป.4", "ป.5", "ป.6"];
-const CLASSROOMS = ["1", "2", "3", "4", "5", "6", "7", "8"];
+const CLASSROOMS = ["KBW", "2"];
 
 const SUBJECTS = [
   "ภาษาไทย",

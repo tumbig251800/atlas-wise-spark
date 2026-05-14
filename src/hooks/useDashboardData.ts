@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/atlasSupabase";
 import { useAuth } from "@/hooks/useAuth";
 import type { Tables } from "@/integrations/supabase/types";
+import { sortClassrooms } from "@/lib/utils";
 
 export type TeachingLog = Tables<"teaching_logs">;
 
@@ -69,7 +70,7 @@ export function useDashboardData(filters: DashboardFilters) {
   // Derive filter options from all logs (ensure string for Select compatibility)
   const filterOptions: FilterOptions = {
     gradeLevels: [...new Set(allLogs.map((l) => l.grade_level))].sort(),
-    classrooms: [...new Set(allLogs.map((l) => String(l.classroom ?? "")))].filter(Boolean).sort(),
+    classrooms: sortClassrooms([...new Set(allLogs.map((l) => String(l.classroom ?? "")))].filter(Boolean)),
     subjects: [...new Set(allLogs.map((l) => l.subject))].sort(),
   };
 
@@ -105,7 +106,7 @@ export function useDashboardFilterOptions() {
       const rows = data ?? [];
       return {
         gradeLevels: [...new Set(rows.map((l) => l.grade_level))].filter(Boolean).sort(),
-        classrooms: [...new Set(rows.map((l) => String(l.classroom ?? "")))].filter(Boolean).sort(),
+        classrooms: sortClassrooms([...new Set(rows.map((l) => String(l.classroom ?? "")))].filter(Boolean)),
         subjects: [...new Set(rows.map((l) => l.subject))].filter(Boolean).sort(),
       } satisfies FilterOptions;
     },

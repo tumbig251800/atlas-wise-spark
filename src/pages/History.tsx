@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/atlasSupabase";
+import { sortClassrooms } from "@/lib/utils";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Card, CardContent } from "@/components/ui/card";
@@ -288,7 +289,7 @@ export default function History() {
   const filterOptions: HistoryFilterOptions = useMemo(() => {
     const subjects = [...new Set(logs.map((l) => l.subject))].filter(Boolean).sort();
     const gradeLevels = [...new Set(logs.map((l) => l.grade_level))].filter(Boolean).sort();
-    const classrooms = [...new Set(logs.map((l) => String(l.classroom ?? "")))].filter(Boolean).sort();
+    const classrooms = sortClassrooms([...new Set(logs.map((l) => String(l.classroom ?? "")))].filter(Boolean));
     const teacherNames = [...new Set(logs.map((l) => l.teacher_name).filter(Boolean) as string[])].sort();
     return { subjects, gradeLevels, classrooms, teacherNames };
   }, [logs]);

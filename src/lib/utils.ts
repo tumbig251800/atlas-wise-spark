@@ -33,6 +33,23 @@ export function cleanClassroomData(value: string): string {
   const roomMatch = trimmed.match(/^ห้อง\s*(\d+)$/);
   if (roomMatch) return roomMatch[1];
 
-  // Already a pure number or valid format
+  // "ป.x/1" or "x/1" → "KBW" (legacy CSV: ห้อง 1 = KBW track)
+  const legacyKbw = trimmed.match(/^(?:ป\.\d+\/)?1$/);
+  if (legacyKbw) return "KBW";
+
+  // Already a valid format
   return trimmed;
+}
+
+/** Sort classrooms: KBW first, then numeric ascending */
+export function sortClassrooms(rooms: string[]): string[] {
+  const order = ["KBW", "2", "3", "4", "5", "6", "7", "8"];
+  return [...rooms].sort((a, b) => {
+    const ai = order.indexOf(a);
+    const bi = order.indexOf(b);
+    if (ai !== -1 && bi !== -1) return ai - bi;
+    if (ai !== -1) return -1;
+    if (bi !== -1) return 1;
+    return a.localeCompare(b);
+  });
 }
