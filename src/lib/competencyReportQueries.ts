@@ -4,6 +4,7 @@
  * Uses 8 capabilities (2026 Curriculum) with Latest Score aggregation
  */
 import { supabase } from "@/lib/atlasSupabase";
+import { sortClassrooms } from "@/lib/utils";
 import type { SmartReportFilter } from "@/types/smartReport";
 import type { SmartReportFilterOptions } from "@/lib/smartReportQueries";
 import type { UnitAssessmentRaw } from "@/types/smartReport";
@@ -85,7 +86,7 @@ export async function fetchCompetencyFilterOptions(
   return {
     subjects: [...s].sort(),
     gradeLevels: [...g].sort(),
-    classrooms: [...c].sort(),
+    classrooms: sortClassrooms([...c]),
     academicTerms: [...t].sort(),
   };
 }

@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { sortClassrooms } from "@/lib/utils";
 import { AppLayout } from "@/components/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -59,7 +60,7 @@ export default function LessonPlan() {
       const { data } = await supabase.from("teaching_logs").select("grade_level, classroom, subject");
       if (data) {
         setGradeLevels([...new Set(data.map((d) => d.grade_level))].sort());
-        setClassrooms([...new Set(data.map((d) => d.classroom))].sort());
+        setClassrooms(sortClassrooms([...new Set(data.map((d) => d.classroom))]));
         setSubjects([...new Set(data.map((d) => d.subject))].sort());
       }
       setOptionsLoading(false);

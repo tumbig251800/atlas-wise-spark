@@ -3,6 +3,7 @@
  * Fetches teaching_logs and unit_assessments with filter
  */
 import { supabase } from "@/lib/atlasSupabase";
+import { sortClassrooms } from "@/lib/utils";
 import type {
   SmartReportFilter,
   TeachingLogRaw,
@@ -106,7 +107,7 @@ export async function fetchFilterOptions(): Promise<SmartReportFilterOptions> {
   return {
     subjects: [...new Set([...fromLogs.s, ...fromAssess.s])].sort(),
     gradeLevels: [...new Set([...fromLogs.g, ...fromAssess.g])].sort(),
-    classrooms: [...new Set([...fromLogs.c, ...fromAssess.c])].sort(),
+    classrooms: sortClassrooms([...new Set([...fromLogs.c, ...fromAssess.c])]),
     academicTerms: [...new Set([...fromLogs.t, ...fromAssess.t])].sort(),
   };
 }
