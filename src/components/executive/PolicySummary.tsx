@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Loader2 } from "lucide-react";
 import { getAiSummaryUrl, invokeEdgeJson } from "@/lib/edgeFunctionFetch";
@@ -15,6 +15,11 @@ export function PolicySummary({ logs }: Props) {
   const [summary, setSummary] = useState("");
   const [loading, setLoading] = useState(false);
   const [validation, setValidation] = useState<SummaryValidation | null>(null);
+
+  useEffect(() => {
+    setSummary("");
+    setValidation(null);
+  }, [logs]);
 
   const generate = async () => {
     if (!logs.length) return;
@@ -73,7 +78,7 @@ Mastery ตามชั้น: ${Object.entries(gradeSummary).map(([g, v]) => `$
         </h3>
         <Button size="sm" onClick={generate} disabled={loading || !logs.length}>
           {loading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}
-          วิเคราะห์
+          วิเคราะห์ ({logs.length} log)
         </Button>
       </div>
       {summary ? (
