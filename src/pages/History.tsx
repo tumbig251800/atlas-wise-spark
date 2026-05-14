@@ -71,6 +71,7 @@ export default function History() {
     gradeLevel: "",
     classroom: "",
     teacherName: "",
+    academicTerm: "",
   });
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<TeachingLog | null>(null);
@@ -197,19 +198,25 @@ export default function History() {
   };
 
   const filterOptions: HistoryFilterOptions = useMemo(() => {
-    const subjects = [...new Set(logs.map((l) => l.subject))].filter(Boolean).sort();
+    const academicTerms = [...new Set(logs.map((l) => l.academic_term).filter(Boolean) as string[])].sort().reverse();
+    const teacherNames = [...new Set(logs.map((l) => l.teacher_name).filter(Boolean) as string[])].sort();
+    // subjects cascade by selected teacher
+    const subjectBase = filters.teacherName
+      ? logs.filter((l) => l.teacher_name === filters.teacherName)
+      : logs;
+    const subjects = [...new Set(subjectBase.map((l) => l.subject))].filter(Boolean).sort();
     const gradeLevels = [...new Set(logs.map((l) => l.grade_level))].filter(Boolean).sort();
     const classrooms = sortClassrooms([...new Set(logs.map((l) => String(l.classroom ?? "")))].filter(Boolean));
-    const teacherNames = [...new Set(logs.map((l) => l.teacher_name).filter(Boolean) as string[])].sort();
-    return { subjects, gradeLevels, classrooms, teacherNames };
-  }, [logs]);
+    return { subjects, gradeLevels, classrooms, teacherNames, academicTerms };
+  }, [logs, filters.teacherName]);
 
   const filteredLogs = useMemo(() => {
     return logs.filter((l) => {
+      if (filters.academicTerm && l.academic_term !== filters.academicTerm) return false;
+      if (filters.teacherName && l.teacher_name !== filters.teacherName) return false;
       if (filters.subject && l.subject !== filters.subject) return false;
       if (filters.gradeLevel && l.grade_level !== filters.gradeLevel) return false;
       if (filters.classroom && String(l.classroom ?? "") !== filters.classroom) return false;
-      if (filters.teacherName && l.teacher_name !== filters.teacherName) return false;
       return true;
     });
   }, [logs, filters]);
@@ -294,7 +301,7 @@ export default function History() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setFilters({ subject: "", gradeLevel: "", classroom: "", teacherName: "" })}
+                        onClick={() => setFilters({ subject: "", gradeLevel: "", classroom: "", teacherName: "", academicTerm: "" })}
                       >
                         รีเซ็ต filter
                       </Button>

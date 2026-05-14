@@ -13,6 +13,7 @@ export interface HistoryFiltersState {
   gradeLevel: string;
   classroom: string;
   teacherName: string;
+  academicTerm: string;
 }
 
 export interface HistoryFilterOptions {
@@ -20,6 +21,7 @@ export interface HistoryFilterOptions {
   gradeLevels: string[];
   classrooms: string[];
   teacherNames: string[];
+  academicTerms: string[];
 }
 
 interface Props {
@@ -65,7 +67,8 @@ export function HistoryFilters({ filters, setFilters, options, isDirector }: Pro
     filters.subject ||
     filters.gradeLevel ||
     filters.classroom ||
-    filters.teacherName;
+    filters.teacherName ||
+    filters.academicTerm;
 
   const resetFilters = () =>
     setFilters({
@@ -73,6 +76,7 @@ export function HistoryFilters({ filters, setFilters, options, isDirector }: Pro
       gradeLevel: "",
       classroom: "",
       teacherName: "",
+      academicTerm: "",
     });
 
   return (
@@ -82,6 +86,20 @@ export function HistoryFilters({ filters, setFilters, options, isDirector }: Pro
         <span>ตัวกรองประวัติการสอน</span>
       </div>
       <div className="flex flex-wrap gap-4 items-end">
+        <FilterSelect
+          label="เทอม"
+          value={filters.academicTerm}
+          options={options.academicTerms}
+          onChange={(v) => setFilters({ ...filters, academicTerm: v })}
+        />
+        {isDirector && (
+          <FilterSelect
+            label="ครู"
+            value={filters.teacherName}
+            options={options.teacherNames}
+            onChange={(v) => setFilters({ ...filters, teacherName: v, subject: "" })}
+          />
+        )}
         <FilterSelect
           label="วิชา"
           value={filters.subject}
@@ -100,14 +118,6 @@ export function HistoryFilters({ filters, setFilters, options, isDirector }: Pro
           options={options.classrooms}
           onChange={(v) => setFilters({ ...filters, classroom: v })}
         />
-        {isDirector && (
-          <FilterSelect
-            label="ครู"
-            value={filters.teacherName}
-            options={options.teacherNames}
-            onChange={(v) => setFilters({ ...filters, teacherName: v })}
-          />
-        )}
         {hasActive && (
           <Button
             variant="ghost"
