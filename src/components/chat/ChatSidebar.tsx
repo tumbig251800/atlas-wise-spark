@@ -197,7 +197,7 @@ export function ChatSidebar({ open, onOpenChange, context, audience = "teacher" 
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="flex w-full flex-col sm:max-w-md p-0">
+      <SheetContent side="right" className="flex w-full flex-col sm:max-w-md p-0" overlayClassName="hidden">
         <SheetHeader className="border-b border-border px-4 py-3">
           <SheetTitle className="flex items-center gap-2 text-base">
             🤖 พีท ร่างทอง — AI ที่ปรึกษา
