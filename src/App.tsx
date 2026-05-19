@@ -19,6 +19,7 @@ const UploadCSV = lazy(() => import("./pages/UploadCSV"));
 const AdminSettings = lazy(() => import("./pages/AdminSettings"));
 const History = lazy(() => import("./pages/History"));
 const LessonPlan = lazy(() => import("./pages/LessonPlan"));
+const LessonPlanHistory = lazy(() => import("./pages/LessonPlanHistory"));
 const SmartReportView = lazy(() => import("./pages/SmartReportView"));
 const CompetencyReport = lazy(() => import("./pages/CompetencyReport"));
 const Consultant = lazy(() => import("./pages/Consultant"));
@@ -92,6 +93,14 @@ const App = () => (
                 element={
                   <ProtectedRoute allowedRoles={["teacher", "director"]}>
                     <LessonPlan />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/lesson-plans"
+                element={
+                  <ProtectedRoute allowedRoles={["director"]}>
+                    <LessonPlanHistory />
                   </ProtectedRoute>
                 }
               />
