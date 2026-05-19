@@ -22,7 +22,7 @@ interface Step3Props {
 const GAPS = [
   { value: "k-gap" as const, label: "K-Gap", desc: "ความรู้: เนื้อหายากไป / พื้นฐานไม่แน่น / จำสูตรไม่ได้", icon: "📚", color: "border-destructive/50 bg-destructive/10" },
   { value: "p-gap" as const, label: "P-Gap", desc: "ทักษะ: ทำไม่เป็น / อ่านไม่คล่อง / คำนวณไม่คล่อง", icon: "🔧", color: "border-[hsl(var(--atlas-warning))]/50 bg-[hsl(var(--atlas-warning))]/10" },
-  { value: "a-gap" as const, label: "A1-Gap", desc: "Engagement: ขาดสมาธิ / เบื่อหน่าย / ไม่ส่งงาน", icon: "💔", color: "border-[hsl(var(--atlas-purple))]/50 bg-[hsl(var(--atlas-purple))]/10" },
+  { value: "a-gap" as const, label: "A1-Gap", desc: "A1: ขาดแรงจูงใจ/ทัศนคติ/ความพยายาม หรือ คิดวิเคราะห์ไม่ได้", icon: "💔", color: "border-[hsl(var(--atlas-purple))]/50 bg-[hsl(var(--atlas-purple))]/10" },
   { value: "a2-gap" as const, label: "A2-Gap", desc: "High Risk: พฤติกรรมก้าวร้าว / ทำร้ายตัวเอง-ผู้อื่น", icon: "🚨", color: "border-destructive bg-destructive/20" },
   { value: "system-gap" as const, label: "System-Gap", desc: "ระบบ: เวลาไม่พอ / สื่อไม่มี / เน็ตหลุด", icon: "⚙️", color: "border-[hsl(var(--atlas-info))]/50 bg-[hsl(var(--atlas-info))]/10" },
 ];
