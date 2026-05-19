@@ -10,25 +10,28 @@ export interface DashboardFilters {
   gradeLevel: string;
   classroom: string;
   subject: string;
+  academicTerm: string;
 }
 
 export interface FilterOptions {
   gradeLevels: string[];
   classrooms: string[];
   subjects: string[];
+  academicTerms: string[];
 }
 
 export interface ContextFilter {
   gradeLevel?: string;
   classroom?: string;
   subject?: string;
+  academicTerm?: string;
 }
 
 const STORAGE_KEY = "atlas_dashboard_filters";
 
 export function loadPersistedFilters(): DashboardFilters {
   // Always start with "all" to prevent stale filters hiding data
-  return { gradeLevel: "", classroom: "", subject: "" };
+  return { gradeLevel: "", classroom: "", subject: "", academicTerm: "" };
 }
 
 /** Load filters from localStorage (Dashboard persist). Use for Consultant sync. */
@@ -36,8 +39,15 @@ export function getPersistedFiltersFromStorage(): DashboardFilters | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as DashboardFilters;
-    if (parsed?.subject && parsed?.gradeLevel && parsed?.classroom) return parsed;
+    const parsed = JSON.parse(raw) as Partial<DashboardFilters>;
+    if (parsed?.subject && parsed?.gradeLevel && parsed?.classroom) {
+      return {
+        subject: parsed.subject,
+        gradeLevel: parsed.gradeLevel,
+        classroom: parsed.classroom,
+        academicTerm: parsed.academicTerm ?? "",
+      };
+    }
     return null;
   } catch {
     return null;
@@ -72,6 +82,8 @@ export function useDashboardData(filters: DashboardFilters) {
     gradeLevels: [...new Set(allLogs.map((l) => l.grade_level))].sort(),
     classrooms: sortClassrooms([...new Set(allLogs.map((l) => String(l.classroom ?? "")))].filter(Boolean)),
     subjects: [...new Set(allLogs.map((l) => l.subject))].sort(),
+    // Newest term first so default selection picks the latest
+    academicTerms: [...new Set(allLogs.map((l) => l.academic_term).filter(Boolean) as string[])].sort().reverse(),
   };
 
   // Apply filters (use .toString() for classroom to handle DB number vs Filter string mismatch)
@@ -79,6 +91,7 @@ export function useDashboardData(filters: DashboardFilters) {
     if (filters.gradeLevel && l.grade_level !== filters.gradeLevel) return false;
     if (filters.classroom && String(l.classroom ?? "") !== String(filters.classroom ?? "")) return false;
     if (filters.subject && l.subject !== filters.subject) return false;
+    if (filters.academicTerm && l.academic_term !== filters.academicTerm) return false;
     return true;
   });
 
@@ -99,7 +112,7 @@ export function useDashboardFilterOptions() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("teaching_logs")
-        .select("grade_level,classroom,subject")
+        .select("grade_level,classroom,subject,academic_term")
         .order("teaching_date", { ascending: false })
         .limit(2000);
       if (error) throw error;
@@ -108,13 +121,14 @@ export function useDashboardFilterOptions() {
         gradeLevels: [...new Set(rows.map((l) => l.grade_level))].filter(Boolean).sort(),
         classrooms: sortClassrooms([...new Set(rows.map((l) => String(l.classroom ?? "")))].filter(Boolean)),
         subjects: [...new Set(rows.map((l) => l.subject))].filter(Boolean).sort(),
+        academicTerms: [...new Set(rows.map((l) => l.academic_term).filter(Boolean) as string[])].sort().reverse(),
       } satisfies FilterOptions;
     },
     enabled: !!user,
   });
 
   return {
-    filterOptions: optionsQuery.data ?? { gradeLevels: [], classrooms: [], subjects: [] },
+    filterOptions: optionsQuery.data ?? { gradeLevels: [], classrooms: [], subjects: [], academicTerms: [] },
     isLoading: optionsQuery.isLoading,
     error: optionsQuery.error,
   };

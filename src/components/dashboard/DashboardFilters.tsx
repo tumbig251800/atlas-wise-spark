@@ -16,9 +16,15 @@ export function DashboardFilters({ filters, setFilters, options }: Props) {
     <div className="glass-card p-4 space-y-3">
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Filter className="h-4 w-4" />
-        <span>ตัวกรอง — ใช้กับเมตริก กราฟ และแท็บ Data Pack, QWR, Diagnostic, AI Advice</span>
+        <span>ตัวกรอง — Trend / Velocity เปรียบเทียบภายใน "ปีการศึกษา/เทอม" ที่เลือกเท่านั้น (ป้องกันเทียบข้าม cohort)</span>
       </div>
       <div className="flex flex-wrap gap-4 items-end">
+        <FilterSelect
+          label="ปีการศึกษา/เทอม"
+          value={filters.academicTerm}
+          options={options.academicTerms}
+          onChange={(v) => setFilters({ ...filters, academicTerm: v })}
+        />
         <FilterSelect
           label="ระดับชั้น"
           value={filters.gradeLevel}
@@ -41,7 +47,7 @@ export function DashboardFilters({ filters, setFilters, options }: Props) {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setFilters({ gradeLevel: "", classroom: "", subject: "" })}
+            onClick={() => setFilters({ ...filters, gradeLevel: "", classroom: "", subject: "" })}
             className="text-muted-foreground"
           >
             <RotateCcw className="h-4 w-4 mr-1" />

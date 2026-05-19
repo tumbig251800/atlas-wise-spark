@@ -30,6 +30,8 @@ export interface DiagnosticFilter {
   subject?: string;
   gradeLevel?: string;
   classroom?: string;
+  /** Restrict events to a specific set of teaching_log_ids (e.g., logs of one academic term). */
+  teachingLogIds?: string[];
 }
 
 interface DiagnosticQueryOptions {
@@ -41,8 +43,9 @@ export function useDiagnosticData(filter?: DiagnosticFilter, options?: Diagnosti
   const contextFirst = options?.contextFirst === true;
   const hasCompleteContext = Boolean(filter?.subject && filter?.gradeLevel && filter?.classroom);
 
+  const teachingLogIdsKey = filter?.teachingLogIds ? filter.teachingLogIds.slice().sort().join(",") : "";
   const filterKey = filter
-    ? `${filter.subject ?? ""}|${filter.gradeLevel ?? ""}|${filter.classroom ?? ""}`
+    ? `${filter.subject ?? ""}|${filter.gradeLevel ?? ""}|${filter.classroom ?? ""}|${teachingLogIdsKey}`
     : "all";
 
   const eventsQuery = useQuery({
@@ -97,12 +100,15 @@ export function useDiagnosticData(filter?: DiagnosticFilter, options?: Diagnosti
   const allPivotEvents = pivotEventsQuery.data ?? [];
 
   // Filter by subject/class if filter is provided (prevents Data Leakage)
+  // teachingLogIds: when set, scope events to a specific cohort of logs (e.g., one academic term)
+  const teachingLogIdSet = filter?.teachingLogIds ? new Set(filter.teachingLogIds) : null;
   const diagnosticEvents = filter
     ? allDiagnosticEvents.filter((e) => {
         const matchSubject = !filter.subject || e.subject === filter.subject;
         const matchGrade = !filter.gradeLevel || e.grade_level === filter.gradeLevel;
         const matchClass = !filter.classroom || e.classroom === filter.classroom;
-        return matchSubject && matchGrade && matchClass;
+        const matchLogId = !teachingLogIdSet || (e.teaching_log_id ? teachingLogIdSet.has(e.teaching_log_id) : false);
+        return matchSubject && matchGrade && matchClass && matchLogId;
       })
     : allDiagnosticEvents;
 
@@ -125,7 +131,11 @@ export function useDiagnosticData(filter?: DiagnosticFilter, options?: Diagnosti
         const classStr = p.class_id ?? "";
         const matchGrade = !filter.gradeLevel || classStr.includes(filter.gradeLevel);
         const matchClass = !filter.classroom || classStr.includes(`/${filter.classroom}`);
-        return matchSubject && matchGrade && matchClass;
+        // DB column is teaching_log_id (types.ts has stale trigger_session_id — not yet regenerated)
+        const logIdField = (p as unknown as { teaching_log_id?: string; trigger_session_id?: string });
+        const linkedLogId = logIdField.teaching_log_id ?? logIdField.trigger_session_id;
+        const matchLogId = !teachingLogIdSet || (linkedLogId ? teachingLogIdSet.has(linkedLogId) : false);
+        return matchSubject && matchGrade && matchClass && matchLogId;
       })
     : allPivotEvents;
 
