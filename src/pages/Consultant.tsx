@@ -85,16 +85,19 @@ export default function Consultant() {
     hasCompleteContext,
     isLoading: logsLoading,
   } = useContextFirstTeachingLogs(contextFilter);
-  const { diagnosticEvents, colorCounts, activeStrikes, isLoading: diagnosticLoading } = useDiagnosticData(
-    contextFilter,
-    { contextFirst: true }
-  );
-
-  const dataLoading = optionsLoading || (hasCompleteContext && (logsLoading || diagnosticLoading));
 
   // Derive available terms from loaded logs, auto-select latest when logs change
   const availableTerms = [...new Set(allLogs.map(l => l.academic_term).filter(Boolean) as string[])].sort().reverse();
   const filteredLogs = selectedTerm ? allLogs.filter(l => l.academic_term === selectedTerm) : allLogs;
+
+  // Scope diagnostic events to logs in the selected term so colorCounts/activeStrikes
+  // reflect the same cohort as filteredLogs.
+  const { diagnosticEvents, colorCounts, activeStrikes, isLoading: diagnosticLoading } = useDiagnosticData(
+    { ...contextFilter, teachingLogIds: filteredLogs.map(l => l.id) },
+    { contextFirst: true }
+  );
+
+  const dataLoading = optionsLoading || (hasCompleteContext && (logsLoading || diagnosticLoading));
 
   // Auto-initialize from persisted Dashboard filter only.
   useEffect(() => {

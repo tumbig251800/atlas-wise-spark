@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,7 +26,20 @@ export default function Dashboard() {
   }, []);
 
   const { filteredLogs, filterOptions, isLoading } = useDashboardData(filters);
-  const { diagnosticEvents, colorCounts, activeStrikes, isLoading: diagLoading } = useDiagnosticData();
+  // Scope diagnostic events to logs in the selected term so colorCounts/activeStrikes
+  // don't include events from past cohorts.
+  const filteredLogIds = filteredLogs.map((l) => l.id);
+  const { diagnosticEvents, colorCounts, activeStrikes, isLoading: diagLoading } = useDiagnosticData({
+    teachingLogIds: filteredLogIds,
+  });
+
+  // Auto-resolve empty academicTerm to latest available term so trend/velocity
+  // never mix cohorts across academic terms (e.g., ป.1 2/2568 vs ป.2 1/2569).
+  useEffect(() => {
+    if (!filters.academicTerm && filterOptions.academicTerms.length > 0) {
+      setFilters({ ...filters, academicTerm: filterOptions.academicTerms[0] });
+    }
+  }, [filterOptions.academicTerms.join(","), filters, setFilters]);
 
   return (
     <AppLayout>
