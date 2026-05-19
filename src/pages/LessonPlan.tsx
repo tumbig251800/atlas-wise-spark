@@ -100,6 +100,26 @@ export default function LessonPlan() {
         result += chunk;
         setContent(result);
       });
+
+      // Track successful lesson plan generation (who/what/when) for director visibility
+      try {
+        const { data: userData } = await supabase.auth.getUser();
+        if (userData?.user?.id) {
+          const label = config.topic || config.learningUnit || `แผนการสอน ${config.subject}`.trim();
+          await supabase.from("lesson_plan_snapshots").insert({
+            user_id: userData.user.id,
+            label,
+            grade_level: config.gradeLevel,
+            classroom: config.classroom,
+            subject: config.subject,
+            snapshot_class_profile: config.snapshotClassNotes || "",
+            snapshot_focus: config.snapshotFocusNotes || "",
+            snapshot_notes: `mode=${config.generationMode}; planType=${config.planType}; hours=${config.hours}; unit=${config.learningUnit || "-"}`,
+          });
+        }
+      } catch (logErr) {
+        console.warn("lesson_plan_snapshots insert failed (non-fatal)", logErr);
+      }
     } catch (e) {
       console.error(e);
       const msg = e instanceof Error ? e.message : "เกิดข้อผิดพลาดในการสร้างแผนการสอน";
