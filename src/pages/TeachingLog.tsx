@@ -32,6 +32,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/atlasSupabase";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, ArrowRight, Save, Loader2 } from "lucide-react";
+import { validateKeyIssue } from "@/lib/keyIssueValidation";
 
 export interface TeachingLogForm {
   teachingDate: string;
@@ -154,7 +155,10 @@ export default function TeachingLog() {
     } else if (step === 2) {
       if (!form.masteryScore) errs.masteryScore = "กรุณาเลือกคะแนน";
       if (!form.activityMode) errs.activityMode = "กรุณาเลือก Activity Mode";
-      if (!form.keyIssue.trim()) errs.keyIssue = "กรุณาระบุปัญหาหลัก";
+      const keyIssueResult = validateKeyIssue(form.keyIssue, form.masteryScore);
+      if (!keyIssueResult.isValid && keyIssueResult.error) {
+        errs.keyIssue = keyIssueResult.error;
+      }
     } else if (step === 3) {
       if (!form.majorGap) errs.majorGap = "กรุณาเลือก Major Gap";
       if (!form.classroomManagement) errs.classroomManagement = "กรุณาเลือกสถานะการจัดการชั้นเรียน";
@@ -309,7 +313,7 @@ export default function TeachingLog() {
 
         <div className="glass-card p-6">
           {currentStep === 1 && <Step1General data={form} onChange={handleChange} errors={errors} teacherName={teacherName} />}
-          {currentStep === 2 && <Step2Quality data={form} onChange={handleChange} errors={errors} />}
+          {currentStep === 2 && <Step2Quality data={form} majorGap={form.majorGap} onChange={handleChange} errors={errors} />}
           {currentStep === 3 && <Step3Gap data={form} onChange={handleChange} errors={errors} masteryScore={form.masteryScore} />}
           {currentStep === 4 && <Step4Action data={form} onChange={handleChange} errors={errors} masteryScore={form.masteryScore} totalStudents={form.totalStudents} />}
         </div>
