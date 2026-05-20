@@ -1,8 +1,20 @@
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Sparkles } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { ChevronDown } from "lucide-react";
+import {
+  getKeyIssueRules,
+  validateKeyIssue,
+} from "@/lib/keyIssueValidation";
+import { getExamplesForGap } from "@/lib/keyIssueExamples";
+import type { GapValue } from "@/lib/gapOptions";
 
 interface Step2Props {
   data: {
@@ -10,11 +22,12 @@ interface Step2Props {
     activityMode: "active" | "passive" | "constructive" | null;
     keyIssue: string;
   };
+  /** Selected gap from Step 3, used to tailor the example bucket. May be
+   *  null on first visit to Step 2 — fallback handled in getExamplesForGap. */
+  majorGap?: GapValue | null;
   onChange: (field: string, value: unknown) => void;
   errors: Record<string, string>;
 }
-
-const QUICK_FILL_TEXT = "นักเรียนทุกคนเข้าใจเนื้อหาทะลุปรุโปร่ง ไม่พบจุดเข้าใจผิดในคาบนี้";
 
 const MASTERY = [
   { score: 1, label: "วิกฤต", emoji: "🔴", bg: "bg-red-900/30 border-red-500/50" },
@@ -30,9 +43,23 @@ const ACTIVITY_MODES = [
   { value: "constructive" as const, label: "Level 3", desc: "เน้นคิดวิเคราะห์ (Constructive) — สร้างสรรค์ผลงาน", icon: "🧩" },
 ];
 
-export function Step2Quality({ data, onChange, errors }: Step2Props) {
+export function Step2Quality({ data, majorGap, onChange, errors }: Step2Props) {
   const activeMastery = MASTERY.find((m) => m.score === data.masteryScore);
   const cardBg = activeMastery?.bg ?? "";
+
+  const { minLength, helperText, placeholder } = getKeyIssueRules(data.masteryScore);
+  const examples = getExamplesForGap(majorGap);
+  const trimmedLen = data.keyIssue.trim().length;
+
+  // Validate on blur only (per spec) — don't fight the user on every keystroke.
+  // Parent errors object still wins (e.g. from validateAll on Next/Submit).
+  const [blurError, setBlurError] = useState<string | undefined>();
+  const displayError = errors.keyIssue || blurError;
+
+  const handleKeyIssueBlur = () => {
+    const result = validateKeyIssue(data.keyIssue, data.masteryScore);
+    setBlurError(result.isValid ? undefined : result.error);
+  };
 
   return (
     <div className={cn("glass-card p-5 transition-all duration-500", cardBg)}>
@@ -88,28 +115,70 @@ export function Step2Quality({ data, onChange, errors }: Step2Props) {
         </div>
 
         {/* Key Issue */}
-        <div className="space-y-2" data-error={errors.keyIssue ? true : undefined}>
+        <div className="space-y-2" data-error={displayError ? true : undefined}>
           <Label>ปัญหาหลักที่พบ <span className="text-destructive">*</span></Label>
           <Textarea
-            placeholder="ระบุปัญหาหลักในการเรียนรู้ของนักเรียน"
+            placeholder={placeholder}
             value={data.keyIssue}
-            onChange={(e) => onChange("keyIssue", e.target.value)}
-            className={cn(errors.keyIssue && "border-destructive")}
+            onChange={(e) => {
+              onChange("keyIssue", e.target.value);
+              if (blurError) setBlurError(undefined);
+            }}
+            onBlur={handleKeyIssueBlur}
+            className={cn(displayError && "border-destructive")}
             maxLength={500}
           />
-          {data.masteryScore === 5 && !data.keyIssue.trim() && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="gap-2 border-amber-500/50 text-amber-400 hover:bg-amber-500/10"
-              onClick={() => onChange("keyIssue", QUICK_FILL_TEXT)}
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-              Quick Fill: สอนได้ตามเป้าหมาย
-            </Button>
+
+          {/* Helper text — switches narrative depending on mastery */}
+          <p className="text-xs text-muted-foreground">{helperText}</p>
+
+          {/* Character counter — only show while below minimum */}
+          {trimmedLen > 0 && trimmedLen < minLength && (
+            <p className="text-xs text-muted-foreground">
+              {trimmedLen}/{minLength} ตัวอักษร
+            </p>
           )}
-          {errors.keyIssue && <p className="text-xs text-destructive">{errors.keyIssue}</p>}
+
+          {displayError && <p className="text-xs text-destructive">{displayError}</p>}
+
+          {/* Examples — Collapsible, default closed, content tailored to chosen gap */}
+          <Collapsible className="border rounded-lg">
+            <CollapsibleTrigger asChild>
+              <button
+                type="button"
+                className="w-full flex items-center justify-between gap-2 px-3 py-2 text-sm font-medium hover:bg-secondary/50 transition-colors [&[data-state=open]>svg]:rotate-180"
+              >
+                <span>📋 ดูตัวอย่างการกรอก</span>
+                <ChevronDown className="h-4 w-4 transition-transform" />
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="px-3 pb-3 space-y-2 border-t pt-3">
+              {examples.map((ex, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-start gap-2 p-2 rounded border bg-secondary/30"
+                >
+                  <p className="text-xs flex-1 whitespace-pre-wrap leading-relaxed">{ex.text}</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 text-xs h-7"
+                    onClick={() => {
+                      onChange("keyIssue", ex.text);
+                      setBlurError(undefined);
+                    }}
+                  >
+                    📋 ใช้เป็นแบบ
+                  </Button>
+                </div>
+              ))}
+              <p className="text-[11px] text-muted-foreground italic pt-1">
+                💡 ตัวอย่างเป็นเพียงแนวทาง — กรุณาปรับให้ตรงกับสถานการณ์ในห้องเรียนของท่าน
+                ไม่ควรกรอกตามตัวอย่างทุกตัวอักษร
+              </p>
+            </CollapsibleContent>
+          </Collapsible>
         </div>
       </div>
     </div>

@@ -86,6 +86,10 @@ export function EditGapDialog({ log, open, onOpenChange, onSuccess }: EditGapDia
           <DialogTitle>แก้ไข Gap</DialogTitle>
           <DialogDescription>
             เปลี่ยนได้เฉพาะ Major Gap — ข้อมูลอื่นถูกล็อกไว้
+            <br />
+            <span className="text-xs">
+              หากต้องการแก้ key_issue หรือข้อมูลอื่น กรุณาลบบันทึกแล้วกรอกใหม่
+            </span>
           </DialogDescription>
         </DialogHeader>
 
