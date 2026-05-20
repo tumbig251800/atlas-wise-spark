@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -5,10 +6,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
+import { GAPS, SUCCESS_OPTION, getAllowedGaps, getDefaultGap, type GapValue } from "@/lib/gapOptions";
 
 interface Step3Props {
   data: {
-    majorGap: "k-gap" | "p-gap" | "a-gap" | "a2-gap" | "system-gap" | "success" | null;
+    majorGap: GapValue | null;
     classroomManagement: string;
     classroomManagementOther: string;
     healthCareStatus: "" | "none" | "has";
@@ -18,16 +20,6 @@ interface Step3Props {
   errors: Record<string, string>;
   masteryScore: number | null;
 }
-
-const GAPS = [
-  { value: "k-gap" as const, label: "K-Gap", desc: "ความรู้: เนื้อหายากไป / พื้นฐานไม่แน่น / จำสูตรไม่ได้", icon: "📚", color: "border-destructive/50 bg-destructive/10" },
-  { value: "p-gap" as const, label: "P-Gap", desc: "ทักษะ: ทำไม่เป็น / อ่านไม่คล่อง / คำนวณไม่คล่อง", icon: "🔧", color: "border-[hsl(var(--atlas-warning))]/50 bg-[hsl(var(--atlas-warning))]/10" },
-  { value: "a-gap" as const, label: "A1-Gap", desc: "A1: ขาดแรงจูงใจ/ทัศนคติ/ความพยายาม หรือ คิดวิเคราะห์ไม่ได้", icon: "💔", color: "border-[hsl(var(--atlas-purple))]/50 bg-[hsl(var(--atlas-purple))]/10" },
-  { value: "a2-gap" as const, label: "A2-Gap", desc: "High Risk: พฤติกรรมก้าวร้าว / ทำร้ายตัวเอง-ผู้อื่น", icon: "🚨", color: "border-destructive bg-destructive/20" },
-  { value: "system-gap" as const, label: "System-Gap", desc: "ระบบ: เวลาไม่พอ / สื่อไม่มี / เน็ตหลุด", icon: "⚙️", color: "border-[hsl(var(--atlas-info))]/50 bg-[hsl(var(--atlas-info))]/10" },
-];
-
-const SUCCESS_OPTION = { value: "success" as const, label: "Success", desc: "สอนได้ตามเป้าหมาย (คะแนน 4-5)", icon: "✅", color: "border-[hsl(var(--atlas-success))]/50 bg-[hsl(var(--atlas-success))]/10" };
 
 const MANAGEMENT_OPTIONS = [
   "ลืมเตรียมอุปกรณ์การเรียน/หนังสือ",
@@ -39,60 +31,122 @@ const MANAGEMENT_OPTIONS = [
 ];
 
 export function Step3Gap({ data, onChange, errors, masteryScore }: Step3Props) {
-  const showSmartWarning = masteryScore != null && masteryScore <= 2 && data.majorGap === "success";
+  const allowed = getAllowedGaps(masteryScore);
+  const isHighMastery = masteryScore != null && masteryScore >= 4;
+  const isLowMastery = masteryScore != null && masteryScore <= 3;
+  // For low mastery: show all problem gaps in grid (incl. a2). For high mastery:
+  // grid is empty — Success is the auto-default and A2 surfaces as an override below.
+  const gridGaps = isHighMastery ? [] : GAPS.filter((g) => allowed.includes(g.value));
   const showA2Alert = data.majorGap === "a2-gap";
+
+  // Normalize selection whenever mastery changes:
+  //   1. Clear stale selection no longer allowed (e.g. mastery 5→2 leaves "success" invalid).
+  //   2. Auto-select default for high mastery (success).
+  useEffect(() => {
+    if (data.majorGap && !allowed.includes(data.majorGap)) {
+      onChange("majorGap", null);
+      return;
+    }
+    const def = getDefaultGap(masteryScore);
+    if (def && !data.majorGap) {
+      onChange("majorGap", def);
+    }
+  }, [masteryScore, allowed, data.majorGap, onChange]);
 
   return (
     <div className="space-y-5">
       {/* Major Gap */}
       <div className="space-y-2" data-error={errors.majorGap ? true : undefined}>
         <Label>Major Learning Gap <span className="text-destructive">*</span></Label>
-        <div className="grid grid-cols-2 gap-3">
-          {GAPS.map((gap) => (
+
+        {/* Placeholder when low mastery and no selection yet */}
+        {isLowMastery && !data.majorGap && (
+          <p className="text-sm text-muted-foreground italic">กรุณาเลือกประเภท Gap</p>
+        )}
+
+        {/* High mastery layout: Success big + A2 safety override */}
+        {isHighMastery ? (
+          <>
             <button
-              key={gap.value}
               type="button"
-              onClick={() => onChange("majorGap", gap.value)}
+              onClick={() => onChange("majorGap", SUCCESS_OPTION.value)}
               className={cn(
-                "flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all",
-                data.majorGap === gap.value
-                  ? cn(gap.color, "ring-2 ring-primary/30 scale-[1.02]")
+                "w-full flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all",
+                data.majorGap === SUCCESS_OPTION.value
+                  ? cn(SUCCESS_OPTION.color, "ring-2 ring-primary/30 scale-[1.02]")
                   : "border-transparent bg-secondary/50 hover:bg-secondary"
               )}
             >
-              <span className="text-2xl">{gap.icon}</span>
-              <span className="font-semibold">{gap.label}</span>
-              <span className="text-xs text-muted-foreground text-center">{gap.desc}</span>
+              <span className="text-2xl">{SUCCESS_OPTION.icon}</span>
+              <span className="font-semibold">{SUCCESS_OPTION.label}</span>
+              <span className="text-xs text-muted-foreground">{SUCCESS_OPTION.desc}</span>
             </button>
-          ))}
-        </div>
-        {/* Success card - full width */}
-        <button
-          type="button"
-          onClick={() => onChange("majorGap", SUCCESS_OPTION.value)}
-          className={cn(
-            "w-full flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all",
-            data.majorGap === SUCCESS_OPTION.value
-              ? cn(SUCCESS_OPTION.color, "ring-2 ring-primary/30 scale-[1.02]")
-              : "border-transparent bg-secondary/50 hover:bg-secondary"
-          )}
-        >
-          <span className="text-2xl">{SUCCESS_OPTION.icon}</span>
-          <span className="font-semibold">{SUCCESS_OPTION.label}</span>
-          <span className="text-xs text-muted-foreground">{SUCCESS_OPTION.desc}</span>
-        </button>
+
+            {/* A2 safety override */}
+            <button
+              type="button"
+              onClick={() => onChange("majorGap", "a2-gap")}
+              className={cn(
+                "w-full flex items-center justify-center gap-2 p-2 rounded-lg border text-sm transition-all",
+                data.majorGap === "a2-gap"
+                  ? "border-destructive bg-destructive/15 text-destructive font-semibold"
+                  : "border-dashed border-muted-foreground/30 text-muted-foreground hover:border-destructive/50 hover:text-destructive"
+              )}
+            >
+              <span>🚨</span>
+              <span>หากมีเหตุการณ์ safety ให้เลือก A2-Gap แทน</span>
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              {gridGaps.map((gap) => (
+                <button
+                  key={gap.value}
+                  type="button"
+                  onClick={() => onChange("majorGap", gap.value)}
+                  className={cn(
+                    "flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all",
+                    data.majorGap === gap.value
+                      ? cn(gap.color, "ring-2 ring-primary/30 scale-[1.02]")
+                      : "border-transparent bg-secondary/50 hover:bg-secondary"
+                  )}
+                >
+                  <span className="text-2xl">{gap.icon}</span>
+                  <span className="font-semibold">{gap.label}</span>
+                  <span className="text-xs text-muted-foreground text-center">{gap.desc}</span>
+                </button>
+              ))}
+            </div>
+            {/* Success card for mastery=null (initial state only) */}
+            {allowed.includes("success") && (
+              <button
+                type="button"
+                onClick={() => onChange("majorGap", SUCCESS_OPTION.value)}
+                className={cn(
+                  "w-full flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all",
+                  data.majorGap === SUCCESS_OPTION.value
+                    ? cn(SUCCESS_OPTION.color, "ring-2 ring-primary/30 scale-[1.02]")
+                    : "border-transparent bg-secondary/50 hover:bg-secondary"
+                )}
+              >
+                <span className="text-2xl">{SUCCESS_OPTION.icon}</span>
+                <span className="font-semibold">{SUCCESS_OPTION.label}</span>
+                <span className="text-xs text-muted-foreground">{SUCCESS_OPTION.desc}</span>
+              </button>
+            )}
+          </>
+        )}
+
         {errors.majorGap && <p className="text-xs text-destructive">{errors.majorGap}</p>}
+        {isHighMastery && (
+          <p className="text-xs text-muted-foreground">Mastery 4–5 = Success อัตโนมัติ</p>
+        )}
+        {isLowMastery && (
+          <p className="text-xs text-muted-foreground">Mastery 1–3 ต้องระบุประเภท Gap เสมอ</p>
+        )}
       </div>
 
-      {/* Smart Warning */}
-      {showSmartWarning && (
-        <Alert className="border-[hsl(var(--atlas-warning))]/50 bg-[hsl(var(--atlas-warning))]/10">
-          <AlertTriangle className="h-4 w-4 text-[hsl(var(--atlas-warning))]" />
-          <AlertDescription className="text-muted-foreground">
-            คะแนนค่อนข้างต่ำ ({masteryScore}/5) แต่เลือกว่าไม่มีปัญหา — ข้อมูลสอดคล้องกันหรือไม่?
-          </AlertDescription>
-        </Alert>
-      )}
 
       {/* A2-Gap Red Alert Banner */}
       {showA2Alert && (

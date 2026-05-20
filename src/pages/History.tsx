@@ -26,10 +26,11 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
-import { History as HistoryIcon, Eye, BookOpen, Trash2, Loader2, UserCog, Download } from "lucide-react";
+import { History as HistoryIcon, Eye, BookOpen, Trash2, Loader2, UserCog, Download, Pencil } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { ReassignTeacherDialog } from "@/components/history/ReassignTeacherDialog";
+import { EditGapDialog } from "@/components/history/EditGapDialog";
 import {
   HistoryFilters,
   type HistoryFiltersState,
@@ -77,6 +78,7 @@ export default function History() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [clearingAll, setClearingAll] = useState(false);
   const [reassignLog, setReassignLog] = useState<TeachingLog | null>(null);
+  const [editLog, setEditLog] = useState<TeachingLog | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [exportFromDate, setExportFromDate] = useState("");
   const [exportToDate, setExportToDate] = useState("");
@@ -454,6 +456,14 @@ export default function History() {
                             <Eye className="h-4 w-4 mr-1" />
                             ดูรายละเอียด
                           </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setEditLog(log)}
+                            title="แก้ไข Gap"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button
@@ -557,6 +567,18 @@ export default function History() {
                     ? { ...l, teacher_id: newTeacherId, teacher_name: newTeacherName }
                     : l
                 )
+              );
+            }}
+          />
+
+          {/* Edit Gap Dialog */}
+          <EditGapDialog
+            log={editLog}
+            open={!!editLog}
+            onOpenChange={(open) => { if (!open) setEditLog(null); }}
+            onSuccess={(logId, newGap) => {
+              setLogs((prev) =>
+                prev.map((l) => (l.id === logId ? { ...l, major_gap: newGap } : l))
               );
             }}
           />
