@@ -22,15 +22,18 @@ interface RawLog {
   mastery_score: number;
   teaching_date: string;
   teacher_name: string | null;
+  teacher_id: string;
+  academic_term: string | null;
 }
 
 const RED_ZONE_THRESHOLD = 2.5; // ≤ 2.5 / 5 = 50%
 
 function computeAlerts(logs: RawLog[]): TrendAlert[] {
-  // Group by (grade_level, classroom, subject)
+  // Group by (grade_level, classroom, subject, teacher_id, academic_term)
+  // Must include teacher_id and academic_term to avoid mixing cross-term or cross-teacher data
   const groups = new Map<string, RawLog[]>();
   for (const log of logs) {
-    const key = `${log.grade_level}||${log.classroom}||${log.subject}`;
+    const key = `${log.grade_level}||${log.classroom}||${log.subject}||${log.teacher_id}||${log.academic_term ?? ""}`;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(log);
   }
@@ -76,7 +79,7 @@ export function useTrendAlerts() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("teaching_logs")
-        .select("grade_level, classroom, subject, mastery_score, teaching_date, teacher_name")
+        .select("grade_level, classroom, subject, mastery_score, teaching_date, teacher_name, teacher_id, academic_term")
         .order("teaching_date", { ascending: true });
       if (error) throw error;
       return data as RawLog[];
