@@ -18,11 +18,13 @@ import type { Tables } from "@/integrations/supabase/types";
 
 type TeachingLog = Tables<"teaching_logs">;
 
+type ProblemGapValue = Exclude<GapValue, "success">;
+
 interface EditGapDialogProps {
   log: TeachingLog | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess: (logId: string, newGap: GapValue) => void;
+  onSuccess: (logId: string, newGap: GapValue, newMinorGaps: ProblemGapValue[]) => void;
 }
 
 function formatDate(s: string) {
@@ -35,6 +37,7 @@ function formatDate(s: string) {
 
 export function EditGapDialog({ log, open, onOpenChange, onSuccess }: EditGapDialogProps) {
   const [selected, setSelected] = useState<GapValue | null>(null);
+  const [minorGaps, setMinorGaps] = useState<ProblemGapValue[]>([]);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
@@ -42,11 +45,16 @@ export function EditGapDialog({ log, open, onOpenChange, onSuccess }: EditGapDia
     if (log && open) {
       const current = log.major_gap as GapValue;
       const allowedNow = getAllowedGaps(log.mastery_score);
-      // If the saved gap is no longer allowed under the new mastery rule (legacy data),
-      // fall back to the default for that mastery (e.g. success for mastery>=4).
       setSelected(allowedNow.includes(current) ? current : getDefaultGap(log.mastery_score));
+      setMinorGaps((log.minor_gaps ?? []) as ProblemGapValue[]);
     }
   }, [log?.id, open]);
+
+  const toggleMinorGap = (value: ProblemGapValue) => {
+    setMinorGaps((prev) =>
+      prev.includes(value) ? prev.filter((g) => g !== value) : [...prev, value]
+    );
+  };
 
   if (!log) return null;
 
@@ -57,7 +65,13 @@ export function EditGapDialog({ log, open, onOpenChange, onSuccess }: EditGapDia
 
   const handleSave = async () => {
     if (!selected) return;
-    if (selected === log.major_gap) {
+    // Remove majorGap from minorGaps if teacher accidentally had it there
+    const cleanedMinorGaps = minorGaps.filter((g) => g !== selected);
+    const unchanged =
+      selected === log.major_gap &&
+      JSON.stringify(cleanedMinorGaps.slice().sort()) ===
+        JSON.stringify(((log.minor_gaps ?? []) as ProblemGapValue[]).slice().sort());
+    if (unchanged) {
       onOpenChange(false);
       return;
     }
@@ -65,11 +79,11 @@ export function EditGapDialog({ log, open, onOpenChange, onSuccess }: EditGapDia
     try {
       const { error } = await supabase
         .from("teaching_logs")
-        .update({ major_gap: selected })
+        .update({ major_gap: selected, minor_gaps: cleanedMinorGaps })
         .eq("id", log.id);
       if (error) throw error;
-      onSuccess(log.id, selected);
-      toast({ title: "บันทึกแล้ว", description: `อัพเดต Gap เป็น ${selected}` });
+      onSuccess(log.id, selected, cleanedMinorGaps);
+      toast({ title: "บันทึกแล้ว", description: `อัพเดต Gap เรียบร้อย` });
       onOpenChange(false);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "ไม่สามารถบันทึกได้";
@@ -170,6 +184,44 @@ export function EditGapDialog({ log, open, onOpenChange, onSuccess }: EditGapDia
             <p className="text-xs text-muted-foreground">Mastery 1–3 ต้องระบุประเภท Gap เสมอ</p>
           )}
         </div>
+
+        {/* Minor Gaps section (low mastery, after primary is selected) */}
+        {isLowMastery && selected && selected !== "success" && (
+          <>
+            <Separator />
+            <div className="space-y-2">
+              <div className="text-sm font-medium">
+                Gap รอง <span className="font-normal text-muted-foreground">(ถ้ามีปัญหาเพิ่มเติม — ไม่บังคับ)</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {GAPS.filter((g) => g.value !== selected).map((gap) => {
+                  const checked = minorGaps.includes(gap.value as ProblemGapValue);
+                  return (
+                    <button
+                      key={gap.value}
+                      type="button"
+                      onClick={() => toggleMinorGap(gap.value as ProblemGapValue)}
+                      className={cn(
+                        "flex items-center gap-2 p-2 rounded-lg border text-left text-sm transition-all",
+                        checked
+                          ? cn(gap.color, "ring-1 ring-primary/30")
+                          : "border-dashed border-muted-foreground/30 bg-secondary/30 hover:bg-secondary"
+                      )}
+                    >
+                      <span className="text-base shrink-0">{gap.icon}</span>
+                      <span className="font-medium">{gap.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {minorGaps.includes("a2-gap") && (
+                <p className="text-xs text-amber-600 font-medium">
+                  ⚠️ พบเหตุการณ์ safety เพิ่มเติม — ระบบจะบันทึกไว้ในรายงาน
+                </p>
+              )}
+            </div>
+          </>
+        )}
 
         <DialogFooter className="gap-2 sm:gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>

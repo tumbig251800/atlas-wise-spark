@@ -308,6 +308,7 @@ export type Database = {
           learning_unit: string | null
           major_gap: Database["public"]["Enums"]["major_gap"]
           mastery_score: number
+          minor_gaps: Database["public"]["Enums"]["major_gap"][]
           next_strategy: string | null
           reflection: string | null
           remedial_ids: string | null
@@ -333,6 +334,7 @@ export type Database = {
           learning_unit?: string | null
           major_gap?: Database["public"]["Enums"]["major_gap"]
           mastery_score: number
+          minor_gaps?: Database["public"]["Enums"]["major_gap"][]
           next_strategy?: string | null
           reflection?: string | null
           remedial_ids?: string | null
@@ -358,6 +360,7 @@ export type Database = {
           learning_unit?: string | null
           major_gap?: Database["public"]["Enums"]["major_gap"]
           mastery_score?: number
+          minor_gaps?: Database["public"]["Enums"]["major_gap"][]
           next_strategy?: string | null
           reflection?: string | null
           remedial_ids?: string | null
