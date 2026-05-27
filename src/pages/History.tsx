@@ -430,6 +430,14 @@ export default function History() {
                               Mastery: <strong className="text-foreground">{log.mastery_score}</strong>
                             </span>
                             <Badge className={gap.className}>{gap.label}</Badge>
+                            {(log.minor_gaps ?? []).map((mg) => {
+                              const mgConf = gapConfig[mg];
+                              return mgConf ? (
+                                <Badge key={mg} variant="outline" className={`text-xs ${mgConf.className} opacity-75`}>
+                                  {mgConf.label}
+                                </Badge>
+                              ) : null;
+                            })}
                           </div>
                           {log.topic && (
                             <p className="text-sm text-muted-foreground truncate">
@@ -529,11 +537,19 @@ export default function History() {
                     <Row label="หัวข้อ" value={selected.topic} />
                     <Separator />
                     <Row label="Mastery Score" value={String(selected.mastery_score)} />
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-muted-foreground w-36 shrink-0">Gap</span>
                       <Badge className={gapConfig[selected.major_gap]?.className}>
                         {gapConfig[selected.major_gap]?.label}
                       </Badge>
+                      {(selected.minor_gaps ?? []).map((mg) => {
+                        const mgConf = gapConfig[mg];
+                        return mgConf ? (
+                          <Badge key={mg} variant="outline" className={`text-xs ${mgConf.className} opacity-75`}>
+                            {mgConf.label}
+                          </Badge>
+                        ) : null;
+                      })}
                     </div>
                     <Row label="รูปแบบกิจกรรม" value={activityModeLabel[selected.activity_mode]} />
                     <Separator />
@@ -576,9 +592,11 @@ export default function History() {
             log={editLog}
             open={!!editLog}
             onOpenChange={(open) => { if (!open) setEditLog(null); }}
-            onSuccess={(logId, newGap) => {
+            onSuccess={(logId, newGap, newMinorGaps) => {
               setLogs((prev) =>
-                prev.map((l) => (l.id === logId ? { ...l, major_gap: newGap } : l))
+                prev.map((l) =>
+                  l.id === logId ? { ...l, major_gap: newGap, minor_gaps: newMinorGaps } : l
+                )
               );
             }}
           />

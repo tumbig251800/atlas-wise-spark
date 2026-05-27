@@ -46,6 +46,7 @@ export interface TeachingLogForm {
   activityMode: "active" | "passive" | "constructive" | null;
   keyIssue: string;
   majorGap: "k-gap" | "p-gap" | "a-gap" | "a2-gap" | "system-gap" | "success" | null;
+  minorGaps: ("k-gap" | "p-gap" | "a-gap" | "a2-gap" | "system-gap")[];
   classroomManagement: string;
   classroomManagementOther: string;
   healthCareStatus: "" | "none" | "has";
@@ -68,6 +69,7 @@ const INITIAL_FORM: TeachingLogForm = {
   activityMode: null,
   keyIssue: "",
   majorGap: null,
+  minorGaps: [],
   classroomManagement: "",
   classroomManagementOther: "",
   healthCareStatus: "",
@@ -252,6 +254,7 @@ export default function TeachingLog() {
         activity_mode: form.activityMode!,
         key_issue: form.keyIssue.trim() || null,
         major_gap: form.majorGap!,
+        minor_gaps: form.minorGaps,
         classroom_management: form.classroomManagement === "อื่นๆ (โปรดระบุ)"
           ? `อื่นๆ: ${form.classroomManagementOther.trim()}`
           : form.classroomManagement || null,

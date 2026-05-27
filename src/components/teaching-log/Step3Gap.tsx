@@ -8,9 +8,12 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
 import { GAPS, SUCCESS_OPTION, getAllowedGaps, getDefaultGap, type GapValue } from "@/lib/gapOptions";
 
+type ProblemGapValue = Exclude<GapValue, "success">;
+
 interface Step3Props {
   data: {
     majorGap: GapValue | null;
+    minorGaps: ProblemGapValue[];
     classroomManagement: string;
     classroomManagementOther: string;
     healthCareStatus: "" | "none" | "has";
@@ -34,22 +37,39 @@ export function Step3Gap({ data, onChange, errors, masteryScore }: Step3Props) {
   const allowed = getAllowedGaps(masteryScore);
   const isHighMastery = masteryScore != null && masteryScore >= 4;
   const isLowMastery = masteryScore != null && masteryScore <= 3;
-  // For low mastery: show all problem gaps in grid (incl. a2). For high mastery:
-  // grid is empty — Success is the auto-default and A2 surfaces as an override below.
   const gridGaps = isHighMastery ? [] : GAPS.filter((g) => allowed.includes(g.value));
   const showA2Alert = data.majorGap === "a2-gap";
 
+  // Minor gaps: problem gaps available as secondary selections (mastery ≤ 3 only)
+  // Excludes whatever is currently selected as majorGap to prevent duplication
+  const minorGapOptions = isLowMastery
+    ? GAPS.filter((g) => g.value !== data.majorGap)
+    : [];
+
+  const toggleMinorGap = (value: ProblemGapValue) => {
+    const current = data.minorGaps ?? [];
+    const next = current.includes(value)
+      ? current.filter((g) => g !== value)
+      : [...current, value];
+    onChange("minorGaps", next);
+  };
+
   // Normalize selection whenever mastery changes:
-  //   1. Clear stale selection no longer allowed (e.g. mastery 5→2 leaves "success" invalid).
+  //   1. Clear stale major gap no longer allowed (e.g. mastery 5→2 leaves "success" invalid).
   //   2. Auto-select default for high mastery (success).
+  //   3. Clear all minor gaps when switching to high mastery zone.
   useEffect(() => {
     if (data.majorGap && !allowed.includes(data.majorGap)) {
       onChange("majorGap", null);
+      onChange("minorGaps", []);
       return;
     }
     const def = getDefaultGap(masteryScore);
     if (def && !data.majorGap) {
       onChange("majorGap", def);
+    }
+    if (isHighMastery && data.minorGaps && data.minorGaps.length > 0) {
+      onChange("minorGaps", []);
     }
   }, [masteryScore, allowed, data.majorGap, onChange]);
 
@@ -157,6 +177,44 @@ export function Step3Gap({ data, onChange, errors, masteryScore }: Step3Props) {
             นี่ไม่ใช่ปัญหาการเรียนปกติ — ต้องดำเนินการทันที
           </AlertDescription>
         </Alert>
+      )}
+
+      {/* Minor Gaps (problem gaps only, mastery ≤ 3) */}
+      {isLowMastery && data.majorGap && data.majorGap !== "success" && minorGapOptions.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-muted-foreground">
+            Gap รอง <span className="font-normal">(ถ้ามีปัญหาเพิ่มเติม — ไม่บังคับ)</span>
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {minorGapOptions.map((gap) => {
+              const checked = (data.minorGaps ?? []).includes(gap.value as ProblemGapValue);
+              const isA2 = gap.value === "a2-gap";
+              return (
+                <button
+                  key={gap.value}
+                  type="button"
+                  onClick={() => toggleMinorGap(gap.value as ProblemGapValue)}
+                  className={cn(
+                    "flex items-center gap-2 p-2 rounded-lg border text-left text-sm transition-all",
+                    checked
+                      ? cn(gap.color, "ring-1 ring-primary/30")
+                      : "border-dashed border-muted-foreground/30 bg-secondary/30 hover:bg-secondary"
+                  )}
+                >
+                  <span className="text-base shrink-0">{gap.icon}</span>
+                  <span className={cn("font-medium", isA2 && checked && "text-destructive")}>
+                    {gap.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {(data.minorGaps ?? []).includes("a2-gap") && (
+            <p className="text-xs text-amber-600 font-medium">
+              ⚠️ พบเหตุการณ์ safety เพิ่มเติม — ระบบจะบันทึกไว้ในรายงาน
+            </p>
+          )}
+        </div>
       )}
 
       {/* Classroom Management */}
