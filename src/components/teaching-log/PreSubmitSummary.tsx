@@ -55,7 +55,6 @@ export function PreSubmitSummary({ open, onClose, onConfirm, form, submitting }:
     { label: "Activity Mode", value: form.activityMode ? MODE_LABELS[form.activityMode] : "" },
     { label: "ปัญหาหลัก", value: form.keyIssue },
     { label: "Major Gap", value: form.majorGap ? GAP_LABELS[form.majorGap] || form.majorGap : "" },
-    { label: "การจัดการชั้นเรียน", value: form.classroomManagement === "อื่นๆ (โปรดระบุ)" ? `อื่นๆ: ${form.classroomManagementOther}` : form.classroomManagement },
     { label: "นักเรียนไม่สบาย", value: form.healthCareStatus === "none" ? "ไม่มี" : form.healthCareStatus === "has" ? "มี" : "" },
     { label: "Health Care IDs", value: form.healthCareStatus === "none" ? "[None]" : form.healthCareIds },
     { label: "รหัสนักเรียนซ่อมเสริม", value: form.remedialIds },

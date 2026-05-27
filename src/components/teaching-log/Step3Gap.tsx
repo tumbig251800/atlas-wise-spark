@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
@@ -14,8 +13,6 @@ interface Step3Props {
   data: {
     majorGap: GapValue | null;
     minorGaps: ProblemGapValue[];
-    classroomManagement: string;
-    classroomManagementOther: string;
     healthCareStatus: "" | "none" | "has";
     healthCareIds: string;
   };
@@ -23,15 +20,6 @@ interface Step3Props {
   errors: Record<string, string>;
   masteryScore: number | null;
 }
-
-const MANAGEMENT_OPTIONS = [
-  "ลืมเตรียมอุปกรณ์การเรียน/หนังสือ",
-  "คุยกันเสียงดัง/เล่นกันในเวลาเรียน",
-  "งานกลุ่มล่ม/เกี่ยงกันทำงาน",
-  "มาสาย/เข้าห้องเรียนช้า",
-  "เรียบร้อยดี (No Issues)",
-  "อื่นๆ (โปรดระบุ)",
-];
 
 export function Step3Gap({ data, onChange, errors, masteryScore }: Step3Props) {
   const allowed = getAllowedGaps(masteryScore);
@@ -216,33 +204,6 @@ export function Step3Gap({ data, onChange, errors, masteryScore }: Step3Props) {
           )}
         </div>
       )}
-
-      {/* Classroom Management */}
-      <div className="space-y-2" data-error={errors.classroomManagement ? true : undefined}>
-        <Label>การจัดการชั้นเรียน <span className="text-destructive">*</span></Label>
-        <Select value={data.classroomManagement} onValueChange={(v) => {
-          onChange("classroomManagement", v);
-          if (v !== "อื่นๆ (โปรดระบุ)") onChange("classroomManagementOther", "");
-        }}>
-          <SelectTrigger className={cn(errors.classroomManagement && "border-destructive")}>
-            <SelectValue placeholder="เลือกสถานะ" />
-          </SelectTrigger>
-          <SelectContent>
-            {MANAGEMENT_OPTIONS.map((opt) => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        {data.classroomManagement === "อื่นๆ (โปรดระบุ)" && (
-          <Input
-            placeholder="โปรดระบุรายละเอียด"
-            value={data.classroomManagementOther}
-            onChange={(e) => onChange("classroomManagementOther", e.target.value)}
-            className={cn(errors.classroomManagementOther && "border-destructive")}
-            maxLength={200}
-          />
-        )}
-        {errors.classroomManagement && <p className="text-xs text-destructive">{errors.classroomManagement}</p>}
-        {errors.classroomManagementOther && <p className="text-xs text-destructive">{errors.classroomManagementOther}</p>}
-      </div>
 
       {/* Health Care - Radio Group */}
       <div className="space-y-3" data-error={errors.healthCareStatus ? true : undefined}>

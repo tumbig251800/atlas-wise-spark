@@ -47,8 +47,6 @@ export interface TeachingLogForm {
   keyIssue: string;
   majorGap: "k-gap" | "p-gap" | "a-gap" | "a2-gap" | "system-gap" | "success" | null;
   minorGaps: ("k-gap" | "p-gap" | "a-gap" | "a2-gap" | "system-gap")[];
-  classroomManagement: string;
-  classroomManagementOther: string;
   healthCareStatus: "" | "none" | "has";
   healthCareIds: string;
   remedialIds: string;
@@ -70,8 +68,6 @@ const INITIAL_FORM: TeachingLogForm = {
   keyIssue: "",
   majorGap: null,
   minorGaps: [],
-  classroomManagement: "",
-  classroomManagementOther: "",
   healthCareStatus: "",
   healthCareIds: "",
   remedialIds: "",
@@ -163,10 +159,6 @@ export default function TeachingLog() {
       }
     } else if (step === 3) {
       if (!form.majorGap) errs.majorGap = "กรุณาเลือก Major Gap";
-      if (!form.classroomManagement) errs.classroomManagement = "กรุณาเลือกสถานะการจัดการชั้นเรียน";
-      if (form.classroomManagement === "อื่นๆ (โปรดระบุ)" && !form.classroomManagementOther.trim()) {
-        errs.classroomManagementOther = "กรุณาระบุรายละเอียด";
-      }
       if (!form.healthCareStatus) errs.healthCareStatus = "กรุณาเลือกสถานะสุขภาพ";
       if (form.healthCareStatus === "has" && !form.healthCareIds.trim()) errs.healthCareIds = "กรุณาระบุรหัสนักเรียน";
     } else if (step === 4) {
@@ -255,9 +247,6 @@ export default function TeachingLog() {
         key_issue: form.keyIssue.trim() || null,
         major_gap: form.majorGap!,
         minor_gaps: form.minorGaps,
-        classroom_management: form.classroomManagement === "อื่นๆ (โปรดระบุ)"
-          ? `อื่นๆ: ${form.classroomManagementOther.trim()}`
-          : form.classroomManagement || null,
         health_care_status: form.healthCareStatus === "has",
         health_care_ids: form.healthCareStatus === "none" ? "[None]" : form.healthCareIds.trim() || null,
         total_students: form.totalStudents,
