@@ -4,8 +4,10 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Check } from "lucide-react";
 import { GAPS, SUCCESS_OPTION, getAllowedGaps, getDefaultGap, type GapValue } from "@/lib/gapOptions";
+
+const MAX_MINOR_GAPS = 2;
 
 type ProblemGapValue = Exclude<GapValue, "success">;
 
@@ -34,12 +36,17 @@ export function Step3Gap({ data, onChange, errors, masteryScore }: Step3Props) {
     ? GAPS.filter((g) => g.value !== data.majorGap)
     : [];
 
+  const minorGapCount = (data.minorGaps ?? []).length;
+  const atMinorGapLimit = minorGapCount >= MAX_MINOR_GAPS;
+
   const toggleMinorGap = (value: ProblemGapValue) => {
     const current = data.minorGaps ?? [];
-    const next = current.includes(value)
-      ? current.filter((g) => g !== value)
-      : [...current, value];
-    onChange("minorGaps", next);
+    if (current.includes(value)) {
+      onChange("minorGaps", current.filter((g) => g !== value));
+      return;
+    }
+    if (current.length >= MAX_MINOR_GAPS) return;
+    onChange("minorGaps", [...current, value]);
   };
 
   // Normalize selection whenever mastery changes:
@@ -170,33 +177,55 @@ export function Step3Gap({ data, onChange, errors, masteryScore }: Step3Props) {
       {/* Minor Gaps (problem gaps only, mastery ≤ 3) */}
       {isLowMastery && data.majorGap && data.majorGap !== "success" && minorGapOptions.length > 0 && (
         <div className="space-y-2">
-          <p className="text-sm font-medium text-muted-foreground">
-            Gap รอง <span className="font-normal">(ถ้ามีปัญหาเพิ่มเติม — ไม่บังคับ)</span>
-          </p>
+          <div className="flex items-center justify-between flex-wrap gap-1">
+            <p className="text-sm font-medium text-muted-foreground">
+              Gap รอง <span className="font-normal">(ถ้ามีปัญหาเพิ่มเติม — ไม่บังคับ)</span>
+            </p>
+            <span className={cn(
+              "text-xs",
+              atMinorGapLimit ? "text-primary font-medium" : "text-muted-foreground"
+            )}>
+              {minorGapCount}/{MAX_MINOR_GAPS}
+            </span>
+          </div>
           <div className="grid grid-cols-2 gap-2">
             {minorGapOptions.map((gap) => {
               const checked = (data.minorGaps ?? []).includes(gap.value as ProblemGapValue);
-              const isA2 = gap.value === "a2-gap";
+              const disabled = !checked && atMinorGapLimit;
               return (
                 <button
                   key={gap.value}
                   type="button"
                   onClick={() => toggleMinorGap(gap.value as ProblemGapValue)}
+                  disabled={disabled}
+                  aria-pressed={checked}
                   className={cn(
                     "flex items-center gap-2 p-2 rounded-lg border text-left text-sm transition-all",
                     checked
-                      ? cn(gap.color, "ring-1 ring-primary/30")
-                      : "border-dashed border-muted-foreground/30 bg-secondary/30 hover:bg-secondary"
+                      ? "border-primary bg-primary/10 ring-1 ring-primary/30 text-foreground"
+                      : "border-dashed border-muted-foreground/30 bg-secondary/30 hover:bg-secondary",
+                    disabled && "opacity-40 cursor-not-allowed hover:bg-secondary/30"
                   )}
                 >
-                  <span className="text-base shrink-0">{gap.icon}</span>
-                  <span className={cn("font-medium", isA2 && checked && "text-destructive")}>
-                    {gap.label}
+                  <span
+                    className={cn(
+                      "flex h-4 w-4 items-center justify-center rounded border shrink-0",
+                      checked ? "bg-primary border-primary text-primary-foreground" : "border-muted-foreground/40"
+                    )}
+                  >
+                    {checked && <Check className="h-3 w-3" strokeWidth={3} />}
                   </span>
+                  <span className="text-base shrink-0">{gap.icon}</span>
+                  <span className="font-medium">{gap.label}</span>
                 </button>
               );
             })}
           </div>
+          {atMinorGapLimit && (
+            <p className="text-xs text-muted-foreground">
+              เลือกได้สูงสุด {MAX_MINOR_GAPS} ตัว — หากปัญหาเยอะกว่านี้ ลองพิจารณาเลือก System-Gap แทน
+            </p>
+          )}
           {(data.minorGaps ?? []).includes("a2-gap") && (
             <p className="text-xs text-amber-600 font-medium">
               ⚠️ พบเหตุการณ์ safety เพิ่มเติม — ระบบจะบันทึกไว้ในรายงาน

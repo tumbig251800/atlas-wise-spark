@@ -10,11 +10,13 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Loader2 } from "lucide-react";
+import { Loader2, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { GAPS, SUCCESS_OPTION, getAllowedGaps, getDefaultGap, type GapValue } from "@/lib/gapOptions";
 import type { Tables } from "@/integrations/supabase/types";
+
+const MAX_MINOR_GAPS = 2;
 
 type TeachingLog = Tables<"teaching_logs">;
 
@@ -51,10 +53,13 @@ export function EditGapDialog({ log, open, onOpenChange, onSuccess }: EditGapDia
   }, [log?.id, open]);
 
   const toggleMinorGap = (value: ProblemGapValue) => {
-    setMinorGaps((prev) =>
-      prev.includes(value) ? prev.filter((g) => g !== value) : [...prev, value]
-    );
+    setMinorGaps((prev) => {
+      if (prev.includes(value)) return prev.filter((g) => g !== value);
+      if (prev.length >= MAX_MINOR_GAPS) return prev;
+      return [...prev, value];
+    });
   };
+  const atMinorGapLimit = minorGaps.length >= MAX_MINOR_GAPS;
 
   if (!log) return null;
 
@@ -190,30 +195,55 @@ export function EditGapDialog({ log, open, onOpenChange, onSuccess }: EditGapDia
           <>
             <Separator />
             <div className="space-y-2">
-              <div className="text-sm font-medium">
-                Gap รอง <span className="font-normal text-muted-foreground">(ถ้ามีปัญหาเพิ่มเติม — ไม่บังคับ)</span>
+              <div className="flex items-center justify-between flex-wrap gap-1">
+                <div className="text-sm font-medium">
+                  Gap รอง <span className="font-normal text-muted-foreground">(ถ้ามีปัญหาเพิ่มเติม — ไม่บังคับ)</span>
+                </div>
+                <span className={cn(
+                  "text-xs",
+                  atMinorGapLimit ? "text-primary font-medium" : "text-muted-foreground"
+                )}>
+                  {minorGaps.length}/{MAX_MINOR_GAPS}
+                </span>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 {GAPS.filter((g) => g.value !== selected).map((gap) => {
                   const checked = minorGaps.includes(gap.value as ProblemGapValue);
+                  const disabled = !checked && atMinorGapLimit;
                   return (
                     <button
                       key={gap.value}
                       type="button"
                       onClick={() => toggleMinorGap(gap.value as ProblemGapValue)}
+                      disabled={disabled}
+                      aria-pressed={checked}
                       className={cn(
                         "flex items-center gap-2 p-2 rounded-lg border text-left text-sm transition-all",
                         checked
-                          ? cn(gap.color, "ring-1 ring-primary/30")
-                          : "border-dashed border-muted-foreground/30 bg-secondary/30 hover:bg-secondary"
+                          ? "border-primary bg-primary/10 ring-1 ring-primary/30 text-foreground"
+                          : "border-dashed border-muted-foreground/30 bg-secondary/30 hover:bg-secondary",
+                        disabled && "opacity-40 cursor-not-allowed hover:bg-secondary/30"
                       )}
                     >
+                      <span
+                        className={cn(
+                          "flex h-4 w-4 items-center justify-center rounded border shrink-0",
+                          checked ? "bg-primary border-primary text-primary-foreground" : "border-muted-foreground/40"
+                        )}
+                      >
+                        {checked && <Check className="h-3 w-3" strokeWidth={3} />}
+                      </span>
                       <span className="text-base shrink-0">{gap.icon}</span>
                       <span className="font-medium">{gap.label}</span>
                     </button>
                   );
                 })}
               </div>
+              {atMinorGapLimit && (
+                <p className="text-xs text-muted-foreground">
+                  เลือกได้สูงสุด {MAX_MINOR_GAPS} ตัว
+                </p>
+              )}
               {minorGaps.includes("a2-gap") && (
                 <p className="text-xs text-amber-600 font-medium">
                   ⚠️ พบเหตุการณ์ safety เพิ่มเติม — ระบบจะบันทึกไว้ในรายงาน
