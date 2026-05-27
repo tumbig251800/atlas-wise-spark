@@ -162,9 +162,17 @@ export default function TeachingLog() {
       if (!form.healthCareStatus) errs.healthCareStatus = "กรุณาเลือกสถานะสุขภาพ";
       if (form.healthCareStatus === "has" && !form.healthCareIds.trim()) errs.healthCareIds = "กรุณาระบุรหัสนักเรียน";
     } else if (step === 4) {
-      if (!form.remedialIds.trim()) errs.remedialIds = "กรุณาระบุรหัสนักเรียน";
-      // Validate remedial statuses - every student must have a status
-      if (form.remedialIds.trim()) {
+      const isHighMastery = form.masteryScore != null && form.masteryScore >= 4;
+      const isSuccess = form.majorGap === "success";
+      const remedialOptional = isSuccess && isHighMastery;
+      const remedialIsNone = form.remedialIds === "[None]";
+
+      // Remedial IDs: required unless Success+mastery>=4
+      if (!remedialOptional && !form.remedialIds.trim()) {
+        errs.remedialIds = "กรุณาระบุรหัสนักเรียน";
+      }
+      // Validate PASS/STAY only when real IDs are entered (not [None] sentinel)
+      if (form.remedialIds.trim() && !remedialIsNone) {
         const ids = form.remedialIds.split(",").map(id => id.trim()).filter(Boolean);
         const allHaveStatus = ids.every(id => form.remedialStatuses[id]);
         if (!allHaveStatus) errs.remedialStatuses = "กรุณาเลือกสถานะ PASS/STAY ทุกคน";
@@ -307,7 +315,7 @@ export default function TeachingLog() {
           {currentStep === 1 && <Step1General data={form} onChange={handleChange} errors={errors} teacherName={teacherName} />}
           {currentStep === 2 && <Step2Quality data={form} majorGap={form.majorGap} onChange={handleChange} errors={errors} />}
           {currentStep === 3 && <Step3Gap data={form} onChange={handleChange} errors={errors} masteryScore={form.masteryScore} />}
-          {currentStep === 4 && <Step4Action data={form} onChange={handleChange} errors={errors} masteryScore={form.masteryScore} totalStudents={form.totalStudents} />}
+          {currentStep === 4 && <Step4Action data={form} onChange={handleChange} errors={errors} masteryScore={form.masteryScore} totalStudents={form.totalStudents} majorGap={form.majorGap} />}
         </div>
 
         {/* Navigation */}
