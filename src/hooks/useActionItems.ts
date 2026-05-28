@@ -32,18 +32,21 @@ export function useResolveActionItem() {
   return useMutation({
     mutationFn: async ({ id, status, note, userId }: ResolveInput) => {
       const now = new Date().toISOString();
-      const { error } = await supabase
+      const payload =
+        status === "verified"
+          ? { status, resolution_note: note, verified_by: userId, verified_at: now, updated_at: now }
+          : { status, resolution_note: note, updated_at: now };
+
+      const { data, error } = await supabase
         .from("action_plan_items")
-        .update({
-          status,
-          resolution_note: note,
-          verified_by: userId,
-          verified_at: now,
-          resolved_at: status === "verified" ? now : null,
-          updated_at: now,
-        })
-        .eq("id", id);
+        .update(payload)
+        .eq("id", id)
+        .in("status", ["open", "resolved"])
+        .select("id");
       if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error("รายการนี้ถูกปิดไปแล้วโดยผู้อื่น กรุณารีเฟรชหน้า");
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ACTION_ITEMS_KEY });

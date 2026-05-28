@@ -120,7 +120,12 @@ export default function ActionBoard() {
               onFilterChange={(f) => { setFilter(f); setPage(0); }}
               counts={counts}
             />
-            <ActionTable items={paged} onVerify={handleVerify} onDismiss={handleDismiss} />
+            <ActionTable
+              items={paged}
+              startIndex={safePage * PAGE_SIZE}
+              onVerify={handleVerify}
+              onDismiss={handleDismiss}
+            />
 
             {totalPages > 1 && (
               <div className="flex items-center justify-between text-sm">
