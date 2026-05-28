@@ -27,6 +27,7 @@ import { Step2Quality } from "@/components/teaching-log/Step2Quality";
 import { Step3Gap } from "@/components/teaching-log/Step3Gap";
 import { Step4Action } from "@/components/teaching-log/Step4Action";
 import { PreSubmitSummary } from "@/components/teaching-log/PreSubmitSummary";
+import { SpecialCarePlanModal } from "@/components/teaching-log/SpecialCarePlanModal";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/atlasSupabase";
@@ -88,6 +89,9 @@ export default function TeachingLog() {
   const [submitting, setSubmitting] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [teacherName, setTeacherName] = useState("");
+  const [showSpecialCarePlan, setShowSpecialCarePlan] = useState(false);
+  const [scStudentIds, setScStudentIds] = useState<string[]>([]);
+  const [scLogId, setScLogId] = useState("");
   const diagnosticCalledRef = useRef<Set<string>>(new Set());
 
   // Fetch teacher name from profile
@@ -287,6 +291,15 @@ export default function TeachingLog() {
       setShowSummary(false);
       localStorage.removeItem(DRAFT_KEY);
 
+      if (form.majorGap === "a-gap" && form.remedialIds.trim() && logData?.id) {
+        const ids = form.remedialIds.split(",").map((s) => s.trim()).filter(Boolean);
+        if (ids.length > 0) {
+          setScStudentIds(ids);
+          setScLogId(logData.id);
+          setShowSpecialCarePlan(true);
+        }
+      }
+
       const persist = localStorage.getItem(SMART_PERSIST_KEY);
       let resetForm = { ...INITIAL_FORM };
       if (persist) {
@@ -343,6 +356,15 @@ export default function TeachingLog() {
         onConfirm={handleSubmit}
         form={form}
         submitting={submitting}
+      />
+
+      <SpecialCarePlanModal
+        open={showSpecialCarePlan}
+        studentIds={scStudentIds}
+        sourceLogId={scLogId}
+        teacherId={user?.id ?? ""}
+        onClose={() => setShowSpecialCarePlan(false)}
+        onSaved={() => setShowSpecialCarePlan(false)}
       />
     </AppLayout>
   );

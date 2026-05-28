@@ -14,63 +14,93 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_rate_limits: {
+        Row: {
+          function_name: string
+          last_request_at: string
+          user_id: string
+        }
+        Insert: {
+          function_name: string
+          last_request_at?: string
+          user_id: string
+        }
+        Update: {
+          function_name?: string
+          last_request_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       diagnostic_events: {
         Row: {
           classroom: string | null
           created_at: string
-          decision_object: Json | null
+          decision_object: Json
+          decision_status: string | null
+          event_kind: string
           gap_type: string | null
           grade_level: string | null
           id: string
           intervention_size: string | null
           normalized_topic: string | null
           priority_level: number | null
-          status_color: string
+          status_color: string | null
           status_label: string | null
           student_id: string | null
           subject: string | null
+          tags: string[] | null
           teacher_id: string
           teaching_log_id: string
           threshold_pct: number | null
           topic: string | null
+          updated_at: string
         }
         Insert: {
           classroom?: string | null
           created_at?: string
-          decision_object?: Json | null
+          decision_object?: Json
+          decision_status?: string | null
+          event_kind?: string
           gap_type?: string | null
           grade_level?: string | null
           id?: string
           intervention_size?: string | null
           normalized_topic?: string | null
           priority_level?: number | null
-          status_color: string
+          status_color?: string | null
           status_label?: string | null
           student_id?: string | null
           subject?: string | null
+          tags?: string[] | null
           teacher_id: string
           teaching_log_id: string
           threshold_pct?: number | null
           topic?: string | null
+          updated_at?: string
         }
         Update: {
           classroom?: string | null
           created_at?: string
-          decision_object?: Json | null
+          decision_object?: Json
+          decision_status?: string | null
+          event_kind?: string
           gap_type?: string | null
           grade_level?: string | null
           id?: string
           intervention_size?: string | null
           normalized_topic?: string | null
           priority_level?: number | null
-          status_color?: string
+          status_color?: string | null
           status_label?: string | null
           student_id?: string | null
           subject?: string | null
+          tags?: string[] | null
           teacher_id?: string
           teaching_log_id?: string
           threshold_pct?: number | null
           topic?: string | null
+          updated_at?: string
         }
         Relationships: [
           {
@@ -84,84 +114,108 @@ export type Database = {
       }
       lesson_plan_snapshots: {
         Row: {
-          id: string
-          user_id: string
-          label: string | null
-          grade_level: string
           classroom: string
-          subject: string
+          created_at: string
+          grade_level: string
+          id: string
+          label: string | null
           snapshot_class_profile: string
           snapshot_focus: string
           snapshot_notes: string
-          created_at: string
+          subject: string
           updated_at: string
+          user_id: string
         }
         Insert: {
-          id?: string
-          user_id: string
-          label?: string | null
-          grade_level?: string
           classroom?: string
-          subject?: string
+          created_at?: string
+          grade_level?: string
+          id?: string
+          label?: string | null
           snapshot_class_profile?: string
           snapshot_focus?: string
           snapshot_notes?: string
-          created_at?: string
+          subject?: string
           updated_at?: string
+          user_id: string
         }
         Update: {
-          id?: string
-          user_id?: string
-          label?: string | null
-          grade_level?: string
           classroom?: string
-          subject?: string
+          created_at?: string
+          grade_level?: string
+          id?: string
+          label?: string | null
           snapshot_class_profile?: string
           snapshot_focus?: string
           snapshot_notes?: string
-          created_at?: string
+          subject?: string
           updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
       pivot_events: {
         Row: {
-          class_id: string
+          classroom: string
           created_at: string
-          evidence_refs: string[]
+          decision_object: Json | null
+          gap_type: string | null
+          grade_level: string
           id: string
-          normalized_topic: string
-          reason_code: string
+          intervention_size: string | null
+          normalized_topic: string | null
+          priority_level: number | null
+          status_color: string
+          status_label: string | null
+          student_id: string
           subject: string
           teacher_id: string
-          trigger_session_id: string
+          teaching_log_id: string
+          threshold_pct: number | null
+          topic: string
         }
         Insert: {
-          class_id: string
+          classroom: string
           created_at?: string
-          evidence_refs?: string[]
+          decision_object?: Json | null
+          gap_type?: string | null
+          grade_level: string
           id?: string
-          normalized_topic: string
-          reason_code?: string
+          intervention_size?: string | null
+          normalized_topic?: string | null
+          priority_level?: number | null
+          status_color?: string
+          status_label?: string | null
+          student_id: string
           subject: string
           teacher_id: string
-          trigger_session_id: string
+          teaching_log_id: string
+          threshold_pct?: number | null
+          topic: string
         }
         Update: {
-          class_id?: string
+          classroom?: string
           created_at?: string
-          evidence_refs?: string[]
+          decision_object?: Json | null
+          gap_type?: string | null
+          grade_level?: string
           id?: string
-          normalized_topic?: string
-          reason_code?: string
+          intervention_size?: string | null
+          normalized_topic?: string | null
+          priority_level?: number | null
+          status_color?: string
+          status_label?: string | null
+          student_id?: string
           subject?: string
           teacher_id?: string
-          trigger_session_id?: string
+          teaching_log_id?: string
+          threshold_pct?: number | null
+          topic?: string
         }
         Relationships: [
           {
-            foreignKeyName: "pivot_events_trigger_session_id_fkey"
-            columns: ["trigger_session_id"]
+            foreignKeyName: "pivot_events_teaching_log_id_fkey"
+            columns: ["teaching_log_id"]
             isOneToOne: false
             referencedRelation: "teaching_logs"
             referencedColumns: ["id"]
@@ -195,50 +249,56 @@ export type Database = {
         }
         Relationships: []
       }
-      remedial_tracking: {
+      student_support_plans: {
         Row: {
-          classroom: string | null
+          care_plan: string | null
+          concern: string | null
           created_at: string
-          grade_level: string | null
-          id: string
-          normalized_topic: string | null
-          remedial_status: string
+          follow_up_date: string | null
+          gap_type: string
+          id: number
+          resolved_at: string | null
+          resolved_note: string | null
+          source_log_id: string | null
+          status: string
           student_id: string
-          subject: string | null
-          teacher_id: string
-          teaching_log_id: string
-          topic: string | null
+          teacher_id: string | null
+          updated_at: string
         }
         Insert: {
-          classroom?: string | null
+          care_plan?: string | null
+          concern?: string | null
           created_at?: string
-          grade_level?: string | null
-          id?: string
-          normalized_topic?: string | null
-          remedial_status: string
+          follow_up_date?: string | null
+          gap_type: string
+          id?: number
+          resolved_at?: string | null
+          resolved_note?: string | null
+          source_log_id?: string | null
+          status?: string
           student_id: string
-          subject?: string | null
-          teacher_id: string
-          teaching_log_id: string
-          topic?: string | null
+          teacher_id?: string | null
+          updated_at?: string
         }
         Update: {
-          classroom?: string | null
+          care_plan?: string | null
+          concern?: string | null
           created_at?: string
-          grade_level?: string | null
-          id?: string
-          normalized_topic?: string | null
-          remedial_status?: string
+          follow_up_date?: string | null
+          gap_type?: string
+          id?: number
+          resolved_at?: string | null
+          resolved_note?: string | null
+          source_log_id?: string | null
+          status?: string
           student_id?: string
-          subject?: string | null
-          teacher_id?: string
-          teaching_log_id?: string
-          topic?: string | null
+          teacher_id?: string | null
+          updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "remedial_tracking_teaching_log_id_fkey"
-            columns: ["teaching_log_id"]
+            foreignKeyName: "student_support_plans_source_log_id_fkey"
+            columns: ["source_log_id"]
             isOneToOne: false
             referencedRelation: "teaching_logs"
             referencedColumns: ["id"]
@@ -247,49 +307,118 @@ export type Database = {
       }
       strike_counter: {
         Row: {
+          classroom: string | null
           first_strike_at: string | null
           gap_type: string | null
+          grade_level: string | null
           id: string
           last_session_id: string | null
           last_updated: string
           normalized_topic: string | null
-          scope: string
-          scope_id: string
+          scope: string | null
+          scope_id: string | null
           status: string
           strike_count: number
-          subject: string | null
+          student_id: string | null
+          subject: string
           teacher_id: string
-          topic: string | null
+          topic: string
         }
         Insert: {
+          classroom?: string | null
           first_strike_at?: string | null
           gap_type?: string | null
+          grade_level?: string | null
           id?: string
           last_session_id?: string | null
           last_updated?: string
           normalized_topic?: string | null
-          scope: string
-          scope_id: string
+          scope?: string | null
+          scope_id?: string | null
           status?: string
           strike_count?: number
-          subject?: string | null
+          student_id?: string | null
+          subject: string
           teacher_id: string
-          topic?: string | null
+          topic: string
         }
         Update: {
+          classroom?: string | null
           first_strike_at?: string | null
           gap_type?: string | null
+          grade_level?: string | null
           id?: string
           last_session_id?: string | null
           last_updated?: string
           normalized_topic?: string | null
-          scope?: string
-          scope_id?: string
+          scope?: string | null
+          scope_id?: string | null
           status?: string
           strike_count?: number
-          subject?: string | null
+          student_id?: string | null
+          subject?: string
           teacher_id?: string
-          topic?: string | null
+          topic?: string
+        }
+        Relationships: []
+      }
+      students: {
+        Row: {
+          classroom: string | null
+          created_at: string
+          first_name: string
+          grade_level: string | null
+          id: string
+          is_active: boolean
+          last_name: string
+          student_code: string | null
+          updated_at: string
+        }
+        Insert: {
+          classroom?: string | null
+          created_at?: string
+          first_name: string
+          grade_level?: string | null
+          id?: string
+          is_active?: boolean
+          last_name: string
+          student_code?: string | null
+          updated_at?: string
+        }
+        Update: {
+          classroom?: string | null
+          created_at?: string
+          first_name?: string
+          grade_level?: string | null
+          id?: string
+          is_active?: boolean
+          last_name?: string
+          student_code?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      teachers: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          role: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          role?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          role?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -306,10 +435,13 @@ export type Database = {
           id: string
           key_issue: string | null
           learning_unit: string | null
+          lesson_topic: string | null
           major_gap: Database["public"]["Enums"]["major_gap"]
           mastery_score: number
+          meta: Json
           minor_gaps: Database["public"]["Enums"]["major_gap"][]
           next_strategy: string | null
+          notes: string | null
           reflection: string | null
           remedial_ids: string | null
           subject: string
@@ -318,6 +450,7 @@ export type Database = {
           teaching_date: string
           topic: string | null
           total_students: number | null
+          unit_name: string | null
           updated_at: string
         }
         Insert: {
@@ -332,18 +465,22 @@ export type Database = {
           id?: string
           key_issue?: string | null
           learning_unit?: string | null
+          lesson_topic?: string | null
           major_gap?: Database["public"]["Enums"]["major_gap"]
-          mastery_score: number
+          mastery_score?: number
+          meta?: Json
           minor_gaps?: Database["public"]["Enums"]["major_gap"][]
           next_strategy?: string | null
+          notes?: string | null
           reflection?: string | null
           remedial_ids?: string | null
           subject: string
           teacher_id: string
           teacher_name?: string | null
-          teaching_date?: string
+          teaching_date: string
           topic?: string | null
           total_students?: number | null
+          unit_name?: string | null
           updated_at?: string
         }
         Update: {
@@ -358,10 +495,13 @@ export type Database = {
           id?: string
           key_issue?: string | null
           learning_unit?: string | null
+          lesson_topic?: string | null
           major_gap?: Database["public"]["Enums"]["major_gap"]
           mastery_score?: number
+          meta?: Json
           minor_gaps?: Database["public"]["Enums"]["major_gap"][]
           next_strategy?: string | null
+          notes?: string | null
           reflection?: string | null
           remedial_ids?: string | null
           subject?: string
@@ -370,87 +510,144 @@ export type Database = {
           teaching_date?: string
           topic?: string | null
           total_students?: number | null
+          unit_name?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      topic_aliases: {
+        Row: {
+          alias: string
+          canonical: string
+          created_at: string
+          id: string
+          subject: string | null
+        }
+        Insert: {
+          alias: string
+          canonical: string
+          created_at?: string
+          id?: string
+          subject?: string | null
+        }
+        Update: {
+          alias?: string
+          canonical?: string
+          created_at?: string
+          id?: string
+          subject?: string | null
         }
         Relationships: []
       }
       unit_assessments: {
         Row: {
-          id: string
-          teacher_id: string
-          student_id: string
-          student_name: string | null
-          subject: string
-          grade_level: string
-          classroom: string
-          academic_term: string | null
-          unit_name: string | null
-          score: number
-          total_score: number
-          assessed_date: string | null
-          teaching_log_ref: string | null
-          created_at: string
           a1_score: number | null
           a2_score: number | null
           a3_score: number | null
           a4_score: number | null
           a5_score: number | null
           a6_score: number | null
-          competency_note: string | null
+          academic_term: string | null
+          art_culture_score: number | null
           assessed_by: string | null
+          assessed_date: string | null
+          calculating_score: number | null
+          classroom: string
           competency_assessed_date: string | null
+          competency_note: string | null
+          created_at: string | null
+          economy_finance_score: number | null
+          grade_level: string
+          health_score: number | null
+          id: string
+          reading_score: number | null
+          sci_tech_score: number | null
+          score: number
+          social_civic_score: number | null
+          student_id: string
+          student_name: string | null
+          subject: string
+          teacher_id: string
+          teaching_log_ref: string | null
+          total_score: number
+          unit_name: string | null
+          writing_score: number | null
         }
         Insert: {
+          a1_score?: number | null
+          a2_score?: number | null
+          a3_score?: number | null
+          a4_score?: number | null
+          a5_score?: number | null
+          a6_score?: number | null
+          academic_term?: string | null
+          art_culture_score?: number | null
+          assessed_by?: string | null
+          assessed_date?: string | null
+          calculating_score?: number | null
+          classroom: string
+          competency_assessed_date?: string | null
+          competency_note?: string | null
+          created_at?: string | null
+          economy_finance_score?: number | null
+          grade_level: string
+          health_score?: number | null
           id?: string
-          teacher_id: string
+          reading_score?: number | null
+          sci_tech_score?: number | null
+          score: number
+          social_civic_score?: number | null
           student_id: string
           student_name?: string | null
           subject: string
-          grade_level: string
-          classroom: string
-          academic_term?: string | null
-          unit_name?: string | null
-          score: number
-          total_score: number
-          assessed_date?: string | null
+          teacher_id: string
           teaching_log_ref?: string | null
-          created_at?: string
+          total_score?: number
+          unit_name?: string | null
+          writing_score?: number | null
+        }
+        Update: {
           a1_score?: number | null
           a2_score?: number | null
           a3_score?: number | null
           a4_score?: number | null
           a5_score?: number | null
           a6_score?: number | null
-          competency_note?: string | null
+          academic_term?: string | null
+          art_culture_score?: number | null
           assessed_by?: string | null
+          assessed_date?: string | null
+          calculating_score?: number | null
+          classroom?: string
           competency_assessed_date?: string | null
-        }
-        Update: {
+          competency_note?: string | null
+          created_at?: string | null
+          economy_finance_score?: number | null
+          grade_level?: string
+          health_score?: number | null
           id?: string
-          teacher_id?: string
+          reading_score?: number | null
+          sci_tech_score?: number | null
+          score?: number
+          social_civic_score?: number | null
           student_id?: string
           student_name?: string | null
           subject?: string
-          grade_level?: string
-          classroom?: string
-          academic_term?: string | null
-          unit_name?: string | null
-          score?: number
-          total_score?: number
-          assessed_date?: string | null
+          teacher_id?: string
           teaching_log_ref?: string | null
-          created_at?: string
-          a1_score?: number | null
-          a2_score?: number | null
-          a3_score?: number | null
-          a4_score?: number | null
-          a5_score?: number | null
-          a6_score?: number | null
-          competency_note?: string | null
-          assessed_by?: string | null
-          competency_assessed_date?: string | null
+          total_score?: number
+          unit_name?: string | null
+          writing_score?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "unit_assessments_teaching_log_ref_fkey"
+            columns: ["teaching_log_ref"]
+            isOneToOne: false
+            referencedRelation: "teaching_logs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
@@ -475,6 +672,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_and_set_rate_limit: {
+        Args: {
+          p_function_name: string
+          p_limit_seconds?: number
+          p_user_id: string
+        }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -482,20 +687,10 @@ export type Database = {
         }
         Returns: boolean
       }
-      update_class_strike: {
-        Args: {
-          p_gap_rate: number
-          p_gap_type: string
-          p_is_a2_gap: boolean
-          p_is_system_gap: boolean
-          p_normalized_topic: string
-          p_scope_id: string
-          p_session_id: string
-          p_subject: string
-          p_teacher_id: string
-          p_topic: string
-        }
-        Returns: Json
+      is_admin: { Args: never; Returns: boolean }
+      promote_to_director_by_email: {
+        Args: { user_email: string }
+        Returns: undefined
       }
     }
     Enums: {
@@ -505,9 +700,9 @@ export type Database = {
         | "k-gap"
         | "p-gap"
         | "a-gap"
-        | "success"
-        | "system-gap"
         | "a2-gap"
+        | "system-gap"
+        | "success"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -637,7 +832,7 @@ export const Constants = {
     Enums: {
       activity_mode: ["active", "passive", "constructive"],
       app_role: ["teacher", "director"],
-      major_gap: ["k-gap", "p-gap", "a-gap", "success", "system-gap", "a2-gap"],
+      major_gap: ["k-gap", "p-gap", "a-gap", "a2-gap", "system-gap", "success"],
     },
   },
 } as const
