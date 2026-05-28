@@ -1,0 +1,112 @@
+import { useState, useEffect } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { useResolveActionItem, type ActionItem } from "@/hooks/useActionItems";
+
+interface Props {
+  open: boolean;
+  mode: "verify" | "dismiss";
+  item: ActionItem | null;
+  onClose: () => void;
+}
+
+export function VerifyDismissDialog({ open, mode, item, onClose }: Props) {
+  const [note, setNote] = useState("");
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const resolve = useResolveActionItem();
+
+  useEffect(() => {
+    if (open) setNote("");
+  }, [open]);
+
+  if (!item) return null;
+
+  const isDismiss = mode === "dismiss";
+  const title = isDismiss ? "ปิดรายการ (Dismiss)" : "ยืนยันรายการ (Verify)";
+  const description = isDismiss
+    ? "รายการนี้จะถูกปิดและไม่ปรากฏในรายการค้างอีก กรุณาระบุเหตุผล"
+    : "ยืนยันว่าปัญหานี้ได้รับการแก้ไขแล้ว";
+  const buttonLabel = isDismiss ? "Dismiss" : "Verify";
+
+  const handleConfirm = async () => {
+    if (!user) return;
+    if (isDismiss && !note.trim()) {
+      toast({ title: "กรุณาระบุเหตุผล", variant: "destructive" });
+      return;
+    }
+    try {
+      await resolve.mutateAsync({
+        id: item.id,
+        status: isDismiss ? "dismissed" : "verified",
+        note: note.trim() || null,
+        userId: user.id,
+      });
+      toast({
+        title: isDismiss ? "Dismissed เรียบร้อย" : "Verified เรียบร้อย",
+        description: `${item.teacher_name ?? "—"} • ${item.metric_label ?? ""}`,
+      });
+      onClose();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "ไม่สามารถบันทึกได้";
+      toast({ title: "เกิดข้อผิดพลาด", description: message, variant: "destructive" });
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <div className="text-sm bg-muted/40 rounded-md p-3 space-y-1">
+            <div><span className="text-muted-foreground">ครู:</span> {item.teacher_name ?? "—"}</div>
+            <div><span className="text-muted-foreground">ชั้น/วิชา:</span> {item.grade_level ?? "—"} {item.classroom ?? ""} · {item.subject ?? "—"}</div>
+            <div><span className="text-muted-foreground">ตัวชี้วัด:</span> {item.metric_label ?? "—"} {item.metric_value != null ? `(${item.metric_value})` : ""}</div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1" htmlFor="resolution-note">
+              หมายเหตุ {isDismiss ? <span className="text-destructive">*</span> : <span className="text-muted-foreground">(optional)</span>}
+            </label>
+            <textarea
+              id="resolution-note"
+              rows={3}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+              placeholder={isDismiss ? "เหตุผลที่ปิดรายการ..." : "หมายเหตุเพิ่มเติม..."}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button variant="ghost" onClick={onClose} disabled={resolve.isPending}>
+            ยกเลิก
+          </Button>
+          <Button
+            onClick={handleConfirm}
+            disabled={resolve.isPending}
+            variant={isDismiss ? "outline" : "default"}
+          >
+            {resolve.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            {buttonLabel}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

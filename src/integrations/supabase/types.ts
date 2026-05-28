@@ -14,6 +14,102 @@ export type Database = {
   }
   public: {
     Tables: {
+      action_plan_items: {
+        Row: {
+          ai_owner: string | null
+          ai_priority: string | null
+          ai_summary: string | null
+          auto_resolved: boolean
+          calendar_event_id: string | null
+          calendar_html_link: string | null
+          classroom: string | null
+          created_at: string
+          detail: string | null
+          due_date: string | null
+          due_in_days: number | null
+          grade_level: string | null
+          id: number
+          issue_key: string
+          issue_type: string
+          metric_label: string | null
+          metric_value: number | null
+          resolution_note: string | null
+          resolved_at: string | null
+          run_date: string | null
+          severity: string
+          status: string
+          subject: string | null
+          teacher_id: string | null
+          teacher_name: string | null
+          updated_at: string
+          verified_at: string | null
+          verified_by: string | null
+          wf4_logged_at: string | null
+        }
+        Insert: {
+          ai_owner?: string | null
+          ai_priority?: string | null
+          ai_summary?: string | null
+          auto_resolved?: boolean
+          calendar_event_id?: string | null
+          calendar_html_link?: string | null
+          classroom?: string | null
+          created_at?: string
+          detail?: string | null
+          due_date?: string | null
+          due_in_days?: number | null
+          grade_level?: string | null
+          id?: number
+          issue_key: string
+          issue_type: string
+          metric_label?: string | null
+          metric_value?: number | null
+          resolution_note?: string | null
+          resolved_at?: string | null
+          run_date?: string | null
+          severity: string
+          status?: string
+          subject?: string | null
+          teacher_id?: string | null
+          teacher_name?: string | null
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+          wf4_logged_at?: string | null
+        }
+        Update: {
+          ai_owner?: string | null
+          ai_priority?: string | null
+          ai_summary?: string | null
+          auto_resolved?: boolean
+          calendar_event_id?: string | null
+          calendar_html_link?: string | null
+          classroom?: string | null
+          created_at?: string
+          detail?: string | null
+          due_date?: string | null
+          due_in_days?: number | null
+          grade_level?: string | null
+          id?: number
+          issue_key?: string
+          issue_type?: string
+          metric_label?: string | null
+          metric_value?: number | null
+          resolution_note?: string | null
+          resolved_at?: string | null
+          run_date?: string | null
+          severity?: string
+          status?: string
+          subject?: string | null
+          teacher_id?: string | null
+          teacher_name?: string | null
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+          wf4_logged_at?: string | null
+        }
+        Relationships: []
+      }
       ai_rate_limits: {
         Row: {
           function_name: string

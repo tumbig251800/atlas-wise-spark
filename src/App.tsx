@@ -24,6 +24,7 @@ const SmartReportView = lazy(() => import("./pages/SmartReportView"));
 const CompetencyReport = lazy(() => import("./pages/CompetencyReport"));
 const Consultant = lazy(() => import("./pages/Consultant"));
 const Launch = lazy(() => import("./pages/Launch"));
+const ActionBoard = lazy(() => import("./pages/ActionBoard"));
 
 const queryClient = new QueryClient();
 
@@ -61,6 +62,14 @@ const App = () => (
                 element={
                   <ProtectedRoute allowedRoles={["director"]}>
                     <Executive />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/action-board"
+                element={
+                  <ProtectedRoute allowedRoles={["director"]}>
+                    <ActionBoard />
                   </ProtectedRoute>
                 }
               />
