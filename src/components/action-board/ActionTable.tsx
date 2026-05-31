@@ -1,4 +1,5 @@
 import { Fragment, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Table,
   TableBody,
@@ -8,7 +9,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight, ExternalLink, CheckCircle2, XCircle } from "lucide-react";
+import { ChevronDown, ChevronRight, ExternalLink, CheckCircle2, XCircle, Bot } from "lucide-react";
 import type { ActionItem } from "@/hooks/useActionItems";
 import { StatusBadge, IssueTypeBadge, SeverityBadge } from "./StatusBadge";
 
@@ -28,7 +29,22 @@ function formatDate(d: string | null): string {
   });
 }
 
+function buildAiPrompt(item: ActionItem): string {
+  const parts: string[] = [];
+  if (item.issue_type) parts.push(`ปัญหาประเภท: ${item.issue_type}`);
+  if (item.metric_label) {
+    parts.push(
+      `ตัวชี้วัด: ${item.metric_label}${item.metric_value != null ? ` (${item.metric_value})` : ""}`
+    );
+  }
+  if (item.detail) parts.push(`รายละเอียด: ${item.detail}`);
+  if (item.ai_summary) parts.push(`สรุปจาก AI: ${item.ai_summary}`);
+  const body = parts.join("\n");
+  return `ช่วยวิเคราะห์และแนะนำแนวทางแก้ไขปัญหาต่อไปนี้ให้หน่อยครับ:\n${body}`;
+}
+
 export function ActionTable({ items, startIndex = 0, onVerify, onDismiss }: Props) {
+  const navigate = useNavigate();
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
   const toggle = (id: number) => {
@@ -155,21 +171,44 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss }: Prop
                           </div>
                         )}
 
-                        {canResolve && (
+                        {(canResolve || (item.subject && item.grade_level && item.classroom)) && (
                           <div className="flex gap-2 pt-2 border-t border-border">
-                            <Button
-                              size="sm"
-                              onClick={(e) => { e.stopPropagation(); onVerify(item); }}
-                            >
-                              <CheckCircle2 className="h-4 w-4 mr-1" /> Verify
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={(e) => { e.stopPropagation(); onDismiss(item); }}
-                            >
-                              <XCircle className="h-4 w-4 mr-1" /> Dismiss
-                            </Button>
+                            {canResolve && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  onClick={(e) => { e.stopPropagation(); onVerify(item); }}
+                                >
+                                  <CheckCircle2 className="h-4 w-4 mr-1" /> Verify
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={(e) => { e.stopPropagation(); onDismiss(item); }}
+                                >
+                                  <XCircle className="h-4 w-4 mr-1" /> Dismiss
+                                </Button>
+                              </>
+                            )}
+                            {item.subject && item.grade_level && item.classroom && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate("/consultant", {
+                                    state: {
+                                      subject: item.subject,
+                                      gradeLevel: item.grade_level,
+                                      classroom: item.classroom,
+                                      initialPrompt: buildAiPrompt(item),
+                                    },
+                                  });
+                                }}
+                              >
+                                <Bot className="h-4 w-4 mr-1" /> ถามพีท AI
+                              </Button>
+                            )}
                           </div>
                         )}
                       </div>

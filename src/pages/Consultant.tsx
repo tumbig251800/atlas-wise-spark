@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import { AppLayout } from "@/components/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
@@ -49,8 +49,21 @@ function genMsgId() {
   return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+type ConsultantNavState = {
+  subject?: string;
+  gradeLevel?: string;
+  classroom?: string;
+  initialPrompt?: string;
+};
+
 export default function Consultant() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const didApplyNavStateRef = useRef(false);
+  // Holds a prompt arriving via navigation until its target filter key is active,
+  // so the "reset chat on filter change" effect can't clobber the pre-filled input.
+  const pendingPromptRef = useRef<string | null>(null);
+  const pendingPromptKeyRef = useRef<string | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -119,6 +132,39 @@ export default function Consultant() {
     }
   }, [filterInitialized, optionsLoading, filterOptions.gradeLevels, filterOptions.classrooms, filterOptions.subjects]);
 
+  // Pre-fill from Action Board navigation (location.state). Runs only after the
+  // base filter-init flow has completed, so it doesn't race the persisted-filter
+  // restore. Applies once, then clears state to avoid re-priming on refresh.
+  useEffect(() => {
+    if (!filterInitialized || didApplyNavStateRef.current) return;
+    const navState = location.state as ConsultantNavState | null;
+    if (!navState || (!navState.subject && !navState.initialPrompt)) return;
+
+    didApplyNavStateRef.current = true;
+
+    if (navState.subject && navState.gradeLevel && navState.classroom) {
+      const navKey = `${navState.subject}|${navState.gradeLevel}|${navState.classroom}`;
+      setContextFilter({
+        subject: navState.subject,
+        gradeLevel: navState.gradeLevel,
+        classroom: navState.classroom,
+      });
+      // Defer the prompt until the new filter key is active. Changing the filter
+      // triggers the chat-reset effect (which clears input); applying the prompt
+      // only once filterKey matches lets it win over that reset.
+      if (navState.initialPrompt) {
+        pendingPromptRef.current = navState.initialPrompt;
+        pendingPromptKeyRef.current = navKey;
+      }
+    } else if (navState.initialPrompt) {
+      // No filter change → no reset to race; set directly.
+      setInput(navState.initialPrompt);
+    }
+
+    // Clear location.state so a refresh doesn't re-prefill.
+    navigate(location.pathname, { replace: true, state: null });
+  }, [filterInitialized, location.state, location.pathname, navigate]);
+
   // Auto-select latest term when logs load or filter changes
   useEffect(() => {
     if (availableTerms.length > 0 && !selectedTerm) {
@@ -161,6 +207,17 @@ export default function Consultant() {
       setMessages([]);
     }
   }, [filterInitialized, filterKey]);
+
+  // Apply a navigation-supplied prompt once its target filter key is active.
+  // Defined after the chat-reset effect so this setInput runs last in the same
+  // render pass and isn't cleared by the reset above.
+  useEffect(() => {
+    if (pendingPromptRef.current != null && pendingPromptKeyRef.current === filterKey) {
+      setInput(pendingPromptRef.current);
+      pendingPromptRef.current = null;
+      pendingPromptKeyRef.current = null;
+    }
+  }, [filterKey]);
   
   // Build context with citation format
   const baseContext = buildContextWithCitation(filteredLogs);
