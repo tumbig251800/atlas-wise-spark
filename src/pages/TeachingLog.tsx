@@ -320,6 +320,30 @@ export default function TeachingLog() {
       setShowSummary(false);
       localStorage.removeItem(DRAFT_KEY);
 
+      // Auto-verify IntegrityFlags: re-check whether the teacher's fix cleared the
+      // FLAG and close the action item automatically. Fire-and-forget — never
+      // block or fail the save flow on recheck errors.
+      supabase.functions
+        .invoke("atlas-integrity-recheck", {
+          body: {
+            teacher_id: user.id,
+            subject: form.subject.trim(),
+            classroom: cleanedClassroom,
+            grade_level: form.gradeLevel,
+            academic_term: getAcademicTerm(form.teachingDate),
+          },
+        })
+        .then(({ data }) => {
+          const resolved = (data as { resolved_count?: number } | null)?.resolved_count ?? 0;
+          if (resolved > 0) {
+            toast({
+              title: "ระบบตรวจสอบแล้ว",
+              description: `ปิด ${resolved} รายการอัตโนมัติ`,
+            });
+          }
+        })
+        .catch((err) => console.error("Integrity recheck error:", err));
+
       // Snapshot the submitted values so "แก้ไขบันทึก" can reopen them for editing.
       lastSubmittedFormRef.current = form;
 
