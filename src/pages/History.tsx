@@ -36,6 +36,7 @@ import {
   type HistoryFiltersState,
   type HistoryFilterOptions,
 } from "@/components/history/HistoryFilters";
+import { ExportFilteredLogsButton } from "@/components/history/ExportFilteredLogsButton";
 import { persistFilters } from "@/hooks/useDashboardData";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -101,13 +102,6 @@ export default function History() {
       const { data, error } = await q;
       if (!error && data) {
         setLogs(data);
-        // Set default academic term to the latest term if not already set
-        if (data.length > 0 && !filters.academicTerm) {
-          const terms = [...new Set(data.map((l) => l.academic_term).filter(Boolean) as string[])].sort().reverse();
-          if (terms.length > 0) {
-            setFilters((prev) => ({ ...prev, academicTerm: terms[0] }));
-          }
-        }
       }
       setLoading(false);
     };
@@ -299,13 +293,31 @@ export default function History() {
   };
 
   const filterOptions: HistoryFilterOptions = useMemo(() => {
+    // Always show all academic terms
     const academicTerms = [...new Set(logs.map((l) => l.academic_term).filter(Boolean) as string[])].sort().reverse();
-    const subjects = [...new Set(logs.map((l) => l.subject))].filter(Boolean).sort();
-    const gradeLevels = [...new Set(logs.map((l) => l.grade_level))].filter(Boolean).sort();
-    const classrooms = sortClassrooms([...new Set(logs.map((l) => String(l.classroom ?? "")))].filter(Boolean));
-    const teacherNames = [...new Set(logs.map((l) => l.teacher_name).filter(Boolean) as string[])].sort();
+
+    // Filter options based on currently selected filters (cascading)
+    let availableLogs = logs;
+    if (filters.academicTerm) {
+      availableLogs = availableLogs.filter((l) => l.academic_term === filters.academicTerm);
+    }
+    if (filters.teacherName) {
+      availableLogs = availableLogs.filter((l) => l.teacher_name === filters.teacherName);
+    }
+    if (filters.gradeLevel) {
+      availableLogs = availableLogs.filter((l) => l.grade_level === filters.gradeLevel);
+    }
+    if (filters.classroom) {
+      availableLogs = availableLogs.filter((l) => String(l.classroom ?? "") === filters.classroom);
+    }
+
+    const subjects = [...new Set(availableLogs.map((l) => l.subject))].filter(Boolean).sort();
+    const gradeLevels = [...new Set(availableLogs.map((l) => l.grade_level))].filter(Boolean).sort();
+    const classrooms = sortClassrooms([...new Set(availableLogs.map((l) => String(l.classroom ?? "")))].filter(Boolean));
+    const teacherNames = [...new Set(availableLogs.map((l) => l.teacher_name).filter(Boolean) as string[])].sort();
+
     return { academicTerms, subjects, gradeLevels, classrooms, teacherNames };
-  }, [logs]);
+  }, [logs, filters.academicTerm, filters.teacherName, filters.gradeLevel, filters.classroom]);
 
   const filteredLogs = useMemo(() => {
     return logs.filter((l) => {
@@ -330,6 +342,18 @@ export default function History() {
                 <h1 className="text-2xl font-bold text-foreground">ประวัติการสอน</h1>
               </div>
               <div className="flex items-center gap-2">
+                {filteredLogs.length > 0 && (
+                  <ExportFilteredLogsButton
+                    logs={filteredLogs}
+                    teacherName={filters.teacherName || profile?.full_name || user?.email}
+                    filters={{
+                      academicTerm: filters.academicTerm,
+                      subject: filters.subject,
+                      gradeLevel: filters.gradeLevel,
+                      classroom: filters.classroom,
+                    }}
+                  />
+                )}
                 {user && (
                   <Button
                     variant="outline"
