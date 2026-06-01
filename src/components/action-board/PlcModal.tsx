@@ -114,7 +114,7 @@ export function PlcModal({
     }
 
     const members = Array.from(selectedMembers).map((tid) => {
-      const t = teachers.find((x) => x.id === tid);
+      const t = teachers.find((x) => x.user_id === tid);
       return { teacher_id: tid, teacher_name: t?.full_name ?? "" };
     });
 
@@ -264,17 +264,17 @@ export function PlcModal({
                   <p className="text-sm text-muted-foreground">ไม่มีรายชื่อครู</p>
                 ) : (
                   teachers.map((t) => (
-                    <div key={t.id} className="flex items-center space-x-2">
+                    <div key={t.user_id} className="flex items-center space-x-2">
                       <Checkbox
-                        id={`teacher_${t.id}`}
-                        checked={selectedMembers.has(t.id)}
-                        onCheckedChange={() => toggleMember(t.id)}
+                        id={`teacher_${t.user_id}`}
+                        checked={selectedMembers.has(t.user_id)}
+                        onCheckedChange={() => toggleMember(t.user_id)}
                       />
                       <label
-                        htmlFor={`teacher_${t.id}`}
+                        htmlFor={`teacher_${t.user_id}`}
                         className="text-sm font-normal cursor-pointer flex-1"
                       >
-                        {t.full_name || t.id}
+                        {t.full_name || t.user_id}
                       </label>
                     </div>
                   ))

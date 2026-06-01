@@ -64,12 +64,12 @@ export function useTeacherList() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, full_name, role")
+        .select("user_id, full_name, role")
         .eq("role", "teacher")
         .order("full_name");
 
       if (error) throw error;
-      return (data ?? []) as { id: string; full_name: string; role: string }[];
+      return (data ?? []) as { user_id: string; full_name: string; role: string }[];
     },
   });
 }
