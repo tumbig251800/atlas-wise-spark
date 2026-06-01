@@ -15,7 +15,8 @@ const WATCH_THRESHOLD = -0.5; // delta <= this (but > ACTION) → Watch (status 
 
 const BASE_METRIC_LABEL = "Mastery ลดลง (เฉลี่ย 3 คาบ)";
 const ESCALATE_SUFFIX = "ตกต่อเนื่อง — เข้านิเทศ";
-const RESOLVE_SUFFIX = "คะแนนฟื้นตัว — ปิดอัตโนมัติ";
+const RESOLVE_SUFFIX = "คะแนนที่ลดลง ไม่เกินเกณฑ์วิกฤต (0.5) — ไม่จำเป็นต้องเข้าแทรกแซง";
+const RECOVER_SUFFIX = "คะแนนฟื้นตัว — ปิดอัตโนมัติ";
 
 type SupabaseClient = ReturnType<typeof createClient>;
 
@@ -239,8 +240,8 @@ async function runWatchReevaluation(
           status: "resolved",
           auto_resolved: true,
           resolved_at: nowIso,
-          resolution_note: RESOLVE_SUFFIX,
-          metric_label: `${BASE_METRIC_LABEL} — ${RESOLVE_SUFFIX}`,
+          resolution_note: RECOVER_SUFFIX,
+          metric_label: `${BASE_METRIC_LABEL} — ${RECOVER_SUFFIX}`,
           watch_started_at: null,
         })
         .eq("id", item.id);
