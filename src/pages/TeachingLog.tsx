@@ -28,12 +28,18 @@ import { Step3Gap } from "@/components/teaching-log/Step3Gap";
 import { Step4Action } from "@/components/teaching-log/Step4Action";
 import { PreSubmitSummary } from "@/components/teaching-log/PreSubmitSummary";
 import { SpecialCarePlanModal } from "@/components/teaching-log/SpecialCarePlanModal";
+import { ValidationBanner } from "@/components/teaching-log/ValidationBanner";
+import { PostSubmitFlagDialog } from "@/components/teaching-log/PostSubmitFlagDialog";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/atlasSupabase";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, ArrowRight, Save, Loader2 } from "lucide-react";
 import { validateKeyIssue } from "@/lib/keyIssueValidation";
+import {
+  useTeachingLogValidation,
+  type FlagResult,
+} from "@/hooks/useTeachingLogValidation";
 
 export interface TeachingLogForm {
   teachingDate: string;
@@ -93,6 +99,20 @@ export default function TeachingLog() {
   const [scStudentIds, setScStudentIds] = useState<string[]>([]);
   const [scLogId, setScLogId] = useState("");
   const diagnosticCalledRef = useRef<Set<string>>(new Set());
+
+  // Real-time validation + post-submit FLAG feedback.
+  const [showPostSubmit, setShowPostSubmit] = useState(false);
+  const [postSubmitFlags, setPostSubmitFlags] = useState<FlagResult[]>([]);
+  const lastSubmittedFormRef = useRef<TeachingLogForm | null>(null);
+
+  const validation = useTeachingLogValidation({
+    masteryScore: form.masteryScore,
+    majorGap: form.majorGap,
+    healthCareStatus: form.healthCareStatus === "has",
+    healthCareIds: form.healthCareIds,
+    remedialIds: form.remedialIds,
+    teachingDate: form.teachingDate,
+  });
 
   // Fetch teacher name from profile
   useEffect(() => {
@@ -291,13 +311,25 @@ export default function TeachingLog() {
       setShowSummary(false);
       localStorage.removeItem(DRAFT_KEY);
 
+      // Snapshot the submitted values so "แก้ไขบันทึก" can reopen them for editing.
+      lastSubmittedFormRef.current = form;
+
+      let willShowSpecialCare = false;
       if (form.majorGap === "a-gap" && form.remedialIds.trim() && logData?.id) {
         const ids = form.remedialIds.split(",").map((s) => s.trim()).filter(Boolean);
         if (ids.length > 0) {
           setScStudentIds(ids);
           setScLogId(logData.id);
           setShowSpecialCarePlan(true);
+          willShowSpecialCare = true;
         }
+      }
+
+      // Surface detected FLAGs after submit — unless the special-care modal is
+      // already taking over (avoid stacking two dialogs).
+      if (validation.flags.length > 0 && !willShowSpecialCare) {
+        setPostSubmitFlags(validation.flags);
+        setShowPostSubmit(true);
       }
 
       const persist = localStorage.getItem(SMART_PERSIST_KEY);
@@ -331,6 +363,15 @@ export default function TeachingLog() {
           {currentStep === 4 && <Step4Action data={form} onChange={handleChange} errors={errors} masteryScore={form.masteryScore} totalStudents={form.totalStudents} majorGap={form.majorGap} />}
         </div>
 
+        {/* Real-time validation summary — shown on the final (submit) step. */}
+        {currentStep === 4 && (
+          <ValidationBanner
+            warnings={validation.warnings}
+            errors={validation.errors}
+            lateByDays={validation.lateByDays}
+          />
+        )}
+
         {/* Navigation */}
         <div className="flex justify-between">
           <Button variant="outline" onClick={handleBack} disabled={currentStep === 1}>
@@ -342,7 +383,7 @@ export default function TeachingLog() {
               ถัดไป <ArrowRight className="w-4 h-4 ml-1" />
             </Button>
           ) : (
-            <Button onClick={handlePreSubmit} disabled={submitting} className="bg-[hsl(var(--atlas-success))] hover:bg-[hsl(var(--atlas-success))]/90">
+            <Button onClick={handlePreSubmit} disabled={submitting || validation.errors.length > 0} className="bg-[hsl(var(--atlas-success))] hover:bg-[hsl(var(--atlas-success))]/90">
               {submitting ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Save className="w-4 h-4 mr-1" />}
               บันทึก
             </Button>
@@ -365,6 +406,19 @@ export default function TeachingLog() {
         teacherId={user?.id ?? ""}
         onClose={() => setShowSpecialCarePlan(false)}
         onSaved={() => setShowSpecialCarePlan(false)}
+      />
+
+      <PostSubmitFlagDialog
+        open={showPostSubmit}
+        flags={postSubmitFlags}
+        onClose={() => setShowPostSubmit(false)}
+        onEdit={() => {
+          if (lastSubmittedFormRef.current) {
+            setForm(lastSubmittedFormRef.current);
+            setCurrentStep(1);
+          }
+          setShowPostSubmit(false);
+        }}
       />
     </AppLayout>
   );
