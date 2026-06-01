@@ -11,7 +11,9 @@ import { useActionItems, usePassActionItem, ACTION_ITEMS_KEY, daysRemaining, typ
 import { ActionStatsBar } from "@/components/action-board/ActionStatsBar";
 import { ActionFilters, type ActionFilterChip } from "@/components/action-board/ActionFilters";
 import { ActionTable } from "@/components/action-board/ActionTable";
+import { TeacherActionView } from "@/components/action-board/TeacherActionView";
 import { VerifyDismissDialog } from "@/components/action-board/VerifyDismissDialog";
+import { useUserRole } from "@/hooks/useUserRole";
 
 const PAGE_SIZE = 20;
 
@@ -86,6 +88,7 @@ export default function ActionBoard() {
 
   const passItem = usePassActionItem();
   const { role } = useAuth();
+  const { isTeacher, teacherId, loading: roleLoading } = useUserRole();
   const { toast } = useToast();
   const qc = useQueryClient();
   const [running, setRunning] = useState(false);
@@ -130,7 +133,9 @@ export default function ActionBoard() {
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <ListChecks className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold text-foreground">Action Board</h1>
+            <h1 className="text-2xl font-bold text-foreground">
+              {isTeacher ? "รายการติดตามของคุณ" : "Action Board"}
+            </h1>
           </div>
           {role === "director" && (
             <Button
@@ -151,7 +156,15 @@ export default function ActionBoard() {
           </div>
         )}
 
-        {isLoading ? (
+        {roleLoading ? (
+          <div className="space-y-3">
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-16 w-full" />
+            <Skeleton className="h-64 w-full" />
+          </div>
+        ) : isTeacher && teacherId ? (
+          <TeacherActionView teacherId={teacherId} />
+        ) : isLoading ? (
           <div className="space-y-3">
             <Skeleton className="h-20 w-full" />
             <Skeleton className="h-16 w-full" />

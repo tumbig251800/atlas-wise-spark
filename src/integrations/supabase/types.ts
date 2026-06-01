@@ -433,6 +433,7 @@ export type Database = {
           created_at: string
           full_name: string
           id: string
+          role: string
           teacher_code: string | null
           updated_at: string
           user_id: string
@@ -441,6 +442,7 @@ export type Database = {
           created_at?: string
           full_name?: string
           id?: string
+          role?: string
           teacher_code?: string | null
           updated_at?: string
           user_id: string
@@ -449,6 +451,7 @@ export type Database = {
           created_at?: string
           full_name?: string
           id?: string
+          role?: string
           teacher_code?: string | null
           updated_at?: string
           user_id?: string
