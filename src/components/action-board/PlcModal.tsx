@@ -49,7 +49,7 @@ export function PlcModal({
 }: PlcModalProps) {
   const { user } = useAuth();
   const { savePlcSession } = usePlcSessions();
-  const { data: teachers = [] } = useTeacherList();
+  const { data: teachers = [], isLoading: teachersLoading } = useTeacherList();
 
   const authName =
     (user?.user_metadata?.full_name as string | undefined) ??
@@ -258,7 +258,9 @@ export function PlcModal({
             <div>
               <Label>สมาชิก PLC</Label>
               <div className="border border-border rounded-md p-3 space-y-2 max-h-40 overflow-y-auto">
-                {teachers.length === 0 ? (
+                {teachersLoading ? (
+                  <p className="text-sm text-muted-foreground">กำลังโหลดรายชื่อครู...</p>
+                ) : teachers.length === 0 ? (
                   <p className="text-sm text-muted-foreground">ไม่มีรายชื่อครู</p>
                 ) : (
                   teachers.map((t) => (
@@ -268,9 +270,12 @@ export function PlcModal({
                         checked={selectedMembers.has(t.id)}
                         onCheckedChange={() => toggleMember(t.id)}
                       />
-                      <Label htmlFor={`teacher_${t.id}`} className="font-normal cursor-pointer">
-                        {t.full_name}
-                      </Label>
+                      <label
+                        htmlFor={`teacher_${t.id}`}
+                        className="text-sm font-normal cursor-pointer flex-1"
+                      >
+                        {t.full_name || t.id}
+                      </label>
                     </div>
                   ))
                 )}
