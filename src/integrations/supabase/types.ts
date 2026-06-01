@@ -428,6 +428,72 @@ export type Database = {
           },
         ]
       }
+      plc_sessions: {
+        Row: {
+          action_steps: string | null
+          approach: string | null
+          created_at: string
+          created_by: string | null
+          duration_minutes: number | null
+          facilitator_name: string
+          grade_band: string | null
+          id: string
+          linked_action_item_ids: number[]
+          members: Json
+          next_plc_date: string | null
+          outcome_type: string
+          plc_type: string
+          problem_statement: string | null
+          root_cause: string | null
+          session_date: string
+          subject: string | null
+          topic: string
+          updated_at: string
+        }
+        Insert: {
+          action_steps?: string | null
+          approach?: string | null
+          created_at?: string
+          created_by?: string | null
+          duration_minutes?: number | null
+          facilitator_name?: string
+          grade_band?: string | null
+          id?: string
+          linked_action_item_ids?: number[]
+          members?: Json
+          next_plc_date?: string | null
+          outcome_type?: string
+          plc_type: string
+          problem_statement?: string | null
+          root_cause?: string | null
+          session_date?: string
+          subject?: string | null
+          topic?: string
+          updated_at?: string
+        }
+        Update: {
+          action_steps?: string | null
+          approach?: string | null
+          created_at?: string
+          created_by?: string | null
+          duration_minutes?: number | null
+          facilitator_name?: string
+          grade_band?: string | null
+          id?: string
+          linked_action_item_ids?: number[]
+          members?: Json
+          next_plc_date?: string | null
+          outcome_type?: string
+          plc_type?: string
+          problem_statement?: string | null
+          root_cause?: string | null
+          session_date?: string
+          subject?: string | null
+          topic?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -638,6 +704,7 @@ export type Database = {
           classroom: string
           classroom_management: string | null
           created_at: string
+          days_late: number | null
           grade_level: string
           health_care_ids: string | null
           health_care_status: boolean
@@ -668,6 +735,7 @@ export type Database = {
           classroom: string
           classroom_management?: string | null
           created_at?: string
+          days_late?: number | null
           grade_level: string
           health_care_ids?: string | null
           health_care_status?: boolean
@@ -698,6 +766,7 @@ export type Database = {
           classroom?: string
           classroom_management?: string | null
           created_at?: string
+          days_late?: number | null
           grade_level?: string
           health_care_ids?: string | null
           health_care_status?: boolean
@@ -901,6 +970,7 @@ export type Database = {
         Args: { user_email: string }
         Returns: undefined
       }
+      run_mastery_watch_batch: { Args: never; Returns: Json }
     }
     Enums: {
       activity_mode: "active" | "passive" | "constructive"

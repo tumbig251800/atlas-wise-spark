@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { RotateCcw, Filter } from "lucide-react";
 
 export interface HistoryFiltersState {
+  academicTerm: string;
   subject: string;
   gradeLevel: string;
   classroom: string;
@@ -16,6 +17,7 @@ export interface HistoryFiltersState {
 }
 
 export interface HistoryFilterOptions {
+  academicTerms: string[];
   subjects: string[];
   gradeLevels: string[];
   classrooms: string[];
@@ -62,6 +64,7 @@ function FilterSelect({
 
 export function HistoryFilters({ filters, setFilters, options, isDirector }: Props) {
   const hasActive =
+    filters.academicTerm ||
     filters.subject ||
     filters.gradeLevel ||
     filters.classroom ||
@@ -69,6 +72,7 @@ export function HistoryFilters({ filters, setFilters, options, isDirector }: Pro
 
   const resetFilters = () =>
     setFilters({
+      academicTerm: "",
       subject: "",
       gradeLevel: "",
       classroom: "",
@@ -82,6 +86,12 @@ export function HistoryFilters({ filters, setFilters, options, isDirector }: Pro
         <span>ตัวกรองประวัติการสอน</span>
       </div>
       <div className="flex flex-wrap gap-4 items-end">
+        <FilterSelect
+          label="ภาคเรียน"
+          value={filters.academicTerm}
+          options={options.academicTerms}
+          onChange={(v) => setFilters({ ...filters, academicTerm: v })}
+        />
         <FilterSelect
           label="วิชา"
           value={filters.subject}

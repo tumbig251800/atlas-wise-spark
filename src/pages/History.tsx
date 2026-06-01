@@ -68,6 +68,7 @@ function formatDate(dateStr: string) {
 export default function History() {
   const [logs, setLogs] = useState<TeachingLog[]>([]);
   const [filters, setFilters] = useState<HistoryFiltersState>({
+    academicTerm: "",
     subject: "",
     gradeLevel: "",
     classroom: "",
@@ -98,7 +99,16 @@ export default function History() {
         q = q.eq("teacher_id", user.id);
       }
       const { data, error } = await q;
-      if (!error && data) setLogs(data);
+      if (!error && data) {
+        setLogs(data);
+        // Set default academic term to the latest term if not already set
+        if (data.length > 0 && !filters.academicTerm) {
+          const terms = [...new Set(data.map((l) => l.academic_term).filter(Boolean) as string[])].sort().reverse();
+          if (terms.length > 0) {
+            setFilters((prev) => ({ ...prev, academicTerm: terms[0] }));
+          }
+        }
+      }
       setLoading(false);
     };
     fetchLogs();
@@ -289,15 +299,17 @@ export default function History() {
   };
 
   const filterOptions: HistoryFilterOptions = useMemo(() => {
+    const academicTerms = [...new Set(logs.map((l) => l.academic_term).filter(Boolean) as string[])].sort().reverse();
     const subjects = [...new Set(logs.map((l) => l.subject))].filter(Boolean).sort();
     const gradeLevels = [...new Set(logs.map((l) => l.grade_level))].filter(Boolean).sort();
     const classrooms = sortClassrooms([...new Set(logs.map((l) => String(l.classroom ?? "")))].filter(Boolean));
     const teacherNames = [...new Set(logs.map((l) => l.teacher_name).filter(Boolean) as string[])].sort();
-    return { subjects, gradeLevels, classrooms, teacherNames };
+    return { academicTerms, subjects, gradeLevels, classrooms, teacherNames };
   }, [logs]);
 
   const filteredLogs = useMemo(() => {
     return logs.filter((l) => {
+      if (filters.academicTerm && l.academic_term !== filters.academicTerm) return false;
       if (filters.subject && l.subject !== filters.subject) return false;
       if (filters.gradeLevel && l.grade_level !== filters.gradeLevel) return false;
       if (filters.classroom && String(l.classroom ?? "") !== filters.classroom) return false;
@@ -387,7 +399,7 @@ export default function History() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setFilters({ subject: "", gradeLevel: "", classroom: "", teacherName: "" })}
+                        onClick={() => setFilters({ academicTerm: "", subject: "", gradeLevel: "", classroom: "", teacherName: "" })}
                       >
                         รีเซ็ต filter
                       </Button>
@@ -438,6 +450,18 @@ export default function History() {
                                 </Badge>
                               ) : null;
                             })}
+                            {log.days_late != null && log.days_late > 1 && (
+                              <Badge
+                                variant="outline"
+                                className={
+                                  log.days_late >= 4
+                                    ? "bg-red-100 text-red-700 border-red-300"
+                                    : "bg-yellow-100 text-yellow-700 border-yellow-300"
+                                }
+                              >
+                                กรอกล่าช้า {log.days_late} วัน
+                              </Badge>
+                            )}
                           </div>
                           {log.topic && (
                             <p className="text-sm text-muted-foreground truncate">
