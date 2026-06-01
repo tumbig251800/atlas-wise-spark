@@ -345,7 +345,7 @@ export default function History() {
                 {filteredLogs.length > 0 && (
                   <ExportFilteredLogsButton
                     logs={filteredLogs}
-                    teacherName={filters.teacherName || profile?.full_name || user?.email}
+                    teacherName={filters.teacherName || user?.email || "ไม่ระบุ"}
                     filters={{
                       academicTerm: filters.academicTerm,
                       subject: filters.subject,
