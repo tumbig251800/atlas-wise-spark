@@ -32,6 +32,7 @@ interface PlcModalProps {
   onSaved: (session: PlcSession) => void;
   actionItem: ActionItem;
   existingSession?: PlcSession | null;
+  prefilledData?: Partial<PlcSession>;
 }
 
 function todayISO(): string {
@@ -46,6 +47,7 @@ export function PlcModal({
   onSaved,
   actionItem,
   existingSession,
+  prefilledData,
 }: PlcModalProps) {
   const { user } = useAuth();
   const { savePlcSession } = usePlcSessions();
@@ -89,6 +91,22 @@ export function PlcModal({
       setActionSteps(existingSession.action_steps || "");
       setOutcomeType(existingSession.outcome_type);
       setNextPlcDate(existingSession.next_plc_date || "");
+    } else if (prefilledData) {
+      // Use prefilled data from AI planner
+      setSessionDate(todayISO());
+      setDurationMinutes("");
+      setPlcType(prefilledData.plc_type || "subject");
+      setGradeBand(prefilledData.grade_band ?? "");
+      setSubject(prefilledData.subject ?? "");
+      setFacilitatorName(authName);
+      setSelectedMembers(new Set(prefilledData.members?.map((m) => m.teacher_id) ?? []));
+      setTopic(prefilledData.topic || "");
+      setProblemStatement(prefilledData.problem_statement || "");
+      setRootCause(prefilledData.root_cause || "");
+      setApproach(prefilledData.approach || "");
+      setActionSteps(prefilledData.action_steps || "");
+      setOutcomeType(prefilledData.outcome_type || "continue_plc");
+      setNextPlcDate(prefilledData.next_plc_date || "");
     } else {
       setSessionDate(todayISO());
       setDurationMinutes("");
@@ -105,7 +123,7 @@ export function PlcModal({
       setOutcomeType("continue_plc");
       setNextPlcDate("");
     }
-  }, [open, existingSession, actionItem, authName]);
+  }, [open, existingSession, prefilledData, actionItem, authName]);
 
   const handleSave = async () => {
     if (!topic.trim()) {
@@ -133,7 +151,7 @@ export function PlcModal({
       action_steps: actionSteps,
       outcome_type: outcomeType,
       next_plc_date: outcomeType === "continue_plc" && nextPlcDate ? nextPlcDate : null,
-      linked_action_item_ids: [actionItem.id],
+      linked_action_item_ids: prefilledData?.linked_action_item_ids ?? [actionItem.id],
       created_by: user?.id ?? null,
     };
 

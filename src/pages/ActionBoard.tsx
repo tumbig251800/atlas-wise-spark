@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { AppLayout } from "@/components/AppLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, ListChecks, RefreshCw } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, ListChecks, RefreshCw, Sparkles } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/lib/atlasSupabase";
 import { useAuth } from "@/hooks/useAuth";
@@ -14,7 +14,12 @@ import { ActionFilters, type ActionFilterChip } from "@/components/action-board/
 import { ActionTable } from "@/components/action-board/ActionTable";
 import { TeacherActionView } from "@/components/action-board/TeacherActionView";
 import { VerifyDismissDialog } from "@/components/action-board/VerifyDismissDialog";
+import { PlcModal } from "@/components/action-board/PlcModal";
+import { PlcPlannerModal } from "@/components/action-board/PlcPlannerModal";
 import { useUserRole } from "@/hooks/useUserRole";
+import { usePlcPlanner } from "@/hooks/usePlcPlanner";
+import type { PlcPlan } from "@/types/plc";
+import type { PlcSession } from "@/types/plc";
 
 const PAGE_SIZE = 20;
 
@@ -69,6 +74,13 @@ export default function ActionBoard() {
 
   const [dialogMode, setDialogMode] = useState<"verify" | "dismiss">("verify");
   const [dialogItem, setDialogItem] = useState<ActionItem | null>(null);
+
+  // PLC Planner state
+  const [plannerOpen, setPlannerOpen] = useState(false);
+  const [plcModalOpen, setPlcModalOpen] = useState(false);
+  const [prefilledPlcData, setPrefilledPlcData] = useState<Partial<PlcSession> | null>(null);
+  const [plcPlans, setPlcPlans] = useState<PlcPlan[]>([]);
+  const plcPlanner = usePlcPlanner();
 
   const all = items ?? [];
 
@@ -138,6 +150,39 @@ export default function ActionBoard() {
   };
   const closeDialog = () => setDialogItem(null);
 
+  const handlePlanPLC = () => {
+    setPlannerOpen(true);
+    plcPlanner.mutate(undefined, {
+      onSuccess: (plans) => {
+        setPlcPlans(plans);
+      },
+    });
+  };
+
+  const handlePlanSelected = (plan: PlcPlan) => {
+    // Build prefilled data from plan
+    const prefilled: Partial<PlcSession> = {
+      topic: plan.topic,
+      problem_statement: plan.problem_statement,
+      root_cause: plan.root_cause,
+      approach: plan.approach,
+      plc_type: plan.plc_type as PlcSession["plc_type"],
+      grade_band: plan.grade_band as PlcSession["grade_band"] | undefined,
+      subject: plan.subject,
+      members: plan.members,
+      linked_action_item_ids: plan.covered_item_ids,
+    };
+
+    setPrefilledPlcData(prefilled);
+    setPlannerOpen(false);
+    setPlcModalOpen(true);
+  };
+
+  const handlePlcModalClose = () => {
+    setPlcModalOpen(false);
+    setPrefilledPlcData(null);
+  };
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -149,15 +194,27 @@ export default function ActionBoard() {
             </h1>
           </div>
           {role === "director" && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRunWatchCheck}
-              disabled={running}
-            >
-              <RefreshCw className={`h-4 w-4 mr-1 ${running ? "animate-spin" : ""}`} />
-              รัน Watch Check ตอนนี้
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-violet-400 text-violet-700 hover:bg-violet-50"
+                onClick={handlePlanPLC}
+                disabled={plcPlanner.isPending}
+              >
+                <Sparkles className={`h-4 w-4 mr-1 ${plcPlanner.isPending ? "animate-pulse" : ""}`} />
+                วางแผน PLC ด้วย AI
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRunWatchCheck}
+                disabled={running}
+              >
+                <RefreshCw className={`h-4 w-4 mr-1 ${running ? "animate-spin" : ""}`} />
+                รัน Watch Check ตอนนี้
+              </Button>
+            </div>
           )}
         </div>
 
@@ -249,6 +306,27 @@ export default function ActionBoard() {
           item={dialogItem}
           onClose={closeDialog}
         />
+
+        <PlcPlannerModal
+          open={plannerOpen}
+          onClose={() => setPlannerOpen(false)}
+          onPlanSelected={handlePlanSelected}
+          plans={plcPlans}
+          isLoading={plcPlanner.isPending}
+        />
+
+        {plcModalOpen && (
+          <PlcModal
+            open={plcModalOpen}
+            onClose={handlePlcModalClose}
+            onSaved={() => {
+              setPlcModalOpen(false);
+              setPrefilledPlcData(null);
+            }}
+            actionItem={{} as ActionItem}
+            prefilledData={prefilledPlcData ?? undefined}
+          />
+        )}
       </div>
     </AppLayout>
   );

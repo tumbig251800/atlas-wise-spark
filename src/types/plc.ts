@@ -27,3 +27,18 @@ export const PLC_OUTCOME_LABELS: Record<PlcSession['outcome_type'], string> = {
 };
 
 export const GRADE_BANDS = ['ป.1-3', 'ป.4-6', 'ทั้งโรงเรียน'] as const;
+
+export interface PlcPlan {
+  plan_name: string;
+  topic: string;
+  rationale: string;
+  members: { teacher_id: string; teacher_name: string }[];
+  covered_item_ids: number[];
+  coverage_percent: number;
+  plc_type: 'subject' | 'grade_band' | 'cross';
+  grade_band?: string;
+  subject?: string;
+  problem_statement: string;
+  root_cause: string;
+  approach: string;
+}
