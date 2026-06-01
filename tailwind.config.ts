@@ -5,6 +5,11 @@ export default {
   darkMode: ["class"],
   content: ["./pages/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./app/**/*.{ts,tsx}", "./src/**/*.{ts,tsx}"],
   prefix: "",
+  safelist: [
+    'bg-violet-500', 'hover:bg-violet-500',
+    'bg-red-500', 'hover:bg-red-500',
+    'bg-slate-400', 'hover:bg-slate-400',
+  ],
   theme: {
     container: {
       center: true,
