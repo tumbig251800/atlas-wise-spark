@@ -40,6 +40,7 @@ import {
   useTeachingLogValidation,
   type FlagResult,
 } from "@/hooks/useTeachingLogValidation";
+import { usePreviousMastery } from "@/hooks/usePreviousMastery";
 
 export interface TeachingLogForm {
   teachingDate: string;
@@ -105,6 +106,13 @@ export default function TeachingLog() {
   const [postSubmitFlags, setPostSubmitFlags] = useState<FlagResult[]>([]);
   const lastSubmittedFormRef = useRef<TeachingLogForm | null>(null);
 
+  // Prior mastery for this teacher×subject×classroom×grade — drives FLAG7.
+  const { mastery_score: previousMasteryScore } = usePreviousMastery({
+    subject: form.subject,
+    classroom: form.classroom,
+    gradeLevel: form.gradeLevel,
+  });
+
   const validation = useTeachingLogValidation({
     masteryScore: form.masteryScore,
     majorGap: form.majorGap,
@@ -112,6 +120,7 @@ export default function TeachingLog() {
     healthCareIds: form.healthCareIds,
     remedialIds: form.remedialIds,
     teachingDate: form.teachingDate,
+    previousMasteryScore,
   });
 
   // Fetch teacher name from profile

@@ -31,6 +31,13 @@ export interface TeachingLogValidationInput {
   healthCareIds: string | null;
   remedialIds: string | null;
   teachingDate: string | null;
+  /** Most recent prior mastery for this teacher×subject×classroom (FLAG7). */
+  previousMasteryScore: number | null;
+}
+
+// Format a score delta without trailing ".0" (scores are usually integers).
+function formatDelta(n: number): string {
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
 }
 
 // A remedial/health-care id field counts as "empty" when it is unset, blank,
@@ -61,6 +68,7 @@ export function useTeachingLogValidation(
     healthCareIds,
     remedialIds,
     teachingDate,
+    previousMasteryScore,
   } = input;
 
   return useMemo(() => {
@@ -158,6 +166,30 @@ export function useTeachingLogValidation(
       });
     }
 
+    // FLAG7 — anti-gaming: mastery jumped suspiciously in one period.
+    // Neutral, non-accusatory framing ("ระบบจะตรวจสอบ", never "ครูโกง").
+    if (
+      previousMasteryScore != null &&
+      previousMasteryScore <= 3.0 &&
+      hasMastery &&
+      masteryScore! >= previousMasteryScore + 1.5
+    ) {
+      const delta = formatDelta(masteryScore! - previousMasteryScore);
+      warnings.push({
+        field: "masteryScore",
+        message:
+          `⚠️ Mastery เพิ่มขึ้น ${delta} จุดจากคาบก่อน ` +
+          `(${previousMasteryScore} → ${masteryScore}) — ` +
+          `ระบบจะตรวจสอบความสอดคล้องกับข้อมูลนักเรียน`,
+        flag_code: "FLAG7",
+      });
+      flags.push({
+        code: "FLAG7",
+        description: "Mastery เพิ่มขึ้นผิดปกติจากคาบก่อน — ตรวจสอบความสอดคล้องกับข้อมูลนักเรียน",
+        severity: "warning",
+      });
+    }
+
     // ── Late submission (informational, non-blocking) ────────────────────
     // Surfaced via `lateByDays` so the banner can render its own blue notice
     // (kept out of `warnings` to avoid showing the same message twice).
@@ -171,5 +203,6 @@ export function useTeachingLogValidation(
     healthCareIds,
     remedialIds,
     teachingDate,
+    previousMasteryScore,
   ]);
 }
