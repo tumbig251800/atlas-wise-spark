@@ -1,4 +1,4 @@
-import { Fragment, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Table,
@@ -9,9 +9,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight, ExternalLink, CheckCircle2, XCircle, Bot } from "lucide-react";
+import { ChevronDown, ChevronRight, ExternalLink, CheckCircle2, XCircle, Bot, ClipboardList } from "lucide-react";
 import type { ActionItem } from "@/hooks/useActionItems";
 import { StatusBadge, IssueTypeBadge, SeverityBadge } from "./StatusBadge";
+import { useNidetVisits } from "@/hooks/useNidetVisits";
+import { NidetVisitModal } from "./NidetVisitModal";
+import { NidetVisitCard } from "./NidetVisitCard";
+import { RUBRIC_DIMENSIONS, type NidetVisit } from "@/types/nidet";
 
 interface Props {
   items: ActionItem[];
@@ -29,7 +33,7 @@ function formatDate(d: string | null): string {
   });
 }
 
-function buildAiPrompt(item: ActionItem): string {
+function buildAiPrompt(item: ActionItem, visit?: NidetVisit | null): string {
   const parts: string[] = [];
   if (item.issue_type) parts.push(`ปัญหาประเภท: ${item.issue_type}`);
   if (item.metric_label) {
@@ -40,20 +44,64 @@ function buildAiPrompt(item: ActionItem): string {
   if (item.detail) parts.push(`รายละเอียด: ${item.detail}`);
   if (item.ai_summary) parts.push(`สรุปจาก AI: ${item.ai_summary}`);
   const body = parts.join("\n");
-  return `ช่วยวิเคราะห์และแนะนำแนวทางแก้ไขปัญหาต่อไปนี้ให้หน่อยครับ:\n${body}`;
+  let prompt = `ช่วยวิเคราะห์และแนะนำแนวทางแก้ไขปัญหาต่อไปนี้ให้หน่อยครับ:\n${body}`;
+
+  if (visit) {
+    const rubricSummary = RUBRIC_DIMENSIONS.filter((d) => visit[d.key] !== null)
+      .map((d) => `${d.label} = ${visit[d.key]}/4`)
+      .join(", ");
+    prompt += `\n\nผลการนิเทศ (${visit.visit_date}):
+จุดเด่น: ${visit.strengths}
+จุดพัฒนา: ${visit.improvements}
+ข้อเสนอแนะ: ${visit.recommendations}
+คะแนน rubric ที่ให้: ${rubricSummary}`;
+  }
+
+  return prompt;
 }
 
 export function ActionTable({ items, startIndex = 0, onVerify, onDismiss }: Props) {
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
+  const { fetchVisit } = useNidetVisits();
+  const [nidetVisits, setNidetVisits] = useState<Map<number, NidetVisit>>(new Map());
+  const fetchedRef = useRef<Set<number>>(new Set());
+  const [nidetModalOpen, setNidetModalOpen] = useState(false);
+  const [nidetModalActionItem, setNidetModalActionItem] = useState<ActionItem | null>(null);
+
   const toggle = (id: number) => {
     setExpanded((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+        // Lazy-load the supervision visit for this row once.
+        if (!fetchedRef.current.has(id)) {
+          fetchedRef.current.add(id);
+          fetchVisit(id)
+            .then((v) => {
+              if (v) setNidetVisits((m) => new Map(m).set(id, v));
+            })
+            .catch(() => {
+              // allow a retry on next expand
+              fetchedRef.current.delete(id);
+            });
+        }
+      }
       return next;
     });
+  };
+
+  const openNidetModal = (item: ActionItem) => {
+    setNidetModalActionItem(item);
+    setNidetModalOpen(true);
+  };
+
+  const handleNidetSaved = (visit: NidetVisit) => {
+    setNidetVisits((m) => new Map(m).set(visit.action_item_id, visit));
+    setNidetModalOpen(false);
   };
 
   if (items.length === 0) {
@@ -83,6 +131,7 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss }: Prop
           {items.map((item, idx) => {
             const isOpen = expanded.has(item.id);
             const canResolve = item.status === "open" || item.status === "resolved";
+            const visit = nidetVisits.get(item.id) ?? null;
             return (
               <Fragment key={item.id}>
                 <TableRow
@@ -95,7 +144,14 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss }: Prop
                   <TableCell className="text-muted-foreground">{startIndex + idx + 1}</TableCell>
                   <TableCell><IssueTypeBadge type={item.issue_type} /></TableCell>
                   <TableCell className="font-medium">
-                    <div>{item.teacher_name ?? "—"}</div>
+                    <div className="flex items-center gap-2">
+                      <span>{item.teacher_name ?? "—"}</span>
+                      {visit && (
+                        <span className="text-[11px] bg-sky-100 text-sky-800 border border-sky-200 rounded px-1.5 py-0.5">
+                          นิเทศแล้ว
+                        </span>
+                      )}
+                    </div>
                     <div className="text-xs text-muted-foreground">
                       {item.grade_level ?? "—"} {item.classroom ?? ""} · {item.subject ?? "—"}
                     </div>
@@ -171,8 +227,20 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss }: Prop
                           </div>
                         )}
 
-                        {(canResolve || (item.subject && item.grade_level && item.classroom)) && (
-                          <div className="flex gap-2 pt-2 border-t border-border">
+                        {visit && (
+                          <NidetVisitCard visit={visit} onEdit={() => openNidetModal(item)} />
+                        )}
+
+                        <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-sky-300 text-sky-800 hover:bg-sky-50"
+                            onClick={(e) => { e.stopPropagation(); openNidetModal(item); }}
+                          >
+                            <ClipboardList className="h-4 w-4 mr-1" />
+                            {visit ? "แก้ไขบันทึก" : "บันทึกนิเทศ"}
+                          </Button>
                             {canResolve && (
                               <>
                                 <Button
@@ -201,7 +269,7 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss }: Prop
                                       subject: item.subject,
                                       gradeLevel: item.grade_level,
                                       classroom: item.classroom,
-                                      initialPrompt: buildAiPrompt(item),
+                                      initialPrompt: buildAiPrompt(item, visit),
                                     },
                                   });
                                 }}
@@ -210,7 +278,6 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss }: Prop
                               </Button>
                             )}
                           </div>
-                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -220,6 +287,22 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss }: Prop
           })}
         </TableBody>
       </Table>
+
+      {nidetModalActionItem && (
+        <NidetVisitModal
+          open={nidetModalOpen}
+          onClose={() => setNidetModalOpen(false)}
+          onSaved={handleNidetSaved}
+          actionItem={{
+            id: nidetModalActionItem.id,
+            subject: nidetModalActionItem.subject ?? undefined,
+            grade_level: nidetModalActionItem.grade_level ?? undefined,
+            classroom: nidetModalActionItem.classroom ?? undefined,
+            issue_type: nidetModalActionItem.issue_type ?? undefined,
+          }}
+          existingVisit={nidetVisits.get(nidetModalActionItem.id) ?? null}
+        />
+      )}
     </div>
   );
 }

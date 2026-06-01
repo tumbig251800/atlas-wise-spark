@@ -250,6 +250,83 @@ export type Database = {
         }
         Relationships: []
       }
+      nidet_visits: {
+        Row: {
+          action_item_id: number
+          created_at: string
+          follow_up_date: string | null
+          follow_up_method: string | null
+          id: string
+          improvements: string | null
+          recommendations: string | null
+          rubric_activity_design: number | null
+          rubric_classroom_climate: number | null
+          rubric_collaborative: number | null
+          rubric_feedback: number | null
+          rubric_formative_assess: number | null
+          rubric_individual_care: number | null
+          rubric_media_tech: number | null
+          rubric_questioning: number | null
+          strengths: string | null
+          supervisor_id: string | null
+          supervisor_name: string
+          updated_at: string
+          visit_date: string
+        }
+        Insert: {
+          action_item_id: number
+          created_at?: string
+          follow_up_date?: string | null
+          follow_up_method?: string | null
+          id?: string
+          improvements?: string | null
+          recommendations?: string | null
+          rubric_activity_design?: number | null
+          rubric_classroom_climate?: number | null
+          rubric_collaborative?: number | null
+          rubric_feedback?: number | null
+          rubric_formative_assess?: number | null
+          rubric_individual_care?: number | null
+          rubric_media_tech?: number | null
+          rubric_questioning?: number | null
+          strengths?: string | null
+          supervisor_id?: string | null
+          supervisor_name?: string
+          updated_at?: string
+          visit_date?: string
+        }
+        Update: {
+          action_item_id?: number
+          created_at?: string
+          follow_up_date?: string | null
+          follow_up_method?: string | null
+          id?: string
+          improvements?: string | null
+          recommendations?: string | null
+          rubric_activity_design?: number | null
+          rubric_classroom_climate?: number | null
+          rubric_collaborative?: number | null
+          rubric_feedback?: number | null
+          rubric_formative_assess?: number | null
+          rubric_individual_care?: number | null
+          rubric_media_tech?: number | null
+          rubric_questioning?: number | null
+          strengths?: string | null
+          supervisor_id?: string | null
+          supervisor_name?: string
+          updated_at?: string
+          visit_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nidet_visits_action_item_id_fkey"
+            columns: ["action_item_id"]
+            isOneToOne: false
+            referencedRelation: "action_plan_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pivot_events: {
         Row: {
           classroom: string
@@ -345,62 +422,6 @@ export type Database = {
         }
         Relationships: []
       }
-      student_support_plans: {
-        Row: {
-          care_plan: string | null
-          concern: string | null
-          created_at: string
-          follow_up_date: string | null
-          gap_type: string
-          id: number
-          resolved_at: string | null
-          resolved_note: string | null
-          source_log_id: string | null
-          status: string
-          student_id: string
-          teacher_id: string | null
-          updated_at: string
-        }
-        Insert: {
-          care_plan?: string | null
-          concern?: string | null
-          created_at?: string
-          follow_up_date?: string | null
-          gap_type: string
-          id?: number
-          resolved_at?: string | null
-          resolved_note?: string | null
-          source_log_id?: string | null
-          status?: string
-          student_id: string
-          teacher_id?: string | null
-          updated_at?: string
-        }
-        Update: {
-          care_plan?: string | null
-          concern?: string | null
-          created_at?: string
-          follow_up_date?: string | null
-          gap_type?: string
-          id?: number
-          resolved_at?: string | null
-          resolved_note?: string | null
-          source_log_id?: string | null
-          status?: string
-          student_id?: string
-          teacher_id?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "student_support_plans_source_log_id_fkey"
-            columns: ["source_log_id"]
-            isOneToOne: false
-            referencedRelation: "teaching_logs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       strike_counter: {
         Row: {
           classroom: string | null
@@ -457,6 +478,62 @@ export type Database = {
           topic?: string
         }
         Relationships: []
+      }
+      student_support_plans: {
+        Row: {
+          care_plan: string | null
+          concern: string | null
+          created_at: string
+          follow_up_date: string | null
+          gap_type: string
+          id: number
+          resolved_at: string | null
+          resolved_note: string | null
+          source_log_id: string | null
+          status: string
+          student_id: string
+          teacher_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          care_plan?: string | null
+          concern?: string | null
+          created_at?: string
+          follow_up_date?: string | null
+          gap_type: string
+          id?: number
+          resolved_at?: string | null
+          resolved_note?: string | null
+          source_log_id?: string | null
+          status?: string
+          student_id: string
+          teacher_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          care_plan?: string | null
+          concern?: string | null
+          created_at?: string
+          follow_up_date?: string | null
+          gap_type?: string
+          id?: number
+          resolved_at?: string | null
+          resolved_note?: string | null
+          source_log_id?: string | null
+          status?: string
+          student_id?: string
+          teacher_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "special_care_plans_source_log_id_fkey"
+            columns: ["source_log_id"]
+            isOneToOne: false
+            referencedRelation: "teaching_logs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       students: {
         Row: {
