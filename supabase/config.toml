@@ -19,3 +19,7 @@ verify_jwt = false
 # atlas-mcp: auth handled internally via ATLAS_MCP_API_KEY secret
 [functions.atlas-mcp]
 verify_jwt = false
+
+# atlas-mastery-watch: auth handled internally via requireAtlasUser
+[functions.atlas-mastery-watch]
+verify_jwt = false

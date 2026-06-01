@@ -3,7 +3,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, ListChecks } from "lucide-react";
-import { useActionItems, daysRemaining, type ActionItem } from "@/hooks/useActionItems";
+import { useActionItems, usePassActionItem, daysRemaining, type ActionItem } from "@/hooks/useActionItems";
 import { ActionStatsBar } from "@/components/action-board/ActionStatsBar";
 import { ActionFilters, type ActionFilterChip } from "@/components/action-board/ActionFilters";
 import { ActionTable } from "@/components/action-board/ActionTable";
@@ -80,6 +80,8 @@ export default function ActionBoard() {
   const safePage = Math.min(page, totalPages - 1);
   const paged = filtered.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
 
+  const passItem = usePassActionItem();
+
   const handleVerify = (item: ActionItem) => {
     setDialogItem(item);
     setDialogMode("verify");
@@ -87,6 +89,9 @@ export default function ActionBoard() {
   const handleDismiss = (item: ActionItem) => {
     setDialogItem(item);
     setDialogMode("dismiss");
+  };
+  const handlePass = (item: ActionItem) => {
+    passItem.mutate(item.id);
   };
   const closeDialog = () => setDialogItem(null);
 
@@ -125,6 +130,7 @@ export default function ActionBoard() {
               startIndex={safePage * PAGE_SIZE}
               onVerify={handleVerify}
               onDismiss={handleDismiss}
+              onPass={handlePass}
             />
 
             {totalPages > 1 && (

@@ -22,6 +22,7 @@ interface Props {
   startIndex?: number;
   onVerify: (item: ActionItem) => void;
   onDismiss: (item: ActionItem) => void;
+  onPass: (item: ActionItem) => void;
 }
 
 function formatDate(d: string | null): string {
@@ -30,6 +31,18 @@ function formatDate(d: string | null): string {
     year: "numeric",
     month: "short",
     day: "numeric",
+  });
+}
+
+// watch_started_at is a full timestamptz, not a bare date.
+function formatThaiDateTime(d: string | null): string {
+  if (!d) return "—";
+  return new Date(d).toLocaleString("th-TH", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
@@ -60,7 +73,7 @@ function buildAiPrompt(item: ActionItem, visit?: NidetVisit | null): string {
   return prompt;
 }
 
-export function ActionTable({ items, startIndex = 0, onVerify, onDismiss }: Props) {
+export function ActionTable({ items, startIndex = 0, onVerify, onDismiss, onPass }: Props) {
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
@@ -130,6 +143,7 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss }: Prop
         <TableBody>
           {items.map((item, idx) => {
             const isOpen = expanded.has(item.id);
+            const isWatching = item.status === "watching";
             const canResolve = item.status === "open" || item.status === "resolved";
             const visit = nidetVisits.get(item.id) ?? null;
             return (
@@ -220,6 +234,28 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss }: Prop
                           )}
                         </div>
 
+                        {isWatching && (
+                          <div className="rounded-md border border-amber-300 bg-amber-50 p-3 space-y-1">
+                            <div className="font-medium text-amber-900 flex items-center gap-1">
+                              👁 ระบบกำลังเฝ้าติดตาม
+                            </div>
+                            <div className="text-sm text-amber-900">
+                              ค่าเฉลี่ย 3 คาบล่าสุด:{" "}
+                              <span className="font-semibold">{item.mastery_avg_recent ?? "—"}</span>
+                            </div>
+                            <div className="text-sm text-amber-900">
+                              ค่าเฉลี่ย 3 คาบก่อนหน้า:{" "}
+                              <span className="font-semibold">{item.mastery_avg_previous ?? "—"}</span>
+                            </div>
+                            <div className="text-sm text-amber-900">
+                              ติดตามตั้งแต่: {formatThaiDateTime(item.watch_started_at)}
+                            </div>
+                            <div className="text-xs text-amber-700 pt-1">
+                              ถ้าคะแนนฟื้นตัวในรอบถัดไป ระบบจะปิดให้อัตโนมัติ
+                            </div>
+                          </div>
+                        )}
+
                         {item.resolution_note && (
                           <div className="bg-background rounded-md p-2 border border-border">
                             <div className="text-xs text-muted-foreground mb-1">หมายเหตุการแก้ไข</div>
@@ -232,31 +268,44 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss }: Prop
                         )}
 
                         <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="border-sky-300 text-sky-800 hover:bg-sky-50"
-                            onClick={(e) => { e.stopPropagation(); openNidetModal(item); }}
-                          >
-                            <ClipboardList className="h-4 w-4 mr-1" />
-                            {visit ? "แก้ไขบันทึก" : "บันทึกนิเทศ"}
-                          </Button>
+                          {/* Watch items are not supervised yet — no "บันทึกนิเทศ". */}
+                          {!isWatching && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-sky-300 text-sky-800 hover:bg-sky-50"
+                              onClick={(e) => { e.stopPropagation(); openNidetModal(item); }}
+                            >
+                              <ClipboardList className="h-4 w-4 mr-1" />
+                              {visit ? "แก้ไขบันทึก" : "บันทึกนิเทศ"}
+                            </Button>
+                          )}
+                            {isWatching && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-emerald-400 text-emerald-700 hover:bg-emerald-50"
+                                onClick={(e) => { e.stopPropagation(); onPass(item); }}
+                              >
+                                <CheckCircle2 className="h-4 w-4 mr-1" /> ผ่าน
+                              </Button>
+                            )}
                             {canResolve && (
-                              <>
-                                <Button
-                                  size="sm"
-                                  onClick={(e) => { e.stopPropagation(); onVerify(item); }}
-                                >
-                                  <CheckCircle2 className="h-4 w-4 mr-1" /> Verify
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={(e) => { e.stopPropagation(); onDismiss(item); }}
-                                >
-                                  <XCircle className="h-4 w-4 mr-1" /> Dismiss
-                                </Button>
-                              </>
+                              <Button
+                                size="sm"
+                                onClick={(e) => { e.stopPropagation(); onVerify(item); }}
+                              >
+                                <CheckCircle2 className="h-4 w-4 mr-1" /> Verify
+                              </Button>
+                            )}
+                            {(canResolve || isWatching) && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={(e) => { e.stopPropagation(); onDismiss(item); }}
+                              >
+                                <XCircle className="h-4 w-4 mr-1" /> Dismiss
+                              </Button>
                             )}
                             {item.subject && item.grade_level && item.classroom && (
                               <Button

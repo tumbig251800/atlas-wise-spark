@@ -41,7 +41,36 @@ export function useResolveActionItem() {
         .from("action_plan_items")
         .update(payload)
         .eq("id", id)
-        .in("status", ["open", "resolved"])
+        .in("status", ["open", "resolved", "watching"])
+        .select("id");
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error("รายการนี้ถูกปิดไปแล้วโดยผู้อื่น กรุณารีเฟรชหน้า");
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ACTION_ITEMS_KEY });
+    },
+  });
+}
+
+// Manually "pass" a Watch item: director judges mastery recovered → resolve it.
+export function usePassActionItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const now = new Date().toISOString();
+      const { data, error } = await supabase
+        .from("action_plan_items")
+        .update({
+          status: "resolved",
+          resolved_at: now,
+          resolution_note: "คะแนนฟื้นตัว / ผู้บริหารพิจารณาผ่าน",
+          watch_started_at: null,
+          updated_at: now,
+        })
+        .eq("id", id)
+        .in("status", ["watching", "open", "resolved"])
         .select("id");
       if (error) throw error;
       if (!data || data.length === 0) {

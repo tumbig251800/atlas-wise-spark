@@ -31,6 +31,8 @@ export type Database = {
           id: number
           issue_key: string
           issue_type: string
+          mastery_avg_previous: number | null
+          mastery_avg_recent: number | null
           metric_label: string | null
           metric_value: number | null
           resolution_note: string | null
@@ -44,6 +46,8 @@ export type Database = {
           updated_at: string
           verified_at: string | null
           verified_by: string | null
+          watch_checked_at: string | null
+          watch_started_at: string | null
           wf4_logged_at: string | null
         }
         Insert: {
@@ -62,6 +66,8 @@ export type Database = {
           id?: number
           issue_key: string
           issue_type: string
+          mastery_avg_previous?: number | null
+          mastery_avg_recent?: number | null
           metric_label?: string | null
           metric_value?: number | null
           resolution_note?: string | null
@@ -75,6 +81,8 @@ export type Database = {
           updated_at?: string
           verified_at?: string | null
           verified_by?: string | null
+          watch_checked_at?: string | null
+          watch_started_at?: string | null
           wf4_logged_at?: string | null
         }
         Update: {
@@ -93,6 +101,8 @@ export type Database = {
           id?: number
           issue_key?: string
           issue_type?: string
+          mastery_avg_previous?: number | null
+          mastery_avg_recent?: number | null
           metric_label?: string | null
           metric_value?: number | null
           resolution_note?: string | null
@@ -106,6 +116,8 @@ export type Database = {
           updated_at?: string
           verified_at?: string | null
           verified_by?: string | null
+          watch_checked_at?: string | null
+          watch_started_at?: string | null
           wf4_logged_at?: string | null
         }
         Relationships: []

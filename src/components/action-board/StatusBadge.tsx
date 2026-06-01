@@ -7,6 +7,9 @@ interface Props {
 }
 
 export function StatusBadge({ status, dueDate }: Props) {
+  if (status === "watching") {
+    return <Badge className="bg-amber-500 hover:bg-amber-500 text-white">👁 เฝ้าติดตาม</Badge>;
+  }
   if (status === "verified") {
     return <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white">✓ Verified</Badge>;
   }
