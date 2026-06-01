@@ -1,5 +1,6 @@
 import { Fragment, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Table,
   TableBody,
@@ -9,12 +10,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight, ExternalLink, CheckCircle2, XCircle, Bot, ClipboardList } from "lucide-react";
-import type { ActionItem } from "@/hooks/useActionItems";
+import { ChevronDown, ChevronRight, ExternalLink, CheckCircle2, XCircle, Bot, ClipboardList, Send, Share2 } from "lucide-react";
+import { ACTION_ITEMS_KEY, type ActionItem } from "@/hooks/useActionItems";
 import { StatusBadge, IssueTypeBadge, SeverityBadge } from "./StatusBadge";
 import { useNidetVisits } from "@/hooks/useNidetVisits";
 import { NidetVisitModal } from "./NidetVisitModal";
 import { NidetVisitCard } from "./NidetVisitCard";
+import { NotifyTeacherModal } from "./NotifyTeacherModal";
+import { ReferralModal } from "./ReferralModal";
 import { RUBRIC_DIMENSIONS, type NidetVisit } from "@/types/nidet";
 
 interface Props {
@@ -77,11 +80,18 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss, onPass
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
+  const qc = useQueryClient();
   const { fetchVisit } = useNidetVisits();
   const [nidetVisits, setNidetVisits] = useState<Map<number, NidetVisit>>(new Map());
   const fetchedRef = useRef<Set<number>>(new Set());
   const [nidetModalOpen, setNidetModalOpen] = useState(false);
   const [nidetModalActionItem, setNidetModalActionItem] = useState<ActionItem | null>(null);
+
+  // IntegrityFlag resolution modals (notify teacher / FLAG5 referral).
+  const [notifyModalOpen, setNotifyModalOpen] = useState(false);
+  const [notifyModalItem, setNotifyModalItem] = useState<ActionItem | null>(null);
+  const [referralModalOpen, setReferralModalOpen] = useState(false);
+  const [referralModalItem, setReferralModalItem] = useState<ActionItem | null>(null);
 
   const toggle = (id: number) => {
     setExpanded((prev) => {
@@ -117,6 +127,28 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss, onPass
     setNidetModalOpen(false);
   };
 
+  const openNotifyModal = (item: ActionItem) => {
+    setNotifyModalItem(item);
+    setNotifyModalOpen(true);
+  };
+
+  const openReferralModal = (item: ActionItem) => {
+    setReferralModalItem(item);
+    setReferralModalOpen(true);
+  };
+
+  // Both IntegrityFlag modals write straight to action_plan_items, so just
+  // refetch the board and close the modal.
+  const handleNotifySaved = () => {
+    qc.invalidateQueries({ queryKey: ACTION_ITEMS_KEY });
+    setNotifyModalOpen(false);
+  };
+
+  const handleReferralSaved = () => {
+    qc.invalidateQueries({ queryKey: ACTION_ITEMS_KEY });
+    setReferralModalOpen(false);
+  };
+
   if (items.length === 0) {
     return (
       <div className="glass-card p-8 text-center text-muted-foreground">
@@ -146,6 +178,16 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss, onPass
             const isWatching = item.status === "watching";
             const canResolve = item.status === "open" || item.status === "resolved";
             const visit = nidetVisits.get(item.id) ?? null;
+
+            // Resolution flow depends on issue_type. MasteryDrop/RedZone need a
+            // classroom supervision visit; IntegrityFlag is a data-entry fix.
+            const isSupervisionNeeded =
+              item.issue_type === "MasteryDrop" || item.issue_type === "RedZone";
+            const isIntegrityFlag = item.issue_type === "IntegrityFlag";
+            const isFlag5 =
+              isIntegrityFlag &&
+              (item.detail?.includes("FLAG5") || item.detail?.includes("a2-gap"));
+            const isActionable = canResolve || isWatching;
             return (
               <Fragment key={item.id}>
                 <TableRow
@@ -267,47 +309,120 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss, onPass
                           <NidetVisitCard visit={visit} onEdit={() => openNidetModal(item)} />
                         )}
 
+                        {/* IntegrityFlag (non-FLAG5) — record of how/when the teacher was told. */}
+                        {isIntegrityFlag && !isFlag5 && item.notify_date && (
+                          <div className="rounded-md border border-sky-200 bg-sky-50 p-3 text-sm space-y-1">
+                            <div className="font-medium text-sky-900 flex items-center gap-1.5">
+                              <Send className="h-4 w-4" />
+                              แจ้งครูแล้ว — {formatDate(item.notify_date)} ผ่าน {item.notify_channel ?? "—"}
+                            </div>
+                            {item.notify_note && (
+                              <div className="text-sky-800">{item.notify_note}</div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* FLAG5 — external referral record. */}
+                        {isIntegrityFlag && isFlag5 && item.referral_date && (
+                          <div className="rounded-md border border-purple-200 bg-purple-50 p-3 text-sm space-y-1">
+                            <div className="font-medium text-purple-900 flex items-center gap-1.5">
+                              <Share2 className="h-4 w-4" />
+                              ส่งต่อแล้ว — {formatDate(item.referral_date)} → {item.referral_agency ?? "—"}
+                            </div>
+                            {item.referral_owner && (
+                              <div className="text-purple-800">ผู้ติดตาม: {item.referral_owner}</div>
+                            )}
+                            {item.referral_note && (
+                              <div className="text-purple-800">{item.referral_note}</div>
+                            )}
+                          </div>
+                        )}
+
                         <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
-                          {/* Watch items are not supervised yet — no "บันทึกนิเทศ". */}
-                          {!isWatching && (
+                          {/* MasteryDrop / RedZone — classroom supervision flow. */}
+                          {isSupervisionNeeded && (
+                            <>
+                              {/* Watch items are not supervised yet — no "บันทึกนิเทศ". */}
+                              {!isWatching && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="border-sky-300 text-sky-800 hover:bg-sky-50"
+                                  onClick={(e) => { e.stopPropagation(); openNidetModal(item); }}
+                                >
+                                  <ClipboardList className="h-4 w-4 mr-1" />
+                                  {visit ? "แก้ไขบันทึก" : "บันทึกนิเทศ"}
+                                </Button>
+                              )}
+                              {isWatching && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="border-emerald-400 text-emerald-700 hover:bg-emerald-50"
+                                  onClick={(e) => { e.stopPropagation(); onPass(item); }}
+                                >
+                                  <CheckCircle2 className="h-4 w-4 mr-1" /> ผ่าน
+                                </Button>
+                              )}
+                              {canResolve && (
+                                <Button
+                                  size="sm"
+                                  onClick={(e) => { e.stopPropagation(); onVerify(item); }}
+                                >
+                                  <CheckCircle2 className="h-4 w-4 mr-1" /> Verify
+                                </Button>
+                              )}
+                            </>
+                          )}
+
+                          {/* FLAG5 — external referral closes the item; no Verify button. */}
+                          {isIntegrityFlag && isFlag5 && isActionable && (
+                            <Button
+                              size="sm"
+                              className="bg-purple-600 hover:bg-purple-700 text-white"
+                              onClick={(e) => { e.stopPropagation(); openReferralModal(item); }}
+                            >
+                              <Share2 className="h-4 w-4 mr-1" />
+                              {item.referral_date ? "แก้ไขการส่งต่อ" : "บันทึกการส่งต่อ"}
+                            </Button>
+                          )}
+
+                          {/* IntegrityFlag (FLAG1-4, 6) — notify teacher, then confirm the fix. */}
+                          {isIntegrityFlag && !isFlag5 && isActionable && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                                onClick={(e) => { e.stopPropagation(); openNotifyModal(item); }}
+                              >
+                                <Send className="h-4 w-4 mr-1" />
+                                {item.notify_date ? "แก้ไขการแจ้ง" : "แจ้งครูแล้ว"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                                onClick={(e) => { e.stopPropagation(); onVerify(item); }}
+                              >
+                                <CheckCircle2 className="h-4 w-4 mr-1" /> ยืนยันครูแก้แล้ว
+                              </Button>
+                            </>
+                          )}
+
+                          {/* Dismiss — available while the item is still actionable. */}
+                          {isActionable && (
                             <Button
                               size="sm"
                               variant="outline"
-                              className="border-sky-300 text-sky-800 hover:bg-sky-50"
-                              onClick={(e) => { e.stopPropagation(); openNidetModal(item); }}
+                              onClick={(e) => { e.stopPropagation(); onDismiss(item); }}
                             >
-                              <ClipboardList className="h-4 w-4 mr-1" />
-                              {visit ? "แก้ไขบันทึก" : "บันทึกนิเทศ"}
+                              <XCircle className="h-4 w-4 mr-1" /> Dismiss
                             </Button>
                           )}
-                            {isWatching && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="border-emerald-400 text-emerald-700 hover:bg-emerald-50"
-                                onClick={(e) => { e.stopPropagation(); onPass(item); }}
-                              >
-                                <CheckCircle2 className="h-4 w-4 mr-1" /> ผ่าน
-                              </Button>
-                            )}
-                            {canResolve && (
-                              <Button
-                                size="sm"
-                                onClick={(e) => { e.stopPropagation(); onVerify(item); }}
-                              >
-                                <CheckCircle2 className="h-4 w-4 mr-1" /> Verify
-                              </Button>
-                            )}
-                            {(canResolve || isWatching) && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={(e) => { e.stopPropagation(); onDismiss(item); }}
-                              >
-                                <XCircle className="h-4 w-4 mr-1" /> Dismiss
-                              </Button>
-                            )}
-                            {item.subject && item.grade_level && item.classroom && (
+
+                          {/* ถามพีท AI — supervision + FLAG5 only (not the plain notify flow). */}
+                          {(isSupervisionNeeded || (isIntegrityFlag && isFlag5)) &&
+                            item.subject && item.grade_level && item.classroom && (
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -350,6 +465,34 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss, onPass
             issue_type: nidetModalActionItem.issue_type ?? undefined,
           }}
           existingVisit={nidetVisits.get(nidetModalActionItem.id) ?? null}
+        />
+      )}
+
+      {notifyModalItem && (
+        <NotifyTeacherModal
+          open={notifyModalOpen}
+          onClose={() => setNotifyModalOpen(false)}
+          onSaved={handleNotifySaved}
+          actionItem={{
+            id: notifyModalItem.id,
+            teacher_name: notifyModalItem.teacher_name ?? undefined,
+            issue_type: notifyModalItem.issue_type ?? undefined,
+            detail: notifyModalItem.detail ?? undefined,
+          }}
+        />
+      )}
+
+      {referralModalItem && (
+        <ReferralModal
+          open={referralModalOpen}
+          onClose={() => setReferralModalOpen(false)}
+          onSaved={handleReferralSaved}
+          actionItem={{
+            id: referralModalItem.id,
+            teacher_name: referralModalItem.teacher_name ?? undefined,
+            issue_type: referralModalItem.issue_type ?? undefined,
+            detail: referralModalItem.detail ?? undefined,
+          }}
         />
       )}
     </div>

@@ -35,6 +35,13 @@ export type Database = {
           mastery_avg_recent: number | null
           metric_label: string | null
           metric_value: number | null
+          notify_channel: string | null
+          notify_date: string | null
+          notify_note: string | null
+          referral_agency: string | null
+          referral_date: string | null
+          referral_note: string | null
+          referral_owner: string | null
           resolution_note: string | null
           resolved_at: string | null
           run_date: string | null
@@ -70,6 +77,13 @@ export type Database = {
           mastery_avg_recent?: number | null
           metric_label?: string | null
           metric_value?: number | null
+          notify_channel?: string | null
+          notify_date?: string | null
+          notify_note?: string | null
+          referral_agency?: string | null
+          referral_date?: string | null
+          referral_note?: string | null
+          referral_owner?: string | null
           resolution_note?: string | null
           resolved_at?: string | null
           run_date?: string | null
@@ -105,6 +119,13 @@ export type Database = {
           mastery_avg_recent?: number | null
           metric_label?: string | null
           metric_value?: number | null
+          notify_channel?: string | null
+          notify_date?: string | null
+          notify_note?: string | null
+          referral_agency?: string | null
+          referral_date?: string | null
+          referral_note?: string | null
+          referral_owner?: string | null
           resolution_note?: string | null
           resolved_at?: string | null
           run_date?: string | null
