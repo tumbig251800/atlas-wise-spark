@@ -270,30 +270,44 @@ serve(async (req) => {
   }
 
   try {
-    const auth = await requireAtlasUser(req);
-    if (!auth.ok) {
-      return new Response(JSON.stringify({ error: auth.error }), {
-        status: auth.status,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    // Two auth paths:
+    //  • Internal/cron calls present the service-role key as the bearer token.
+    //  • UI calls (supabase.functions.invoke) present a user JWT → requireAtlasUser.
+    const authHeader = req.headers.get("authorization") || req.headers.get("Authorization") || "";
+    const bearer = authHeader.toLowerCase().startsWith("bearer ")
+      ? authHeader.slice(7).trim()
+      : authHeader.trim();
+    const isInternal = bearer.length > 0 && bearer === SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!isInternal) {
+      const auth = await requireAtlasUser(req);
+      if (!auth.ok) {
+        return new Response(JSON.stringify({ error: auth.error }), {
+          status: auth.status,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     const body = (await req.json().catch(() => ({}))) as {
-      mode?: "detect" | "reevaluate" | "both";
+      mode?: "detect" | "reevaluate" | "both" | "batch";
       teacherId?: string;
       subject?: string;
       classroom?: string;
     };
-    const mode = body.mode ?? "both";
+    // No body (e.g. a bare cron call) defaults to a full batch re-evaluation.
+    const mode = body.mode ?? "batch";
 
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // Re-evaluate pre-existing watching items FIRST so that any item created by
     // detection in this same call is not immediately re-processed.
+    // "batch" === sweep every watching item (the scheduled-cron entry point).
     let reevaluation = null;
-    if (mode === "reevaluate" || mode === "both") {
+    if (mode === "reevaluate" || mode === "both" || mode === "batch") {
       reevaluation = await runWatchReevaluation(supabase);
     }
 

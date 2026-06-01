@@ -1,9 +1,13 @@
 import { useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { AppLayout } from "@/components/AppLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, ListChecks } from "lucide-react";
-import { useActionItems, usePassActionItem, daysRemaining, type ActionItem } from "@/hooks/useActionItems";
+import { ChevronLeft, ChevronRight, ListChecks, RefreshCw } from "lucide-react";
+import { supabase } from "@/lib/atlasSupabase";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
+import { useActionItems, usePassActionItem, ACTION_ITEMS_KEY, daysRemaining, type ActionItem } from "@/hooks/useActionItems";
 import { ActionStatsBar } from "@/components/action-board/ActionStatsBar";
 import { ActionFilters, type ActionFilterChip } from "@/components/action-board/ActionFilters";
 import { ActionTable } from "@/components/action-board/ActionTable";
@@ -81,6 +85,31 @@ export default function ActionBoard() {
   const paged = filtered.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
 
   const passItem = usePassActionItem();
+  const { role } = useAuth();
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [running, setRunning] = useState(false);
+
+  const handleRunWatchCheck = async () => {
+    setRunning(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("atlas-mastery-watch", {
+        body: { mode: "batch" },
+      });
+      if (error) throw error;
+      const r = data?.reevaluation ?? { escalated: 0, resolved: 0, held: 0, skipped: 0 };
+      toast({
+        title: "รัน Watch Check เสร็จแล้ว",
+        description: `เลื่อนเป็น Action: ${r.escalated} · ปิดอัตโนมัติ: ${r.resolved} · เฝ้าติดตามต่อ: ${r.held} · ข้าม: ${r.skipped}`,
+      });
+      qc.invalidateQueries({ queryKey: ACTION_ITEMS_KEY });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "ไม่ทราบสาเหตุ";
+      toast({ title: "เกิดข้อผิดพลาด", description: message, variant: "destructive" });
+    } finally {
+      setRunning(false);
+    }
+  };
 
   const handleVerify = (item: ActionItem) => {
     setDialogItem(item);
@@ -98,9 +127,22 @@ export default function ActionBoard() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div className="flex items-center gap-2">
-          <ListChecks className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-bold text-foreground">Action Board</h1>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <ListChecks className="h-6 w-6 text-primary" />
+            <h1 className="text-2xl font-bold text-foreground">Action Board</h1>
+          </div>
+          {role === "director" && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRunWatchCheck}
+              disabled={running}
+            >
+              <RefreshCw className={`h-4 w-4 mr-1 ${running ? "animate-spin" : ""}`} />
+              รัน Watch Check ตอนนี้
+            </Button>
+          )}
         </div>
 
         {error && (
