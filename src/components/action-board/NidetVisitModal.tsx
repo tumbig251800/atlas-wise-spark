@@ -264,10 +264,10 @@ export function NidetVisitModal({
                     key={dim.key}
                     className={cn(
                       "flex items-center justify-between gap-3 rounded-md px-2 py-1.5",
-                      isRec && "bg-amber-50 ring-1 ring-amber-200"
+                      isRec && "bg-amber-500/10 ring-1 ring-amber-500/30"
                     )}
                   >
-                    <span className="text-sm flex items-center gap-1.5">
+                    <span className="text-sm text-foreground flex items-center gap-1.5">
                       {dim.label}
                       {isRec && (
                         <span className="text-[10px] text-amber-600 border border-amber-300 rounded px-1">
