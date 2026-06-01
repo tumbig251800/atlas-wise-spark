@@ -14,17 +14,17 @@ export function StatusBadge({ status, dueDate }: Props) {
     return <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white">✓ Verified</Badge>;
   }
   if (status === "dismissed") {
-    return <Badge variant="outline" className="text-muted-foreground">Dismissed</Badge>;
+    return <Badge className="bg-slate-400 hover:bg-slate-400 text-white">Dismissed</Badge>;
   }
 
   const days = daysRemaining(dueDate ?? null);
 
   if (status === "resolved") {
-    return <Badge className="bg-sky-600 hover:bg-sky-600 text-white">Resolved</Badge>;
+    return <Badge className="bg-violet-500 hover:bg-violet-500 text-white">Resolved</Badge>;
   }
 
   if (days === null) {
-    return <Badge variant="secondary">ค้างอยู่</Badge>;
+    return <Badge className="bg-red-500 hover:bg-red-500 text-white">ค้างอยู่</Badge>;
   }
 
   if (days <= 0) {

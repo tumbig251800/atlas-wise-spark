@@ -355,14 +355,36 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss, onPass
                                 </Button>
                               )}
                               {isWatching && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="border-emerald-400 text-emerald-700 hover:bg-emerald-50"
-                                  onClick={(e) => { e.stopPropagation(); onPass(item); }}
-                                >
-                                  <CheckCircle2 className="h-4 w-4 mr-1" /> ผ่าน
-                                </Button>
+                                <>
+                                  {visit && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="border-blue-400 text-blue-700 hover:bg-blue-50"
+                                      onClick={(e) => { e.stopPropagation(); openNidetModal(item); }}
+                                    >
+                                      <ClipboardList className="h-4 w-4 mr-1" />
+                                      ติดตามต่อ
+                                    </Button>
+                                  )}
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-sky-300 text-sky-800 hover:bg-sky-50"
+                                    onClick={(e) => { e.stopPropagation(); openNidetModal(item); }}
+                                  >
+                                    <ClipboardList className="h-4 w-4 mr-1" />
+                                    บันทึกนิเทศ
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-emerald-400 text-emerald-700 hover:bg-emerald-50"
+                                    onClick={(e) => { e.stopPropagation(); onPass(item); }}
+                                  >
+                                    <CheckCircle2 className="h-4 w-4 mr-1" /> ผ่าน
+                                  </Button>
+                                </>
                               )}
                               {canResolve && (
                                 <Button

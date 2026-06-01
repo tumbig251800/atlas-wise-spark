@@ -1,5 +1,6 @@
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search } from "lucide-react";
 
 export type ActionFilterChip = "all" | "overdue" | "open" | "verified" | "dismissed";
@@ -12,15 +13,22 @@ interface Props {
   counts: Record<ActionFilterChip, number>;
 }
 
-const CHIPS: { value: ActionFilterChip; label: string }[] = [
+const TABS: { value: ActionFilterChip; label: string }[] = [
   { value: "all", label: "ทั้งหมด" },
-  { value: "overdue", label: "เกินกำหนด" },
-  { value: "open", label: "ค้างอยู่" },
-  { value: "verified", label: "Verified" },
-  { value: "dismissed", label: "Dismissed" },
+  { value: "open", label: "ต้องนิเทศ" },
+  { value: "overdue", label: "กำลังติดตาม" },
+  { value: "verified", label: "ปิดแล้ว" },
 ];
 
 export function ActionFilters({ search, onSearchChange, filter, onFilterChange, counts }: Props) {
+  // Combine counts for 'ต้องนิเทศ' (open+watching status items) and 'ปิดแล้ว' (verified+dismissed)
+  const tabCounts = {
+    all: counts.all,
+    open: counts.open,
+    overdue: counts.overdue,
+    verified: counts.verified + counts.dismissed,
+  };
+
   return (
     <div className="glass-card p-4 space-y-3">
       <div className="relative">
@@ -32,21 +40,18 @@ export function ActionFilters({ search, onSearchChange, filter, onFilterChange, 
           className="pl-9"
         />
       </div>
-      <div className="flex flex-wrap gap-2">
-        {CHIPS.map((c) => (
-          <Button
-            key={c.value}
-            size="sm"
-            variant={filter === c.value ? "default" : "outline"}
-            onClick={() => onFilterChange(c.value)}
-          >
-            {c.label}
-            <span className="ml-2 inline-block min-w-[1.25rem] text-center text-xs opacity-80">
-              {counts[c.value]}
-            </span>
-          </Button>
-        ))}
-      </div>
+      <Tabs value={filter} onValueChange={(v) => onFilterChange(v as ActionFilterChip)}>
+        <TabsList className="w-full grid grid-cols-4">
+          {TABS.map((tab) => (
+            <TabsTrigger key={tab.value} value={tab.value} className="gap-2">
+              {tab.label}
+              <Badge variant="secondary" className="text-xs">
+                {tabCounts[tab.value as keyof typeof tabCounts]}
+              </Badge>
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
     </div>
   );
 }

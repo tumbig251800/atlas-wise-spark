@@ -3,7 +3,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { AppLayout } from "@/components/AppLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, ListChecks, RefreshCw } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, ListChecks, RefreshCw } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/lib/atlasSupabase";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -64,6 +65,7 @@ export default function ActionBoard() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<ActionFilterChip>("all");
   const [page, setPage] = useState(0);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const [dialogMode, setDialogMode] = useState<"verify" | "dismiss">("verify");
   const [dialogItem, setDialogItem] = useState<ActionItem | null>(null);
@@ -81,6 +83,15 @@ export default function ActionBoard() {
   const filtered = useMemo(() => {
     return sortItems(all.filter((i) => matchesFilter(i, filter) && matchesSearch(i, search)));
   }, [all, filter, search]);
+
+  // Split into queue (open/watching) and history (verified/dismissed/resolved)
+  const queueItems = useMemo(() => {
+    return filtered.filter((i) => i.status === "open" || i.status === "watching");
+  }, [filtered]);
+
+  const historyItems = useMemo(() => {
+    return filtered.filter((i) => i.status === "verified" || i.status === "dismissed" || i.status === "resolved");
+  }, [filtered]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages - 1);
@@ -180,39 +191,55 @@ export default function ActionBoard() {
               onFilterChange={(f) => { setFilter(f); setPage(0); }}
               counts={counts}
             />
-            <ActionTable
-              items={paged}
-              startIndex={safePage * PAGE_SIZE}
-              onVerify={handleVerify}
-              onDismiss={handleDismiss}
-              onPass={handlePass}
-            />
 
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between text-sm">
-                <div className="text-muted-foreground">
-                  หน้า {safePage + 1} / {totalPages} ({filtered.length} รายการ)
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPage((p) => Math.max(0, p - 1))}
-                    disabled={safePage === 0}
-                  >
-                    <ChevronLeft className="h-4 w-4 mr-1" /> ก่อนหน้า
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-                    disabled={safePage >= totalPages - 1}
-                  >
-                    ถัดไป <ChevronRight className="h-4 w-4 ml-1" />
-                  </Button>
-                </div>
+            {/* Section 1: คิวนิเทศ (open + watching) */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-semibold">คิวนิเทศ</h2>
+                <span className="text-sm text-muted-foreground">({queueItems.length} รายการ)</span>
               </div>
-            )}
+              <ActionTable
+                items={queueItems}
+                startIndex={0}
+                onVerify={handleVerify}
+                onDismiss={handleDismiss}
+                onPass={handlePass}
+              />
+            </div>
+
+            {/* Section 2: ประวัติ (verified + dismissed + resolved) - Collapsible */}
+            <Collapsible open={historyOpen} onOpenChange={setHistoryOpen}>
+              <div className="flex items-center justify-between py-2">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-semibold">ประวัติ</h2>
+                  <span className="text-sm text-muted-foreground">({historyItems.length} รายการ)</span>
+                </div>
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="sm">
+                    {historyOpen ? (
+                      <>
+                        <ChevronUp className="h-4 w-4 mr-1" />
+                        ซ่อน
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="h-4 w-4 mr-1" />
+                        แสดง
+                      </>
+                    )}
+                  </Button>
+                </CollapsibleTrigger>
+              </div>
+              <CollapsibleContent>
+                <ActionTable
+                  items={historyItems}
+                  startIndex={0}
+                  onVerify={handleVerify}
+                  onDismiss={handleDismiss}
+                  onPass={handlePass}
+                />
+              </CollapsibleContent>
+            </Collapsible>
           </>
         )}
 
