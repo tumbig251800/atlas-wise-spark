@@ -10,7 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight, ExternalLink, CheckCircle2, XCircle, Bot, ClipboardList, Send, Share2 } from "lucide-react";
+import { ChevronDown, ChevronRight, ExternalLink, CheckCircle2, XCircle, Bot, ClipboardList, Send, Share2, Users } from "lucide-react";
 import { ACTION_ITEMS_KEY, type ActionItem } from "@/hooks/useActionItems";
 import { StatusBadge, IssueTypeBadge, SeverityBadge } from "./StatusBadge";
 import { useNidetVisits } from "@/hooks/useNidetVisits";
@@ -18,7 +18,13 @@ import { NidetVisitModal } from "./NidetVisitModal";
 import { NidetVisitCard } from "./NidetVisitCard";
 import { NotifyTeacherModal } from "./NotifyTeacherModal";
 import { ReferralModal } from "./ReferralModal";
+import { PlcModal } from "./PlcModal";
+import { PlcSessionCard } from "./PlcSessionCard";
 import { RUBRIC_DIMENSIONS, type NidetVisit } from "@/types/nidet";
+import { useFetchPlcSessionsForItem } from "@/hooks/usePlcSessions";
+import type { PlcSession } from "@/types/plc";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/atlasSupabase";
 
 interface Props {
   items: ActionItem[];
@@ -79,6 +85,7 @@ function buildAiPrompt(item: ActionItem, visit?: NidetVisit | null): string {
 export function ActionTable({ items, startIndex = 0, onVerify, onDismiss, onPass }: Props) {
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const { toast } = useToast();
 
   const qc = useQueryClient();
   const { fetchVisit } = useNidetVisits();
@@ -93,7 +100,13 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss, onPass
   const [referralModalOpen, setReferralModalOpen] = useState(false);
   const [referralModalItem, setReferralModalItem] = useState<ActionItem | null>(null);
 
-  const toggle = (id: number) => {
+  // PLC modal state
+  const [plcModalOpen, setPlcModalOpen] = useState(false);
+  const [plcModalActionItem, setPlcModalActionItem] = useState<ActionItem | null>(null);
+  const [plcModalExistingSession, setPlcModalExistingSession] = useState<PlcSession | null>(null);
+  const [plcSessions, setPlcSessions] = useState<Map<number, PlcSession[]>>(new Map());
+
+  const toggle = async (id: number) => {
     setExpanded((prev) => {
       const next = new Set(prev);
       if (next.has(id)) {
@@ -110,6 +123,18 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss, onPass
             .catch(() => {
               // allow a retry on next expand
               fetchedRef.current.delete(id);
+            });
+
+          // Also fetch PLC sessions for this item
+          supabase
+            .from("plc_sessions")
+            .select("*")
+            .contains("linked_action_item_ids", [id])
+            .order("session_date", { ascending: false })
+            .then(({ data }) => {
+              if (data) {
+                setPlcSessions((m) => new Map(m).set(id, data as PlcSession[]));
+              }
             });
         }
       }
@@ -147,6 +172,40 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss, onPass
   const handleReferralSaved = () => {
     qc.invalidateQueries({ queryKey: ACTION_ITEMS_KEY });
     setReferralModalOpen(false);
+  };
+
+  const openPlcModal = (item: ActionItem, existingSession?: PlcSession) => {
+    setPlcModalActionItem(item);
+    setPlcModalExistingSession(existingSession ?? null);
+    setPlcModalOpen(true);
+  };
+
+  const handlePlcSaved = (session: PlcSession) => {
+    // Update local PLC sessions cache
+    const itemId = plcModalActionItem?.id;
+    if (itemId) {
+      supabase
+        .from("plc_sessions")
+        .select("*")
+        .contains("linked_action_item_ids", [itemId])
+        .order("session_date", { ascending: false })
+        .then(({ data }) => {
+          if (data) {
+            setPlcSessions((m) => new Map(m).set(itemId, data as PlcSession[]));
+          }
+        });
+    }
+
+    setPlcModalOpen(false);
+
+    // If outcome is resolved, suggest user to verify
+    if (session.outcome_type === "resolved") {
+      toast({
+        title: "PLC แก้ไขได้แล้ว — กด Verify เพื่อปิดเคส",
+        description: "PLC ระบุว่าแก้ไขได้แล้ว คุณสามารถกด Verify เพื่อปิดเคสนี้ได้",
+        duration: 5000,
+      });
+    }
   };
 
   if (items.length === 0) {
@@ -309,6 +368,15 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss, onPass
                           <NidetVisitCard visit={visit} onEdit={() => openNidetModal(item)} />
                         )}
 
+                        {/* PLC sessions */}
+                        {plcSessions.get(item.id)?.map((session) => (
+                          <PlcSessionCard
+                            key={session.id}
+                            session={session}
+                            onEdit={() => openPlcModal(item, session)}
+                          />
+                        ))}
+
                         {/* IntegrityFlag (non-FLAG5) — record of how/when the teacher was told. */}
                         {isIntegrityFlag && !isFlag5 && item.notify_date && (
                           <div className="rounded-md border border-sky-200 bg-sky-50 p-3 text-sm space-y-1">
@@ -339,6 +407,19 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss, onPass
                         )}
 
                         <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
+                          {/* PLC button — available for ALL open or watching items */}
+                          {isActionable && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-violet-400 text-violet-700 hover:bg-violet-50"
+                              onClick={(e) => { e.stopPropagation(); openPlcModal(item); }}
+                            >
+                              <Users className="h-4 w-4 mr-1" />
+                              PLC
+                            </Button>
+                          )}
+
                           {/* MasteryDrop / RedZone — classroom supervision flow. */}
                           {isSupervisionNeeded && (
                             <>
@@ -515,6 +596,16 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss, onPass
             issue_type: referralModalItem.issue_type ?? undefined,
             detail: referralModalItem.detail ?? undefined,
           }}
+        />
+      )}
+
+      {plcModalActionItem && (
+        <PlcModal
+          open={plcModalOpen}
+          onClose={() => setPlcModalOpen(false)}
+          onSaved={handlePlcSaved}
+          actionItem={plcModalActionItem}
+          existingSession={plcModalExistingSession}
         />
       )}
     </div>
