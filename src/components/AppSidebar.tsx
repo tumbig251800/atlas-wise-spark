@@ -13,7 +13,7 @@ import {
   SidebarFooter,
   SidebarHeader,
 } from "@/components/ui/sidebar";
-import { Brain, ClipboardList, BarChart3, Upload, Building2, LogOut, Settings, History, BookOpen, FileBarChart, Home, Radar, Bot, BookMarked, ListChecks } from "lucide-react";
+import { Brain, ClipboardList, BarChart3, Upload, Building2, LogOut, Settings, History, BookOpen, FileBarChart, Home, Radar, Bot, BookMarked, ListChecks, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTrendAlerts } from "@/hooks/useTrendAlerts";
 
@@ -26,6 +26,7 @@ const teacherMenuItems = [
   { title: "รายงานสมรรถนะ", url: "/smart-report", icon: FileBarChart },
   { title: "สมรรถนะรายบุคคล", url: "/competency-report", icon: Radar },
   { title: "อัปโหลด CSV", url: "/upload", icon: Upload },
+  { title: "บันทึกคะแนนหน่วย", url: "/unit-scores", icon: FileSpreadsheet },
 ];
 
 const directorMenuItems = [
@@ -40,6 +41,7 @@ const directorMenuItems = [
   { title: "รายงานสมรรถนะ", url: "/smart-report", icon: FileBarChart },
   { title: "สมรรถนะรายบุคคล", url: "/competency-report", icon: Radar },
   { title: "อัปโหลด CSV", url: "/upload", icon: Upload },
+  { title: "บันทึกคะแนนหน่วย", url: "/unit-scores", icon: FileSpreadsheet },
   { title: "ประวัติการสร้างแผนการสอน", url: "/admin/lesson-plans", icon: BookMarked },
   { title: "Admin Settings", url: "/admin", icon: Settings },
 ];

@@ -72,7 +72,7 @@ export type Database = {
           grade_level?: string | null
           id?: number
           issue_key: string
-          issue_type: string
+          issue_type?: string
           mastery_avg_previous?: number | null
           mastery_avg_recent?: number | null
           metric_label?: string | null
@@ -87,7 +87,7 @@ export type Database = {
           resolution_note?: string | null
           resolved_at?: string | null
           run_date?: string | null
-          severity: string
+          severity?: string
           status?: string
           subject?: string | null
           teacher_id?: string | null
@@ -647,6 +647,8 @@ export type Database = {
           is_active: boolean
           last_name: string
           student_code: string | null
+          student_id: string | null
+          teacher_id: string | null
           updated_at: string
         }
         Insert: {
@@ -658,6 +660,8 @@ export type Database = {
           is_active?: boolean
           last_name: string
           student_code?: string | null
+          student_id?: string | null
+          teacher_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -669,6 +673,8 @@ export type Database = {
           is_active?: boolean
           last_name?: string
           student_code?: string | null
+          student_id?: string | null
+          teacher_id?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -817,8 +823,64 @@ export type Database = {
         }
         Relationships: []
       }
+      unit_assessment_setups: {
+        Row: {
+          a_total: number
+          academic_term: string
+          assessed_date: string | null
+          classroom: string
+          created_at: string | null
+          grade_level: string
+          id: string
+          k_total: number
+          p_total: number
+          subject: string
+          teacher_id: string
+          total_score: number | null
+          unit_display_name: string | null
+          unit_name: string
+          updated_at: string | null
+        }
+        Insert: {
+          a_total?: number
+          academic_term: string
+          assessed_date?: string | null
+          classroom: string
+          created_at?: string | null
+          grade_level: string
+          id?: string
+          k_total?: number
+          p_total?: number
+          subject: string
+          teacher_id: string
+          total_score?: number | null
+          unit_display_name?: string | null
+          unit_name: string
+          updated_at?: string | null
+        }
+        Update: {
+          a_total?: number
+          academic_term?: string
+          assessed_date?: string | null
+          classroom?: string
+          created_at?: string | null
+          grade_level?: string
+          id?: string
+          k_total?: number
+          p_total?: number
+          subject?: string
+          teacher_id?: string
+          total_score?: number | null
+          unit_display_name?: string | null
+          unit_name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       unit_assessments: {
         Row: {
+          a_score: number | null
+          a_total: number | null
           a1_score: number | null
           a2_score: number | null
           a3_score: number | null
@@ -838,6 +900,10 @@ export type Database = {
           grade_level: string
           health_score: number | null
           id: string
+          k_score: number | null
+          k_total: number | null
+          p_score: number | null
+          p_total: number | null
           reading_score: number | null
           sci_tech_score: number | null
           score: number
@@ -852,6 +918,8 @@ export type Database = {
           writing_score: number | null
         }
         Insert: {
+          a_score?: number | null
+          a_total?: number | null
           a1_score?: number | null
           a2_score?: number | null
           a3_score?: number | null
@@ -871,6 +939,10 @@ export type Database = {
           grade_level: string
           health_score?: number | null
           id?: string
+          k_score?: number | null
+          k_total?: number | null
+          p_score?: number | null
+          p_total?: number | null
           reading_score?: number | null
           sci_tech_score?: number | null
           score: number
@@ -885,6 +957,8 @@ export type Database = {
           writing_score?: number | null
         }
         Update: {
+          a_score?: number | null
+          a_total?: number | null
           a1_score?: number | null
           a2_score?: number | null
           a3_score?: number | null
@@ -904,6 +978,10 @@ export type Database = {
           grade_level?: string
           health_score?: number | null
           id?: string
+          k_score?: number | null
+          k_total?: number | null
+          p_score?: number | null
+          p_total?: number | null
           reading_score?: number | null
           sci_tech_score?: number | null
           score?: number

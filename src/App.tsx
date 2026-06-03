@@ -16,6 +16,7 @@ const TeachingLog = lazy(() => import("./pages/TeachingLog"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Executive = lazy(() => import("./pages/Executive"));
 const UploadCSV = lazy(() => import("./pages/UploadCSV"));
+const UnitScorePage = lazy(() => import("./pages/UnitScorePage"));
 const AdminSettings = lazy(() => import("./pages/AdminSettings"));
 const History = lazy(() => import("./pages/History"));
 const LessonPlan = lazy(() => import("./pages/LessonPlan"));
@@ -78,6 +79,14 @@ const App = () => (
                 element={
                   <ProtectedRoute allowedRoles={["teacher", "director"]}>
                     <UploadCSV />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/unit-scores"
+                element={
+                  <ProtectedRoute allowedRoles={["teacher", "director"]}>
+                    <UnitScorePage />
                   </ProtectedRoute>
                 }
               />
