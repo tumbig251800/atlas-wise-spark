@@ -5,7 +5,8 @@
  * - Row 1 (index 0): title (skip)
  * - Row 2 (index 1): merged header (skip)
  * - Row 3 (index 2): column headers
- * - Row 4+ (index 3+): data
+ * - Row 4 (index 3): [optional] topic/content row — col 0 empty, col 4 = topic name
+ * - Row 4 or 5+ (index 3 or 4+): data (backward compat: if col 0 non-empty at index 3, treat as data)
  *
  * Sheet name format: "ป.X.Y" → grade_level="ป.X", classroom="Y"
  */
@@ -39,6 +40,7 @@ export interface Unit1ParseResult {
     classroom: string;
     totalRows: number;
     scoresProvided: number;
+    topicName?: string;  // from optional topic row (col 0 empty, col 4 = topic)
   };
 }
 
@@ -251,12 +253,26 @@ export function parseUnit1Excel(
           return;
         }
 
-        // Step 5: Parse data rows (start from index 3, skip rows 0-2)
+        // Step 5: Detect optional topic row at index 3
+        // If col 0 is empty → topic row (new template); else → student data (old template)
+        let dataStartIndex = 3;
+        let topicName: string | undefined;
+
+        if (json.length > 3) {
+          const maybeTopicRow = json[3] || [];
+          const col0 = String(maybeTopicRow[0] || "").trim();
+          if (!col0) {
+            topicName = String(maybeTopicRow[4] || "").trim() || undefined;
+            dataStartIndex = 4;
+          }
+        }
+
+        // Step 6: Parse data rows
         const students: Unit1Student[] = [];
         const seenCodes = new Set<string>();
         const scoreMap = new Map<string, number | null>();
 
-        for (let i = 3; i < json.length; i++) {
+        for (let i = dataStartIndex; i < json.length; i++) {
           const row = json[i] || [];
           const rowNum = i + 1;
 
@@ -303,7 +319,7 @@ export function parseUnit1Excel(
           });
         }
 
-        // Step 6: Build unit1Scores
+        // Step 7: Build unit1Scores
         let unit1Scores: Unit1Score[] | null = null;
         const hasAnyScore = Array.from(scoreMap.values()).some((s) => s !== null);
         if (hasAnyScore) {
@@ -313,7 +329,7 @@ export function parseUnit1Excel(
           }));
         }
 
-        // Step 7: Metadata
+        // Step 8: Metadata
         const scoresProvided = hasAnyScore
           ? Array.from(scoreMap.values()).filter((s) => s !== null).length
           : 0;
@@ -330,6 +346,7 @@ export function parseUnit1Excel(
             classroom,
             totalRows: students.length,
             scoresProvided,
+            topicName,
           },
         });
       } catch (e) {
