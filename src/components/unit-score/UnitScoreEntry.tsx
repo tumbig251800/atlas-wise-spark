@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -51,6 +52,15 @@ export function UnitScoreEntry() {
 
   const [deletingUnit, setDeletingUnit] = useState(false);
   const [deleteUnitError, setDeleteUnitError] = useState<string | null>(null);
+
+  // Edit K/P/A totals
+  const [editingKPA, setEditingKPA] = useState(false);
+  const [editK, setEditK] = useState(0);
+  const [editP, setEditP] = useState(0);
+  const [editA, setEditA] = useState(0);
+  const [savingKPA, setSavingKPA] = useState(false);
+  const [kpaError, setKpaError] = useState<string | null>(null);
+  const [kpaSuccess, setKpaSuccess] = useState(false);
 
   // Load all setups
   useEffect(() => {
@@ -150,6 +160,57 @@ export function UnitScoreEntry() {
   }, [filterUnitId, setups, teacherId]);
 
   const selectedSetup = setups.find((s) => s.id === filterUnitId) ?? null;
+
+  // ── Edit K/P/A totals ─────────────────────────────────────────────────────
+  function openEditKPA() {
+    if (!selectedSetup) return;
+    setEditK(selectedSetup.k_total);
+    setEditP(selectedSetup.p_total);
+    setEditA(selectedSetup.a_total);
+    setKpaError(null);
+    setKpaSuccess(false);
+    setEditingKPA(true);
+  }
+
+  async function handleSaveKPA() {
+    if (!filterUnitId || !selectedSetup) return;
+    const total = editK + editP + editA;
+    if (total <= 0) { setKpaError("K + P + A ต้องมากกว่า 0"); return; }
+    if (editK < 0 || editP < 0 || editA < 0) { setKpaError("คะแนนต้องไม่ติดลบ"); return; }
+
+    setSavingKPA(true); setKpaError(null); setKpaSuccess(false);
+    try {
+      // Update setup
+      const { error: sErr } = await supabase
+        .from("unit_assessment_setups")
+        .update({ k_total: editK, p_total: editP, a_total: editA })
+        .eq("id", filterUnitId);
+      if (sErr) throw sErr;
+
+      // Update all assessment rows for this unit (denormalized cache)
+      const { error: aErr } = await supabase
+        .from("unit_assessments")
+        .update({ k_total: editK, p_total: editP, a_total: editA, total_score: total })
+        .eq("teacher_id", teacherId!)
+        .eq("subject", selectedSetup.subject)
+        .eq("grade_level", selectedSetup.grade_level)
+        .eq("classroom", selectedSetup.classroom)
+        .eq("academic_term", selectedSetup.academic_term)
+        .eq("unit_name", selectedSetup.unit_name);
+      if (aErr) throw aErr;
+
+      // Update local state
+      setSetups((prev) => prev.map((s) =>
+        s.id === filterUnitId ? { ...s, k_total: editK, p_total: editP, a_total: editA } : s
+      ));
+      setKpaSuccess(true);
+      setEditingKPA(false);
+    } catch (err) {
+      setKpaError(`บันทึกไม่สำเร็จ: ${err instanceof Error ? err.message : "Unknown error"}`);
+    } finally {
+      setSavingKPA(false);
+    }
+  }
 
   // ── Delete entire unit ────────────────────────────────────────────────────
   async function handleDeleteUnit() {
@@ -294,6 +355,82 @@ export function UnitScoreEntry() {
                 <Alert variant="destructive">
                   <AlertDescription>{deleteUnitError}</AlertDescription>
                 </Alert>
+              )}
+
+              {/* K/P/A totals display + edit */}
+              {filterUnitId && selectedSetup && (
+                <div className="border rounded-lg p-3 bg-muted/20 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex gap-4 text-sm">
+                      <span>คะแนนเต็ม:</span>
+                      <span className="font-medium">K = {selectedSetup.k_total}</span>
+                      <span className="font-medium">P = {selectedSetup.p_total}</span>
+                      <span className="font-medium">
+                        A = {selectedSetup.a_total}
+                        {selectedSetup.a_total === 0 && (
+                          <span className="ml-1 text-xs text-orange-400">(สังเกตพฤติกรรม)</span>
+                        )}
+                      </span>
+                      <span className="text-muted-foreground">รวม {selectedSetup.k_total + selectedSetup.p_total + selectedSetup.a_total}</span>
+                    </div>
+                    {!editingKPA && (
+                      <Button variant="outline" size="sm" onClick={openEditKPA}>
+                        ✏️ แก้ไข K/P/A เต็ม
+                      </Button>
+                    )}
+                  </div>
+
+                  {editingKPA && (
+                    <div className="space-y-3">
+                      <div className="flex gap-3 items-end flex-wrap">
+                        <div>
+                          <Label className="text-xs">K เต็ม</Label>
+                          <Input type="number" min={0} value={editK}
+                            onChange={(e) => setEditK(Math.max(0, Number(e.target.value)))}
+                            className="w-20 h-8" />
+                        </div>
+                        <div>
+                          <Label className="text-xs">P เต็ม</Label>
+                          <Input type="number" min={0} value={editP}
+                            onChange={(e) => setEditP(Math.max(0, Number(e.target.value)))}
+                            className="w-20 h-8" />
+                        </div>
+                        <div>
+                          <Label className="text-xs">
+                            A เต็ม
+                            <span className="ml-1 text-orange-400">(สังเกตพฤติกรรม)</span>
+                          </Label>
+                          <Input type="number" min={0} value={editA}
+                            onChange={(e) => setEditA(Math.max(0, Number(e.target.value)))}
+                            className="w-20 h-8" />
+                        </div>
+                        <div className="text-sm font-medium pb-1">
+                          รวม {editK + editP + editA}
+                        </div>
+                        <div className="flex gap-2 pb-1">
+                          <Button size="sm" onClick={handleSaveKPA} disabled={savingKPA}>
+                            {savingKPA ? "กำลังบันทึก..." : "บันทึก"}
+                          </Button>
+                          <Button size="sm" variant="outline"
+                            onClick={() => { setEditingKPA(false); setKpaError(null); }}>
+                            ยกเลิก
+                          </Button>
+                        </div>
+                      </div>
+                      {kpaError && (
+                        <Alert variant="destructive">
+                          <AlertDescription>{kpaError}</AlertDescription>
+                        </Alert>
+                      )}
+                    </div>
+                  )}
+
+                  {kpaSuccess && (
+                    <Alert className="border-green-500 bg-green-50">
+                      <AlertDescription>✅ อัปเดต K/P/A เต็มสำเร็จ</AlertDescription>
+                    </Alert>
+                  )}
+                </div>
               )}
             </>
           )}
