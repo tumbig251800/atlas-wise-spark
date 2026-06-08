@@ -1,6 +1,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AppLayout } from "@/components/AppLayout";
 import { Unit1Uploader } from "@/components/unit-score/Unit1Uploader";
+import { UnitScoreEntry } from "@/components/unit-score/UnitScoreEntry";
 
 export default function UnitScorePage() {
   return (
@@ -16,9 +17,7 @@ export default function UnitScorePage() {
         <Tabs defaultValue="import" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="import">📤 นำเข้าหน่วย 1 (Excel)</TabsTrigger>
-            <TabsTrigger value="grid" disabled>
-              📝 บันทึกคะแนน Grid - เร็วๆ นี้
-            </TabsTrigger>
+            <TabsTrigger value="grid">📝 บันทึกคะแนน Grid</TabsTrigger>
           </TabsList>
 
           <TabsContent value="import" className="mt-6">
@@ -26,9 +25,7 @@ export default function UnitScorePage() {
           </TabsContent>
 
           <TabsContent value="grid" className="mt-6">
-            <div className="text-center text-muted-foreground py-12">
-              กำลังพัฒนา...
-            </div>
+            <UnitScoreEntry />
           </TabsContent>
         </Tabs>
       </div>
