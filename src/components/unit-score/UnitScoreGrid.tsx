@@ -359,7 +359,10 @@ export function UnitScoreGrid({ rows, setup, onSaved, onRowDeleted, onRowAdded }
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">{mobileIdx + 1} / {rows.length}</p>
-          <p className="font-semibold">{student?.student_name}</p>
+          <div className="text-right">
+            <p className="font-semibold">{student?.student_name}</p>
+            <p className="text-xs text-muted-foreground">{student?.student_id}</p>
+          </div>
         </div>
         <div className="space-y-3">
           <div>
@@ -409,7 +412,7 @@ export function UnitScoreGrid({ rows, setup, onSaved, onRowDeleted, onRowAdded }
         <table className="w-full text-sm border-collapse">
           <thead className="sticky top-0 z-10 bg-background border-b">
             <tr>
-              <th className="sticky left-0 z-20 bg-background text-left px-3 py-2 w-8">#</th>
+              <th className="sticky left-0 z-20 bg-background text-left px-3 py-2 w-20">รหัส</th>
               <th className="sticky left-8 z-20 bg-background text-left px-3 py-2 min-w-[180px]">ชื่อ-สกุล</th>
               {activeColumns.map((col) => (
                 <th key={col} className="text-center px-3 py-2 w-24">
@@ -441,7 +444,7 @@ export function UnitScoreGrid({ rows, setup, onSaved, onRowDeleted, onRowAdded }
                 <tr key={row.id} className={`border-b last:border-0 ${
                   hasError ? "bg-red-50" : isDirty ? "bg-yellow-50" : rowIdx % 2 === 0 ? "" : "bg-muted/30"
                 }`}>
-                  <td className="sticky left-0 bg-inherit px-3 py-1 text-muted-foreground w-8">{row.seq}</td>
+                  <td className="sticky left-0 bg-inherit px-3 py-1 text-muted-foreground w-20 text-xs">{row.student_id}</td>
                   <td className="sticky left-8 bg-inherit px-3 py-1 font-medium min-w-[180px]">
                     <span>{row.student_name}</span>
                     {isAbsent && <span className="ml-2 text-xs text-orange-500 font-normal">ขาดสอบ</span>}
