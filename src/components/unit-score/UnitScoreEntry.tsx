@@ -1,9 +1,9 @@
 /**
- * UnitScoreEntry — filter bar to select which unit to grade,
+ * UnitScoreEntry — cascading filters (ชั้น/ห้อง → วิชา → หน่วย) to select which unit to grade,
  * then loads the roster + existing K/P/A scores and passes to UnitScoreGrid.
  * Also handles: delete entire unit, propagate row-delete / row-add from grid.
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/atlasSupabase";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -40,7 +40,11 @@ export function UnitScoreEntry() {
   const [loadingSetups, setLoadingSetups] = useState(true);
   const [setupError, setSetupError] = useState<string | null>(null);
 
-  const [selectedSetupId, setSelectedSetupId] = useState<string>("");
+  // Cascading filter state
+  const [filterGrade, setFilterGrade] = useState("");       // "ป.3/KBW"
+  const [filterSubject, setFilterSubject] = useState("");   // "ภาษาไทย"
+  const [filterUnitId, setFilterUnitId] = useState("");     // setup.id
+
   const [rows, setRows] = useState<StudentScoreRow[]>([]);
   const [loadingRows, setLoadingRows] = useState(false);
   const [rowsError, setRowsError] = useState<string | null>(null);
@@ -48,7 +52,7 @@ export function UnitScoreEntry() {
   const [deletingUnit, setDeletingUnit] = useState(false);
   const [deleteUnitError, setDeleteUnitError] = useState<string | null>(null);
 
-  // Load all setups for this teacher
+  // Load all setups
   useEffect(() => {
     if (!teacherId) return;
     setLoadingSetups(true);
@@ -56,7 +60,7 @@ export function UnitScoreEntry() {
       .from("unit_assessment_setups")
       .select("id,subject,academic_term,grade_level,classroom,unit_name,unit_display_name,k_total,p_total,a_total")
       .eq("teacher_id", teacherId)
-      .order("created_at", { ascending: false })
+      .order("grade_level")
       .then(({ data, error }) => {
         if (error) setSetupError(error.message);
         else setSetups((data as SetupWithId[]) ?? []);
@@ -64,10 +68,51 @@ export function UnitScoreEntry() {
       });
   }, [teacherId]);
 
-  // Load rows when setup selected
+  // Derived filter options
+  const gradeOptions = useMemo(() => {
+    const seen = new Set<string>();
+    return setups
+      .map((s) => `${s.grade_level}/${s.classroom}`)
+      .filter((g) => { if (seen.has(g)) return false; seen.add(g); return true; })
+      .sort();
+  }, [setups]);
+
+  const subjectOptions = useMemo(() => {
+    if (!filterGrade) return [];
+    const [gl, cl] = filterGrade.split("/");
+    const seen = new Set<string>();
+    return setups
+      .filter((s) => s.grade_level === gl && s.classroom === cl)
+      .map((s) => s.subject)
+      .filter((sub) => { if (seen.has(sub)) return false; seen.add(sub); return true; })
+      .sort();
+  }, [setups, filterGrade]);
+
+  const unitOptions = useMemo(() => {
+    if (!filterGrade || !filterSubject) return [];
+    const [gl, cl] = filterGrade.split("/");
+    return setups
+      .filter((s) => s.grade_level === gl && s.classroom === cl && s.subject === filterSubject)
+      .sort((a, b) => a.unit_name.localeCompare(b.unit_name, "th"));
+  }, [setups, filterGrade, filterSubject]);
+
+  // Reset downstream when upstream changes
+  function handleGradeChange(val: string) {
+    setFilterGrade(val);
+    setFilterSubject("");
+    setFilterUnitId("");
+    setRows([]);
+  }
+  function handleSubjectChange(val: string) {
+    setFilterSubject(val);
+    setFilterUnitId("");
+    setRows([]);
+  }
+
+  // Load rows when unit selected
   useEffect(() => {
-    if (!selectedSetupId || !teacherId) { setRows([]); return; }
-    const setup = setups.find((s) => s.id === selectedSetupId);
+    if (!filterUnitId || !teacherId) { setRows([]); return; }
+    const setup = setups.find((s) => s.id === filterUnitId);
     if (!setup) return;
 
     setLoadingRows(true);
@@ -102,24 +147,16 @@ export function UnitScoreEntry() {
         }
         setLoadingRows(false);
       });
-  }, [selectedSetupId, setups, teacherId]);
+  }, [filterUnitId, setups, teacherId]);
 
-  const selectedSetup = setups.find((s) => s.id === selectedSetupId) ?? null;
-
-  function setupLabel(s: SetupWithId) {
-    const displayUnit = s.unit_display_name
-      ? `${s.unit_name}: ${s.unit_display_name}`
-      : s.unit_name;
-    return `${s.subject} — ${s.grade_level}/${s.classroom} ${displayUnit} (เทอม ${s.academic_term})`;
-  }
+  const selectedSetup = setups.find((s) => s.id === filterUnitId) ?? null;
 
   // ── Delete entire unit ────────────────────────────────────────────────────
   async function handleDeleteUnit() {
-    if (!selectedSetup || !selectedSetupId || !teacherId) return;
+    if (!selectedSetup || !filterUnitId || !teacherId) return;
     setDeletingUnit(true);
     setDeleteUnitError(null);
     try {
-      // Delete all assessments for this unit
       const { error: aErr } = await supabase
         .from("unit_assessments")
         .delete()
@@ -131,16 +168,14 @@ export function UnitScoreEntry() {
         .eq("unit_name", selectedSetup.unit_name);
       if (aErr) throw aErr;
 
-      // Delete the setup
       const { error: sErr } = await supabase
         .from("unit_assessment_setups")
         .delete()
-        .eq("id", selectedSetupId);
+        .eq("id", filterUnitId);
       if (sErr) throw sErr;
 
-      // Update local state
-      setSetups((prev) => prev.filter((s) => s.id !== selectedSetupId));
-      setSelectedSetupId("");
+      setSetups((prev) => prev.filter((s) => s.id !== filterUnitId));
+      setFilterUnitId("");
       setRows([]);
     } catch (err) {
       setDeleteUnitError(`ลบไม่สำเร็จ: ${err instanceof Error ? err.message : "Unknown error"}`);
@@ -156,38 +191,78 @@ export function UnitScoreEntry() {
           <CardTitle>📝 บันทึกคะแนน K/P/A รายคน</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Setup selector */}
-          <div>
-            <Label htmlFor="setup-select">เลือกหน่วยที่ต้องการกรอกคะแนน</Label>
-            {loadingSetups ? (
-              <p className="text-sm text-muted-foreground mt-2">กำลังโหลด...</p>
-            ) : setupError ? (
-              <Alert variant="destructive" className="mt-2">
-                <AlertDescription>{setupError}</AlertDescription>
-              </Alert>
-            ) : setups.length === 0 ? (
-              <Alert className="mt-2">
-                <AlertDescription>
-                  ยังไม่มีหน่วยที่ import — กรุณาอัปโหลด Excel ในแท็บ "นำเข้าหน่วย 1" ก่อน
-                </AlertDescription>
-              </Alert>
-            ) : (
-              <div className="flex gap-2 mt-2">
-                <Select value={selectedSetupId} onValueChange={setSelectedSetupId}>
-                  <SelectTrigger id="setup-select" className="flex-1">
-                    <SelectValue placeholder="— เลือกหน่วย —" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {setups.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {setupLabel(s)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
 
-                {/* Delete entire unit */}
-                {selectedSetupId && (
+          {loadingSetups ? (
+            <p className="text-sm text-muted-foreground">กำลังโหลด...</p>
+          ) : setupError ? (
+            <Alert variant="destructive">
+              <AlertDescription>{setupError}</AlertDescription>
+            </Alert>
+          ) : setups.length === 0 ? (
+            <Alert>
+              <AlertDescription>
+                ยังไม่มีหน่วยที่ import — กรุณาอัปโหลด Excel ในแท็บ "นำเข้าหน่วย 1" ก่อน
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <>
+              {/* ── Cascading filters ── */}
+              <div className="grid grid-cols-3 gap-4">
+                {/* ชั้น/ห้อง */}
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block">ชั้น / ห้อง</Label>
+                  <Select value={filterGrade} onValueChange={handleGradeChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="— เลือกชั้น —" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {gradeOptions.map((g) => (
+                        <SelectItem key={g} value={g}>{g.replace("/", " / ")}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* วิชา */}
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block">วิชา</Label>
+                  <Select value={filterSubject} onValueChange={handleSubjectChange} disabled={!filterGrade}>
+                    <SelectTrigger>
+                      <SelectValue placeholder={filterGrade ? "— เลือกวิชา —" : "เลือกชั้นก่อน"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {subjectOptions.map((s) => (
+                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* หน่วย */}
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block">หน่วย</Label>
+                  <Select value={filterUnitId} onValueChange={setFilterUnitId} disabled={!filterSubject}>
+                    <SelectTrigger>
+                      <SelectValue placeholder={filterSubject ? "— เลือกหน่วย —" : "เลือกวิชาก่อน"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {unitOptions.map((u) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.unit_name}{u.unit_display_name ? `: ${u.unit_display_name}` : ""}
+                          <span className="text-muted-foreground text-xs ml-1">(เทอม {u.academic_term})</span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Delete unit button */}
+              {filterUnitId && (
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    {rows.length > 0 ? `${rows.length} คน` : ""}
+                  </p>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button variant="destructive" size="sm" disabled={deletingUnit}>
@@ -200,35 +275,31 @@ export function UnitScoreEntry() {
                         <AlertDialogDescription>
                           จะลบ setup และคะแนนนักเรียน{" "}
                           <strong>{rows.length} คน</strong> ของหน่วย{" "}
-                          <strong>
-                            {selectedSetup?.unit_display_name ?? selectedSetup?.unit_name}
-                          </strong>{" "}
-                          ออกถาวร ไม่สามารถย้อนกลับได้
+                          <strong>{selectedSetup?.unit_display_name ?? selectedSetup?.unit_name}</strong>{" "}
+                          วิชา <strong>{selectedSetup?.subject}</strong> ออกถาวร ไม่สามารถย้อนกลับได้
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
                         <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={handleDeleteUnit}
-                          className="bg-red-500 hover:bg-red-600"
-                        >
+                        <AlertDialogAction onClick={handleDeleteUnit} className="bg-red-500 hover:bg-red-600">
                           ลบทั้งหน่วย
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
-                )}
-              </div>
-            )}
-            {deleteUnitError && (
-              <Alert variant="destructive" className="mt-2">
-                <AlertDescription>{deleteUnitError}</AlertDescription>
-              </Alert>
-            )}
-          </div>
+                </div>
+              )}
+
+              {deleteUnitError && (
+                <Alert variant="destructive">
+                  <AlertDescription>{deleteUnitError}</AlertDescription>
+                </Alert>
+              )}
+            </>
+          )}
 
           {/* Grid */}
-          {selectedSetupId && (
+          {filterUnitId && (
             <>
               {loadingRows ? (
                 <p className="text-sm text-muted-foreground">กำลังโหลดรายชื่อ...</p>
@@ -245,15 +316,11 @@ export function UnitScoreEntry() {
                   rows={rows}
                   setup={selectedSetup}
                   onSaved={(updated) =>
-                    setRows((prev) =>
-                      prev.map((r) => updated.find((x) => x.id === r.id) ?? r)
-                    )
+                    setRows((prev) => prev.map((r) => updated.find((x) => x.id === r.id) ?? r))
                   }
                   onRowDeleted={(id) =>
                     setRows((prev) =>
-                      prev
-                        .filter((r) => r.id !== id)
-                        .map((r, idx) => ({ ...r, seq: idx + 1 }))
+                      prev.filter((r) => r.id !== id).map((r, idx) => ({ ...r, seq: idx + 1 }))
                     )
                   }
                   onRowAdded={(row) =>
@@ -263,6 +330,7 @@ export function UnitScoreEntry() {
               ) : null}
             </>
           )}
+
         </CardContent>
       </Card>
     </div>
