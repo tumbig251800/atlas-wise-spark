@@ -136,7 +136,7 @@ export function UnitScoreEntry() {
       .eq("classroom", setup.classroom)
       .eq("academic_term", setup.academic_term)
       .eq("unit_name", setup.unit_name)
-      .order("student_name")
+      .order("student_id")
       .then(({ data, error }) => {
         if (error) {
           setRowsError(error.message);
