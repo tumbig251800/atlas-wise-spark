@@ -436,9 +436,10 @@ export default function Consultant() {
     const unitLogs = filteredLogs.filter(l => l.learning_unit === selectedUnit);
     const logsForContext = unitLogs.length > 0 ? unitLogs : filteredLogs;
 
-    // Build context using real teaching_logs fields (not JSONB topics_covered)
+    // Build context — replace a-gap with p-gap so AI doesn't generate A-Gap section
     const contextLines = logsForContext.slice(0, 30).map((log, i) => {
-      return `[REF-${i + 1}] ${log.teaching_date} | หน่วย: ${log.learning_unit || "ไม่ระบุ"} | หัวข้อ: ${log.topic || "ไม่ระบุ"} | Mastery: ${log.mastery_score}/5 | Gap: ${log.major_gap || "ไม่ระบุ"} | Issue: ${log.key_issue || "-"}`;
+      const gapLabel = (log.major_gap || "ไม่ระบุ").replace(/a-gap/gi, "p-gap");
+      return `[REF-${i + 1}] ${log.teaching_date} | หน่วย: ${log.learning_unit || "ไม่ระบุ"} | หัวข้อ: ${log.topic || "ไม่ระบุ"} | Mastery: ${log.mastery_score}/5 | Gap: ${gapLabel} | Issue: ${log.key_issue || "-"}`;
     });
     const context = contextLines.join("\n");
 
@@ -456,6 +457,14 @@ export default function Consultant() {
       const msg = e instanceof Error ? e.message : "เกิดข้อผิดพลาดในการเชื่อมต่อ AI";
       toast.error(msg);
     } finally {
+      // Frontend safety filter — strip any A-Gap labels that slipped through
+      setExamContent((prev) =>
+        prev
+          .replace(/Gap\s*ที่วัด\s*:\s*A-Gap\r?\n?/g, "")
+          .replace(/ส่วนที่\s*3[^\n]*A-Gap[^\n]*/g, "ส่วนที่ 2 (ต่อ): การนำไปใช้")
+          .replace(/ครอบคลุม Gap:[^\n]*A-Gap[^\n]*/g, "ครอบคลุม K และ P")
+          .replace(/A-Gap/g, "P")
+      );
       setExamLoading(false);
     }
   };
