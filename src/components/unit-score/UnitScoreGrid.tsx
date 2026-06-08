@@ -370,7 +370,10 @@ export function UnitScoreGrid({ rows, setup, onSaved, onRowDeleted, onRowAdded }
           </div>
           {activeColumns.map((col) => (
             <div key={col}>
-              <Label className="text-sm font-medium">{colLabel[col]} (เต็ม {colMax[col]})</Label>
+              <Label className="text-sm font-medium">
+                {colLabel[col]} (เต็ม {colMax[col]})
+                {col === "a" && <span className="ml-2 text-xs text-orange-400 font-normal">สังเกตพฤติกรรมในชั้นเรียน</span>}
+              </Label>
               <Input type="number" min={0} max={colMax[col]} value={e[col]}
                 onChange={(ev) => handleChange(student.id, col, ev.target.value)}
                 className={isCellInvalid(e[col], colMax[col]) ? "border-red-500" : ""} />
@@ -410,7 +413,12 @@ export function UnitScoreGrid({ rows, setup, onSaved, onRowDeleted, onRowAdded }
               <th className="sticky left-8 z-20 bg-background text-left px-3 py-2 min-w-[180px]">ชื่อ-สกุล</th>
               {activeColumns.map((col) => (
                 <th key={col} className="text-center px-3 py-2 w-24">
-                  {colLabel[col]}<span className="text-muted-foreground text-xs">/{colMax[col]}</span>
+                  <div className="flex flex-col items-center gap-0.5">
+                    <span>{colLabel[col]}<span className="text-muted-foreground text-xs">/{colMax[col]}</span></span>
+                    {col === "a" && (
+                      <span className="text-[10px] text-orange-400 font-normal leading-tight">สังเกตพฤติกรรม</span>
+                    )}
+                  </div>
                 </th>
               ))}
               <th className="text-center px-3 py-2 w-24">คะแนนรวม<span className="text-muted-foreground text-xs">/{totalMax}</span></th>
