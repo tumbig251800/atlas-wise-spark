@@ -60,7 +60,7 @@ type Props = {
   onRowAdded: (row: StudentScoreRow) => void;
 };
 
-type EditCell = { k: string; p: string; a: string };
+type EditCell = { k: string; p: string; a: string; score: string };
 
 function toStr(v: number | null): string {
   return v === null || v === undefined ? "" : String(v);
@@ -84,7 +84,7 @@ export function UnitScoreGrid({ rows, setup, onSaved, onRowDeleted, onRowAdded }
   const [edits, setEdits] = useState<Record<string, EditCell>>(() => {
     const init: Record<string, EditCell> = {};
     rows.forEach((r) => {
-      init[r.id] = { k: toStr(r.k_score), p: toStr(r.p_score), a: toStr(r.a_score) };
+      init[r.id] = { k: toStr(r.k_score), p: toStr(r.p_score), a: toStr(r.a_score), score: toStr(r.score) };
     });
     return init;
   });
@@ -97,7 +97,7 @@ export function UnitScoreGrid({ rows, setup, onSaved, onRowDeleted, onRowAdded }
       if (!edits[r.id]) {
         setEdits((prev) => ({
           ...prev,
-          [r.id]: { k: toStr(r.k_score), p: toStr(r.p_score), a: toStr(r.a_score) },
+          [r.id]: { k: toStr(r.k_score), p: toStr(r.p_score), a: toStr(r.a_score), score: toStr(r.score) },
         }));
       }
     }
@@ -114,7 +114,7 @@ export function UnitScoreGrid({ rows, setup, onSaved, onRowDeleted, onRowAdded }
   const [showAddForm, setShowAddForm] = useState(false);
   const [addStudentCode, setAddStudentCode] = useState("");
   const [addStudentName, setAddStudentName] = useState("");
-  const [addScore, setAddScore] = useState("");
+  const [addScore, setAddScore] = useState("0");
   const [addDate, setAddDate] = useState(new Date().toISOString().slice(0, 10));
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
@@ -131,7 +131,7 @@ export function UnitScoreGrid({ rows, setup, onSaved, onRowDeleted, onRowAdded }
     []
   );
 
-  function handleChange(rowId: string, field: "k" | "p" | "a", val: string) {
+  function handleChange(rowId: string, field: "k" | "p" | "a" | "score", val: string) {
     setEdits((prev) => ({ ...prev, [rowId]: { ...prev[rowId], [field]: val } }));
     setSaveSuccess(false);
   }
@@ -163,21 +163,39 @@ export function UnitScoreGrid({ rows, setup, onSaved, onRowDeleted, onRowAdded }
     }
   }
 
+  const totalMax = setup.k_total + setup.p_total + setup.a_total;
+
   function getDirtyRows() {
     return rows
       .filter((r) => {
         const e = edits[r.id];
         if (!e) return false;
-        return toNum(e.k) !== r.k_score || toNum(e.p) !== r.p_score || toNum(e.a) !== r.a_score;
+        return (
+          toNum(e.k) !== r.k_score ||
+          toNum(e.p) !== r.p_score ||
+          toNum(e.a) !== r.a_score ||
+          toNum(e.score) !== r.score
+        );
       })
-      .map((r) => ({ id: r.id, k: toNum(edits[r.id].k), p: toNum(edits[r.id].p), a: toNum(edits[r.id].a) }));
+      .map((r) => ({
+        id: r.id,
+        k: toNum(edits[r.id].k),
+        p: toNum(edits[r.id].p),
+        a: toNum(edits[r.id].a),
+        score: toNum(edits[r.id].score),
+      }));
   }
 
   function hasValidationErrors() {
     return rows.some((r) => {
       const e = edits[r.id];
       if (!e) return false;
-      return isCellInvalid(e.k, setup.k_total) || isCellInvalid(e.p, setup.p_total) || isCellInvalid(e.a, setup.a_total);
+      return (
+        isCellInvalid(e.k, setup.k_total) ||
+        isCellInvalid(e.p, setup.p_total) ||
+        isCellInvalid(e.a, setup.a_total) ||
+        isCellInvalid(e.score, totalMax)
+      );
     });
   }
 
@@ -194,13 +212,13 @@ export function UnitScoreGrid({ rows, setup, onSaved, onRowDeleted, onRowAdded }
       for (const row of dirty) {
         const { error } = await supabase
           .from("unit_assessments")
-          .update({ k_score: row.k, p_score: row.p, a_score: row.a })
+          .update({ k_score: row.k, p_score: row.p, a_score: row.a, score: row.score })
           .eq("id", row.id);
         if (error) throw error;
       }
       onSaved(rows.map((r) => {
         const d = dirty.find((x) => x.id === r.id);
-        return d ? { ...r, k_score: d.k, p_score: d.p, a_score: d.a } : r;
+        return d ? { ...r, k_score: d.k, p_score: d.p, a_score: d.a, score: d.score } : r;
       }));
       setSaveSuccess(true);
     } catch (err) {
@@ -313,7 +331,7 @@ export function UnitScoreGrid({ rows, setup, onSaved, onRowDeleted, onRowAdded }
       };
 
       onRowAdded(added);
-      setAddStudentCode(""); setAddStudentName(""); setAddScore("");
+      setAddStudentCode(""); setAddStudentName(""); setAddScore("0");
       setAddDate(new Date().toISOString().slice(0, 10));
       setShowAddForm(false);
     } catch (err) {
@@ -336,7 +354,7 @@ export function UnitScoreGrid({ rows, setup, onSaved, onRowDeleted, onRowAdded }
   // ── Mobile ────────────────────────────────────────────────────────────────
   if (isMobile) {
     const student = rows[mobileIdx];
-    const e = edits[student?.id] ?? { k: "", p: "", a: "" };
+    const e = edits[student?.id] ?? { k: "", p: "", a: "", score: "" };
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
@@ -344,6 +362,12 @@ export function UnitScoreGrid({ rows, setup, onSaved, onRowDeleted, onRowAdded }
           <p className="font-semibold">{student?.student_name}</p>
         </div>
         <div className="space-y-3">
+          <div>
+            <Label className="text-sm font-medium">คะแนนรวม (เต็ม {totalMax})</Label>
+            <Input type="number" min={0} max={totalMax} value={e.score}
+              onChange={(ev) => handleChange(student.id, "score", ev.target.value)}
+              className={isCellInvalid(e.score, totalMax) ? "border-red-500" : ""} />
+          </div>
           {activeColumns.map((col) => (
             <div key={col}>
               <Label className="text-sm font-medium">{colLabel[col]} (เต็ม {colMax[col]})</Label>
@@ -389,25 +413,31 @@ export function UnitScoreGrid({ rows, setup, onSaved, onRowDeleted, onRowAdded }
                   {colLabel[col]}<span className="text-muted-foreground text-xs">/{colMax[col]}</span>
                 </th>
               ))}
-              <th className="text-center px-3 py-2 w-20 text-muted-foreground">รวม</th>
+              <th className="text-center px-3 py-2 w-24">คะแนนรวม<span className="text-muted-foreground text-xs">/{totalMax}</span></th>
               <th className="px-3 py-2 w-12"></th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row, rowIdx) => {
-              const e = edits[row.id] ?? { k: "", p: "", a: "" };
-              const hasError = activeColumns.some((col) => isCellInvalid(e[col], colMax[col]));
-              const isDirty = toNum(e.k) !== row.k_score || toNum(e.p) !== row.p_score || toNum(e.a) !== row.a_score;
-              const liveSum = (e.k || e.p || e.a)
-                ? (toNum(e.k) ?? 0) + (toNum(e.p) ?? 0) + (toNum(e.a) ?? 0)
-                : row.score;
+              const e = edits[row.id] ?? { k: "", p: "", a: "", score: "" };
+              const scoreInvalid = isCellInvalid(e.score, totalMax);
+              const hasError = scoreInvalid || activeColumns.some((col) => isCellInvalid(e[col], colMax[col]));
+              const isDirty =
+                toNum(e.k) !== row.k_score ||
+                toNum(e.p) !== row.p_score ||
+                toNum(e.a) !== row.a_score ||
+                toNum(e.score) !== row.score;
+              const isAbsent = row.score === 0 && row.k_score === null;
 
               return (
                 <tr key={row.id} className={`border-b last:border-0 ${
                   hasError ? "bg-red-50" : isDirty ? "bg-yellow-50" : rowIdx % 2 === 0 ? "" : "bg-muted/30"
                 }`}>
                   <td className="sticky left-0 bg-inherit px-3 py-1 text-muted-foreground w-8">{row.seq}</td>
-                  <td className="sticky left-8 bg-inherit px-3 py-1 font-medium min-w-[180px]">{row.student_name}</td>
+                  <td className="sticky left-8 bg-inherit px-3 py-1 font-medium min-w-[180px]">
+                    <span>{row.student_name}</span>
+                    {isAbsent && <span className="ml-2 text-xs text-orange-500 font-normal">ขาดสอบ</span>}
+                  </td>
                   {activeColumns.map((col) => (
                     <td key={col} className="px-2 py-1 text-center">
                       <Input
@@ -422,8 +452,13 @@ export function UnitScoreGrid({ rows, setup, onSaved, onRowDeleted, onRowAdded }
                       />
                     </td>
                   ))}
-                  <td className="px-3 py-1 text-center font-medium text-muted-foreground">
-                    {liveSum !== null && liveSum !== undefined ? liveSum : "—"}
+                  <td className="px-2 py-1 text-center">
+                    <Input
+                      type="number" min={0} max={totalMax}
+                      value={e.score}
+                      onChange={(ev) => handleChange(row.id, "score", ev.target.value)}
+                      className={`w-20 text-center h-8 ${scoreInvalid ? "border-red-500 focus-visible:ring-red-500" : ""}`}
+                    />
                   </td>
                   <td className="px-2 py-1 text-center">
                     <AlertDialog>
@@ -460,7 +495,7 @@ export function UnitScoreGrid({ rows, setup, onSaved, onRowDeleted, onRowAdded }
       {/* Add late student */}
       {showAddForm ? (
         <div className="border rounded-lg p-4 space-y-3 bg-muted/20">
-          <p className="font-medium text-sm">➕ เพิ่มนักเรียนสอบทีหลัง</p>
+          <p className="font-medium text-sm">➕ เพิ่มนักเรียนขาดสอบ / สอบทีหลัง</p>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs">รหัสนักเรียน</Label>
@@ -471,9 +506,9 @@ export function UnitScoreGrid({ rows, setup, onSaved, onRowDeleted, onRowAdded }
               <Input value={addStudentName} onChange={(e) => setAddStudentName(e.target.value)} placeholder="เช่น เด็กชาย สมชาย ใจดี" />
             </div>
             <div>
-              <Label className="text-xs">คะแนนรวม (เต็ม {setup.k_total + setup.p_total + setup.a_total})</Label>
-              <Input type="number" min={0} max={setup.k_total + setup.p_total + setup.a_total}
-                value={addScore} onChange={(e) => setAddScore(e.target.value)} placeholder="เว้นว่างได้" />
+              <Label className="text-xs">คะแนนรวม (เต็ม {totalMax}) — 0 = ขาดสอบ</Label>
+              <Input type="number" min={0} max={totalMax}
+                value={addScore} onChange={(e) => setAddScore(e.target.value)} />
             </div>
             <div>
               <Label className="text-xs">วันที่สอบ</Label>
@@ -490,7 +525,7 @@ export function UnitScoreGrid({ rows, setup, onSaved, onRowDeleted, onRowAdded }
         </div>
       ) : (
         <Button variant="outline" size="sm" onClick={() => setShowAddForm(true)}>
-          ➕ เพิ่มนักเรียนสอบทีหลัง
+          ➕ เพิ่มนักเรียนขาดสอบ / สอบทีหลัง
         </Button>
       )}
 
