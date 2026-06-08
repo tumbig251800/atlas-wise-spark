@@ -9,53 +9,48 @@ const corsHeaders = {
 
 const EXAM_SYSTEM_PROMPT = `คุณคือ "พีท ร่างทอง" ผู้เชี่ยวชาญออกแบบข้อสอบตามกรอบ ATLAS Logic
 
-## หลักการวัดผล K-P-A (บังคับเข้าใจก่อนออกข้อสอบ)
-ในกรอบ ATLAS มี 3 มิติ แต่วัดด้วยเครื่องมือต่างกัน:
-- K (Knowledge — ความรู้): วัดด้วยข้อสอบได้ดีที่สุด ✅
-- P (Process — ทักษะกระบวนการ): วัดด้วยข้อสอบได้ในระดับหนึ่ง ✅ (เช่น โจทย์สถานการณ์ ขั้นตอนการแก้ปัญหา)
-- A (Attitude — เจตคติ/คุณลักษณะ): วัดด้วยข้อสอบ ❌ ไม่แม่นยำ เพราะผู้เรียนมักตอบ "สิ่งที่ควรตอบ" ไม่ใช่ความรู้สึกจริง — ต้องวัดด้วยการสังเกตพฤติกรรมในชั้นเรียนแทน
-
-ดังนั้น: **ข้อสอบนี้จะออกเฉพาะ K และ P เท่านั้น** A ครูจะประเมินแยกจากการสังเกตพฤติกรรม
+## บทบาทของคุณ
+ออกข้อสอบวัดผลสัมฤทธิ์ทางการเรียน วัดได้เฉพาะ 2 มิติเท่านั้น:
+- **K (Knowledge)** — ความรู้ ความเข้าใจ
+- **P (Process)** — ทักษะกระบวนการ การนำไปใช้ แก้ปัญหา
 
 ## Context Lock — บังคับสูงสุด
-- ข้อสอบทุกข้อต้องอิงจากหัวข้อที่ครูสอนจริงใน Teaching Logs เท่านั้น
-- ห้ามสร้างโจทย์จากหัวข้อที่ไม่มีใน [REF-X] โดยเด็ดขาด
-- ทุกข้อต้องระบุ [REF-X] ที่อ้างอิง เช่น "(อ้างอิง [REF-3] หัวข้อเศษส่วน)"
-- ห้ามนำเนื้อหาวิชาอื่นมาปนในข้อสอบ
+- ข้อสอบทุกข้อต้องอิงจากหัวข้อใน Teaching Logs เท่านั้น
+- ทุกข้อต้องระบุ [REF-X] ที่อ้างอิง
+- ห้ามนำเนื้อหาวิชาอื่นมาปน
 
-## โครงสร้างข้อสอบ ATLAS (บังคับ)
-สร้างข้อสอบ 10 ข้อ วัดเฉพาะ K และ P:
-- ข้อ 1-4: K — Remember/Understand — ทดสอบความรู้และความเข้าใจพื้นฐาน
-- ข้อ 5-10: P — Apply/Analyze — ทดสอบการนำความรู้ไปใช้และแก้ปัญหาในสถานการณ์จริง
+## โครงสร้าง Output (บังคับตาม template นี้เท่านั้น)
 
-หมายเหตุ: ไม่มีข้อสอบวัด A เพราะเจตคติวัดด้วยการสังเกตพฤติกรรมในชั้นเรียน ไม่ใช่ข้อสอบ
+ข้อสอบต้องมี **2 ส่วนเท่านั้น** ตามนี้:
 
-## รูปแบบข้อสอบ
-สำหรับแต่ละข้อให้ระบุ:
-1. หมายเลขข้อ + คำถาม
-2. ตัวเลือก ก. ข. ค. ง. (ถ้าเป็น MCQ) หรือเว้นบรรทัดสำหรับเขียนตอบ
-3. เฉลย: [ระบุคำตอบที่ถูก]
-4. มิติที่วัด: [K / P]
-5. อ้างอิง: [REF-X ที่เกี่ยวข้อง]
+---
+### ส่วนที่ 1: ความรู้พื้นฐาน (ข้อ 1–4)
+[ข้อ 1–4 วัด K: ความรู้ ความเข้าใจ]
 
-## กฎ Deterministic (บังคับ)
-- ห้ามสร้างตัวเลข ชื่อ หรือข้อมูลที่ไม่มีใน context
-- ถ้า context มี remedial IDs ให้ออกแบบข้อสอบให้ครอบคลุม skill ที่เด็กกลุ่มนั้นยังขาด
-- ระบุท้ายข้อสอบว่า "ข้อสอบนี้สร้างจากบันทึกการสอน [X] คาบ ครอบคลุม K และ P"
+### ส่วนที่ 2: การนำไปใช้ (ข้อ 5–10)
+[ข้อ 5–10 วัด P: ทักษะกระบวนการ โจทย์สถานการณ์]
 
-## หมายเหตุสำหรับครูท้ายข้อสอบ (บังคับใส่ทุกครั้ง)
-ปิดท้ายด้วยกล่องข้อความนี้เสมอ:
+ข้อสอบนี้สร้างจากบันทึกการสอน [X] คาบ
 
 ---
 📋 **หมายเหตุสำหรับครู**
 ข้อสอบชุดนี้วัดผล **K (ความรู้)** และ **P (ทักษะกระบวนการ)** เท่านั้น
-
-**A (เจตคติ/คุณลักษณะ)** ไม่สามารถวัดด้วยข้อสอบได้อย่างแม่นยำ เพราะนักเรียนมักตอบ "สิ่งที่ควรตอบ" แทนความรู้สึกจริง
-→ ครูประเมิน A แยกจากการ**สังเกตพฤติกรรมในชั้นเรียน** แล้วกรอกคะแนน A ในช่อง Grid ของ ATLAS ได้เลย
+→ ครูประเมิน **A (เจตคติ)** แยกจากการ**สังเกตพฤติกรรมในชั้นเรียน** แล้วกรอกในช่อง Grid ของ ATLAS
 ---
 
-## Format Output
-เขียนเป็น Markdown มีหัวข้อชัดเจน ใช้ภาษาไทยที่เหมาะกับระดับชั้น`;
+## รูปแบบแต่ละข้อ
+1. หมายเลขข้อ + คำถาม
+2. ตัวเลือก ก. ข. ค. ง. หรือเว้นบรรทัดสำหรับเขียนตอบ
+3. เฉลย: [คำตอบ]
+4. อ้างอิง: [REF-X]
+
+## กฎ Output
+- ใช้หัวข้อส่วนเป็น "ส่วนที่ 1" และ "ส่วนที่ 2" เท่านั้น — ห้ามมี "ส่วนที่ 3"
+- ห้ามใช้คำว่า "A-Gap", "K-Gap", "P-Gap" ในข้อสอบเด็ดขาด
+- ห้ามระบุ "มิติที่วัด" ในแต่ละข้อ
+- ห้ามสร้างตัวเลขหรือชื่อที่ไม่มีใน context
+
+เขียนเป็น Markdown ใช้ภาษาไทยที่เหมาะกับระดับชั้น`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -87,18 +82,25 @@ serve(async (req) => {
 
     const questionCount = numQuestions || 10;
 
+    // Sanitize context: remove A-Gap mentions so AI doesn't generate A-Gap questions
+    const sanitizedContext = (context || "")
+      .replace(/A-Gap/gi, "P-Gap")
+      .replace(/\bA gap\b/gi, "P-Gap")
+      .replace(/gap.*?เจตคติ[^\n]*/gi, "")
+      .replace(/เจตคติ.*?gap[^\n]*/gi, "");
+
     const userContent = `ข้อมูลบริบท:
 ชั้น: ${gradeLevel} ห้อง: ${classroom} วิชา: ${subject}
 หน่วยการเรียนรู้ที่ต้องออกข้อสอบ: ${unit || topic || "ตามบันทึกการสอน"}
 จำนวนข้อสอบที่ต้องการ: ${questionCount} ข้อ
 
 ข้อมูลจาก Teaching Logs เฉพาะหน่วยนี้ (ใช้เป็นฐานสร้างข้อสอบ):
-${context}
+${sanitizedContext}
 
 กฎสำคัญ:
 - สร้างข้อสอบเฉพาะหน่วย "${unit || "ตามบันทึกการสอน"}" วิชา ${subject} ชั้น ${gradeLevel}/${classroom} เท่านั้น
 - อ้างอิง [REF-X] ทุกข้อ ห้ามมโนหัวข้อที่ไม่มีใน Teaching Logs
-- ออกข้อสอบให้ครอบคลุม Gap ที่พบในบันทึก (K-Gap, P-Gap, A-Gap)`;
+- ออกข้อสอบให้ครอบคลุม K-Gap และ P-Gap ที่พบในบันทึก (ห้ามออกข้อสอบวัด A เพราะ A วัดด้วยการสังเกตพฤติกรรม ไม่ใช่ข้อสอบ)`;
 
     // Use Gemini API directly
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}`;
@@ -136,45 +138,47 @@ ${context}
       });
     }
 
-    // Transform Gemini SSE → OpenAI-compatible SSE for frontend
+    // Collect full response, filter A-Gap, then stream to frontend
     const encoder = new TextEncoder();
     const decoder = new TextDecoder();
 
-    const stream = new ReadableStream({
-      async start(controller) {
-        const reader = response.body!.getReader();
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) {
-              controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-              break;
-            }
-            const chunk = decoder.decode(value);
-            const lines = chunk.split("\n");
-            for (const line of lines) {
-              if (!line.startsWith("data: ")) continue;
-              const jsonStr = line.slice(6).trim();
-              if (!jsonStr || jsonStr === "[DONE]") continue;
-              try {
-                const parsed = JSON.parse(jsonStr);
-                const text = parsed?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-                if (text) {
-                  const openAiChunk = {
-                    choices: [{ delta: { content: text } }],
-                  };
-                  controller.enqueue(encoder.encode(`data: ${JSON.stringify(openAiChunk)}\n\n`));
-                }
-              } catch {
-                // skip malformed chunks
-              }
-            }
-          }
-        } catch (e) {
-          console.error("stream error:", e);
-        } finally {
-          controller.close();
+    // Buffer entire Gemini response first
+    let fullText = "";
+    const reader = response.body!.getReader();
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value);
+        for (const line of chunk.split("\n")) {
+          if (!line.startsWith("data: ")) continue;
+          const jsonStr = line.slice(6).trim();
+          if (!jsonStr || jsonStr === "[DONE]") continue;
+          try {
+            const parsed = JSON.parse(jsonStr);
+            const text = parsed?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+            if (text) fullText += text;
+          } catch { /* skip malformed */ }
         }
+      }
+    } catch (e) {
+      console.error("stream read error:", e);
+    }
+
+    // Strip all A-Gap references from complete text
+    const filtered = fullText
+      .replace(/Gap\s*ที่วัด\s*:\s*A-Gap\r?\n?/g, "")
+      .replace(/ครอบคลุม Gap:[^\n]*A-Gap[^\n]*/g, "ครอบคลุม K และ P")
+      .replace(/ส่วนที่\s*3\s*:[^\n]*A-Gap[^\n]*/g, "ส่วนที่ 2 (ต่อ): การนำไปใช้")
+      .replace(/A-Gap/g, "P");
+
+    // Send as single SSE chunk + done
+    const stream = new ReadableStream({
+      start(controller) {
+        const openAiChunk = { choices: [{ delta: { content: filtered } }] };
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(openAiChunk)}\n\n`));
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+        controller.close();
       },
     });
 
