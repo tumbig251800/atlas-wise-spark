@@ -45,7 +45,7 @@ const App = () => (
               <Route
                 path="/log"
                 element={
-                  <ProtectedRoute allowedRoles={["teacher", "director"]}>
+                  <ProtectedRoute allowedRoles={["teacher", "director", "lead"]}>
                     <TeachingLog />
                   </ProtectedRoute>
                 }
@@ -53,7 +53,7 @@ const App = () => (
               <Route
                 path="/dashboard"
                 element={
-                  <ProtectedRoute allowedRoles={["director"]}>
+                  <ProtectedRoute allowedRoles={["director", "lead"]}>
                     <Dashboard />
                   </ProtectedRoute>
                 }
@@ -61,7 +61,7 @@ const App = () => (
               <Route
                 path="/executive"
                 element={
-                  <ProtectedRoute allowedRoles={["director"]}>
+                  <ProtectedRoute allowedRoles={["director", "lead"]}>
                     <Executive />
                   </ProtectedRoute>
                 }
@@ -69,7 +69,7 @@ const App = () => (
               <Route
                 path="/action-board"
                 element={
-                  <ProtectedRoute allowedRoles={["director"]}>
+                  <ProtectedRoute allowedRoles={["director", "lead"]}>
                     <ActionBoard />
                   </ProtectedRoute>
                 }
@@ -77,7 +77,7 @@ const App = () => (
               <Route
                 path="/upload"
                 element={
-                  <ProtectedRoute allowedRoles={["teacher", "director"]}>
+                  <ProtectedRoute allowedRoles={["teacher", "director", "lead"]}>
                     <UploadCSV />
                   </ProtectedRoute>
                 }
@@ -85,7 +85,7 @@ const App = () => (
               <Route
                 path="/unit-scores"
                 element={
-                  <ProtectedRoute allowedRoles={["teacher", "director"]}>
+                  <ProtectedRoute allowedRoles={["teacher", "director", "lead"]}>
                     <UnitScorePage />
                   </ProtectedRoute>
                 }
@@ -101,7 +101,7 @@ const App = () => (
               <Route
                 path="/history"
                 element={
-                  <ProtectedRoute allowedRoles={["teacher", "director"]}>
+                  <ProtectedRoute allowedRoles={["teacher", "director", "lead"]}>
                     <History />
                   </ProtectedRoute>
                 }
@@ -109,7 +109,7 @@ const App = () => (
               <Route
                 path="/lesson-plan"
                 element={
-                  <ProtectedRoute allowedRoles={["teacher", "director"]}>
+                  <ProtectedRoute allowedRoles={["teacher", "director", "lead"]}>
                     <LessonPlan />
                   </ProtectedRoute>
                 }
@@ -117,7 +117,7 @@ const App = () => (
               <Route
                 path="/admin/lesson-plans"
                 element={
-                  <ProtectedRoute allowedRoles={["director"]}>
+                  <ProtectedRoute allowedRoles={["director", "lead"]}>
                     <LessonPlanHistory />
                   </ProtectedRoute>
                 }
@@ -125,7 +125,7 @@ const App = () => (
               <Route
                 path="/smart-report"
                 element={
-                  <ProtectedRoute allowedRoles={["teacher", "director"]}>
+                  <ProtectedRoute allowedRoles={["teacher", "director", "lead"]}>
                     <SmartReportView />
                   </ProtectedRoute>
                 }
@@ -133,7 +133,7 @@ const App = () => (
               <Route
                 path="/competency-report"
                 element={
-                  <ProtectedRoute allowedRoles={["teacher", "director"]}>
+                  <ProtectedRoute allowedRoles={["teacher", "director", "lead"]}>
                     <CompetencyReport />
                   </ProtectedRoute>
                 }
@@ -141,7 +141,7 @@ const App = () => (
               <Route
                 path="/consultant"
                 element={
-                  <ProtectedRoute allowedRoles={["teacher", "director"]}>
+                  <ProtectedRoute allowedRoles={["teacher", "director", "lead"]}>
                     <Consultant />
                   </ProtectedRoute>
                 }
