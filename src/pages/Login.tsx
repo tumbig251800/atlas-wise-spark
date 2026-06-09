@@ -71,8 +71,8 @@ export default function Login() {
             โรงเรียนวรนาถวิทยากำแพงเพชร
           </p>
           <h1 className="text-3xl font-bold text-foreground tracking-tight">ATLAS INTELLIGENCE</h1>
-          <p className="text-sm text-primary/80 font-medium">
-            ATLAS แพลตฟอร์มติดตามและพัฒนาการสอน
+          <p className="text-xl font-semibold text-foreground/80 leading-snug px-2">
+            แพลตฟอร์มติดตามและพัฒนาการสอน
           </p>
         </div>
 
