@@ -42,15 +42,25 @@ export function useStrategyHistory({
 
     async function fetchStrategyHistory() {
       try {
-        // ดึงประวัติ teaching logs ย้อนหลัง 60 วัน
+        // คำนวณภาคเรียนปัจจุบัน (academic_term)
+        const now = new Date();
+        const year = now.getFullYear() + 543; // Buddhist year
+        const month = now.getMonth() + 1;
+        // ภาคเรียนที่ 1: พ.ค. - ก.ย. (5-9)
+        // ภาคเรียนที่ 2: พ.ย. - มี.ค. (11-3)
+        const term = (month >= 5 && month <= 9) ? 1 : 2;
+        const termYear = (month >= 1 && month <= 3) ? year - 1 : year;
+        const currentTerm = `${termYear}/${term}`;
+
+        // ดึงประวัติ teaching logs เฉพาะภาคเรียนปัจจุบัน
         const { data: logs, error } = await supabase
           .from("teaching_logs")
-          .select("teaching_date, next_strategy, mastery_score, major_gap")
+          .select("teaching_date, next_strategy, mastery_score, major_gap, academic_term")
           .eq("teacher_id", teacherId)
           .eq("subject", subject)
           .eq("classroom", classroom)
           .eq("grade_level", gradeLevel)
-          .gte("teaching_date", new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString().split("T")[0])
+          .eq("academic_term", currentTerm)
           .order("teaching_date", { ascending: true });
 
         if (error) throw error;

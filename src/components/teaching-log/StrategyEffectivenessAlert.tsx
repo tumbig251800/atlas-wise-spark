@@ -92,7 +92,7 @@ export function StrategyEffectivenessAlert({
               </div>
             ))}
             <p className="text-xs text-muted-foreground mt-2">
-              📊 ข้อมูลจากการสอนย้อนหลัง 60 วัน
+              📊 ข้อมูลจากการสอนในภาคเรียนนี้
             </p>
           </AlertDescription>
         </Alert>
