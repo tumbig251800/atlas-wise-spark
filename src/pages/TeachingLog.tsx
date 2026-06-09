@@ -207,8 +207,10 @@ export default function TeachingLog() {
       // Validate PASS/STAY only when real IDs are entered (not [None] sentinel)
       if (form.remedialIds.trim() && !remedialIsNone) {
         const ids = form.remedialIds.split(",").map(id => id.trim()).filter(Boolean);
-        const allHaveStatus = ids.every(id => form.remedialStatuses[id]);
-        if (!allHaveStatus) errs.remedialStatuses = "กรุณาเลือกสถานะ PASS/STAY ทุกคน";
+        const missingStatus = ids.filter(id => !form.remedialStatuses[id]);
+        if (missingStatus.length > 0) {
+          errs.remedialStatuses = `กรุณาเลือกสถานะ PASS/STAY ให้ครบ (ยังไม่ได้เลือก ${missingStatus.length} คน)`;
+        }
       }
       if (!form.nextStrategy) errs.nextStrategy = "กรุณาเลือกกลยุทธ์";
       if (!form.reflection.trim()) errs.reflection = "กรุณากรอกสะท้อนคิด";
@@ -274,6 +276,7 @@ export default function TeachingLog() {
     setSubmitting(true);
     try {
       const cleanedClassroom = cleanClassroomData(form.classroom.trim());
+      const academicTerm = getAcademicTerm(form.teachingDate);
       const { data: logData, error } = await supabase.from("teaching_logs").insert({
         teacher_id: user.id,
         teacher_name: teacherName || null,
@@ -294,10 +297,40 @@ export default function TeachingLog() {
         remedial_ids: form.remedialIds.trim() || null,
         next_strategy: form.nextStrategy || null,
         reflection: form.reflection.trim() || null,
-        academic_term: getAcademicTerm(form.teachingDate),
+        academic_term: academicTerm,
       }).select("id").single();
 
       if (error) throw error;
+
+      // บันทึก PASS/STAY รายคนใน remedial_tracking
+      if (
+        logData?.id &&
+        form.remedialStatuses &&
+        Object.keys(form.remedialStatuses).length > 0
+      ) {
+        const trackingRecords = Object.entries(form.remedialStatuses).map(
+          ([studentId, status]) => ({
+            teaching_log_id: logData.id,
+            student_id: studentId,
+            status: status,
+            teacher_id: user.id,
+            grade_level: form.gradeLevel,
+            classroom: cleanedClassroom,
+            subject: form.subject.trim(),
+            academic_term: academicTerm,
+            recorded_at: new Date().toISOString(),
+          })
+        );
+
+        const { error: trackingError } = await supabase
+          .from("remedial_tracking")
+          .insert(trackingRecords);
+
+        if (trackingError) {
+          console.error("Failed to save remedial tracking:", trackingError);
+          // ไม่ throw error เพราะ teaching_log บันทึกสำเร็จแล้ว
+        }
+      }
 
       // Call diagnostic engine asynchronously (don't block submit)
       // Dedup by logId to prevent double-invoke on rapid re-renders

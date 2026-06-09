@@ -799,6 +799,56 @@ export type Database = {
         }
         Relationships: []
       }
+      remedial_tracking: {
+        Row: {
+          id: string
+          teaching_log_id: string
+          student_id: string
+          status: "pass" | "stay"
+          teacher_id: string | null
+          grade_level: string | null
+          classroom: string | null
+          subject: string | null
+          academic_term: string | null
+          recorded_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          teaching_log_id: string
+          student_id: string
+          status: "pass" | "stay"
+          teacher_id?: string | null
+          grade_level?: string | null
+          classroom?: string | null
+          subject?: string | null
+          academic_term?: string | null
+          recorded_at?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          teaching_log_id?: string
+          student_id?: string
+          status?: "pass" | "stay"
+          teacher_id?: string | null
+          grade_level?: string | null
+          classroom?: string | null
+          subject?: string | null
+          academic_term?: string | null
+          recorded_at?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "remedial_tracking_teaching_log_id_fkey"
+            columns: ["teaching_log_id"]
+            isOneToOne: false
+            referencedRelation: "teaching_logs"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       topic_aliases: {
         Row: {
           alias: string

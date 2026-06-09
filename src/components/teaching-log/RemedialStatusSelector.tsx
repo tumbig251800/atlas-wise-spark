@@ -24,6 +24,9 @@ export function RemedialStatusSelector({ remedialIds, statuses, onChange, error 
   return (
     <div className="space-y-3" data-error={error ? true : undefined}>
       <Label>สถานะซ่อมเสริมรายบุคคล <span className="text-destructive">*</span></Label>
+      <p className="text-xs text-muted-foreground">
+        เลือก <strong>PASS</strong> = ผ่านแล้ว ไม่ต้องซ่อมเสริมต่อ | <strong>STAY</strong> = ยังต้องติดตามต่อ
+      </p>
       <div className="space-y-2">
         {ids.map((id) => (
           <div
@@ -37,16 +40,16 @@ export function RemedialStatusSelector({ remedialIds, statuses, onChange, error 
                   : "border-border bg-secondary/30"
             )}
           >
-            <span className="font-mono text-sm min-w-[60px]">{id}</span>
+            <span className="font-mono text-sm min-w-[60px]">ID: {id}</span>
             <div className="flex gap-2 ml-auto">
               <button
                 type="button"
                 onClick={() => setStatus(id, "pass")}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
+                  "flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold transition-all",
                   statuses[id] === "pass"
-                    ? "bg-[hsl(var(--atlas-success))] text-primary-foreground"
-                    : "bg-secondary hover:bg-secondary/80 text-muted-foreground"
+                    ? "bg-[hsl(var(--atlas-success))] text-primary-foreground shadow-md"
+                    : "bg-background text-muted-foreground border border-border hover:border-[hsl(var(--atlas-success))]/50"
                 )}
               >
                 <CheckCircle className="h-3.5 w-3.5" />
@@ -56,16 +59,19 @@ export function RemedialStatusSelector({ remedialIds, statuses, onChange, error 
                 type="button"
                 onClick={() => setStatus(id, "stay")}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
+                  "flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold transition-all",
                   statuses[id] === "stay"
-                    ? "bg-[hsl(var(--atlas-warning))] text-primary-foreground"
-                    : "bg-secondary hover:bg-secondary/80 text-muted-foreground"
+                    ? "bg-[hsl(var(--atlas-warning))] text-primary-foreground shadow-md"
+                    : "bg-background text-muted-foreground border border-border hover:border-[hsl(var(--atlas-warning))]/50"
                 )}
               >
                 <AlertTriangle className="h-3.5 w-3.5" />
                 STAY
               </button>
             </div>
+            {!statuses[id] && (
+              <span className="text-xs text-destructive ml-2">ยังไม่เลือก</span>
+            )}
           </div>
         ))}
       </div>
