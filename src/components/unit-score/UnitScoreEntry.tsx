@@ -65,6 +65,7 @@ export function UnitScoreEntry() {
   // ── Add new unit (copy roster) ────────────────────────────────────────────
   const [showAddUnit, setShowAddUnit] = useState(false);
   const [newUnitSourceId, setNewUnitSourceId] = useState("");
+  const [newUnitSubject, setNewUnitSubject] = useState("");
   const [newUnitName, setNewUnitName] = useState("");
   const [newUnitDisplayName, setNewUnitDisplayName] = useState("");
   const [newUnitDate, setNewUnitDate] = useState(new Date().toISOString().slice(0, 10));
@@ -126,6 +127,15 @@ export function UnitScoreEntry() {
       .filter((s) => s.grade_level === gl && s.classroom === cl && s.subject === filterSubject)
       .sort((a, b) => a.unit_name.localeCompare(b.unit_name, "th"));
   }, [setups, filterGrade, filterSubject]);
+
+  // Source options สำหรับ dialog — ทุกวิชาในชั้น/ห้องเดียวกัน
+  const sourceOptions = useMemo(() => {
+    if (!filterGrade) return [];
+    const [gl, cl] = filterGrade.split("/");
+    return setups
+      .filter((s) => s.grade_level === gl && s.classroom === cl)
+      .sort((a, b) => a.subject.localeCompare(b.subject, "th") || a.unit_name.localeCompare(b.unit_name, "th"));
+  }, [setups, filterGrade]);
 
   // Reset downstream when upstream changes
   function handleGradeChange(val: string) {
@@ -270,7 +280,7 @@ export function UnitScoreEntry() {
 
   // ── Add new unit by copying roster ───────────────────────────────────────
   async function handleAddUnit() {
-    if (!teacherId || !newUnitSourceId || !newUnitName.trim() || !newUnitDisplayName.trim()) {
+    if (!teacherId || !newUnitSourceId || !newUnitSubject.trim() || !newUnitName.trim() || !newUnitDisplayName.trim()) {
       setAddUnitError("กรุณากรอกข้อมูลให้ครบ");
       return;
     }
@@ -285,11 +295,11 @@ export function UnitScoreEntry() {
       (s) =>
         s.grade_level === source.grade_level &&
         s.classroom === source.classroom &&
-        s.subject === source.subject &&
+        s.subject === newUnitSubject.trim() &&
         s.academic_term === source.academic_term &&
         s.unit_name === newUnitName.trim()
     );
-    if (duplicate) { setAddUnitError(`มีหน่วย "${newUnitName.trim()}" อยู่แล้ว`); return; }
+    if (duplicate) { setAddUnitError(`มีหน่วย "${newUnitName.trim()}" วิชา "${newUnitSubject.trim()}" อยู่แล้ว`); return; }
 
     setAddingUnit(true);
     setAddUnitError(null);
@@ -299,7 +309,7 @@ export function UnitScoreEntry() {
         .from("unit_assessment_setups")
         .insert({
           teacher_id: teacherId,
-          subject: source.subject,
+          subject: newUnitSubject.trim(),
           grade_level: source.grade_level,
           classroom: source.classroom,
           academic_term: source.academic_term,
@@ -334,7 +344,7 @@ export function UnitScoreEntry() {
           assessed_by: teacherId,
           student_id: r.student_id,
           student_name: r.student_name,
-          subject: source.subject,
+          subject: newUnitSubject.trim(),
           grade_level: source.grade_level,
           classroom: source.classroom,
           academic_term: source.academic_term,
@@ -357,6 +367,7 @@ export function UnitScoreEntry() {
       setSetups((prev) => [...prev, newSetup as SetupWithId]);
       setShowAddUnit(false);
       setNewUnitSourceId("");
+      setNewUnitSubject("");
       setNewUnitName("");
       setNewUnitDisplayName("");
       setNewUnitK(0);
@@ -456,6 +467,7 @@ export function UnitScoreEntry() {
                     onClick={() => {
                       setAddUnitError(null);
                       setNewUnitSourceId(filterUnitId || (unitOptions[0]?.id ?? ""));
+                      setNewUnitSubject(filterSubject);
                       setShowAddUnit(true);
                     }}
                   >
@@ -625,7 +637,7 @@ export function UnitScoreEntry() {
           </DialogHeader>
 
           <div className="space-y-4 py-2">
-            {/* Source unit */}
+            {/* Source unit — แสดงทุกวิชาในชั้น/ห้องเดียวกัน */}
             <div>
               <Label className="text-sm">คัดลอกรายชื่อจากหน่วย</Label>
               <Select value={newUnitSourceId} onValueChange={setNewUnitSourceId}>
@@ -633,13 +645,27 @@ export function UnitScoreEntry() {
                   <SelectValue placeholder="— เลือกหน่วยต้นทาง —" />
                 </SelectTrigger>
                 <SelectContent>
-                  {unitOptions.map((u) => (
+                  {sourceOptions.map((u) => (
                     <SelectItem key={u.id} value={u.id}>
+                      <span className="text-xs text-muted-foreground mr-1">[{u.subject}]</span>
                       {u.unit_name}{u.unit_display_name ? `: ${u.unit_display_name}` : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* วิชาใหม่ */}
+            <div>
+              <Label className="text-sm">วิชาใหม่ <span className="text-red-500">*</span></Label>
+              <Input
+                className="mt-1"
+                value={newUnitSubject}
+                onChange={(e) => setNewUnitSubject(e.target.value)}
+                placeholder="เช่น คณิตศาสตร์"
+                disabled={addingUnit}
+              />
+              <p className="text-xs text-muted-foreground mt-1">ถ้าวิชาเดิม ไม่ต้องแก้ไข</p>
             </div>
 
             {/* New unit name */}
@@ -717,7 +743,7 @@ export function UnitScoreEntry() {
             <Button variant="outline" onClick={() => setShowAddUnit(false)} disabled={addingUnit}>
               ยกเลิก
             </Button>
-            <Button onClick={handleAddUnit} disabled={addingUnit || !newUnitSourceId}>
+            <Button onClick={handleAddUnit} disabled={addingUnit || !newUnitSourceId || !newUnitSubject.trim()}>
               {addingUnit ? "กำลังสร้าง..." : "สร้างหน่วยใหม่"}
             </Button>
           </DialogFooter>
