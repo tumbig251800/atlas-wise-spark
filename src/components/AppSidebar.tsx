@@ -1,5 +1,6 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useUserRole } from "@/hooks/useUserRole";
 import { signOut } from "@/lib/auth";
 import {
   Sidebar,
@@ -46,13 +47,20 @@ const directorMenuItems = [
   { title: "Admin Settings", url: "/admin", icon: Settings },
 ];
 
+// Lead: เหมือน director แต่ไม่มี Admin Settings
+const leadMenuItems = directorMenuItems.filter((m) => m.url !== "/admin");
+
 export function AppSidebar() {
   const { role, user } = useAuth();
+  const { isLead } = useUserRole();
   const navigate = useNavigate();
   const location = useLocation();
   const { hasAlerts } = useTrendAlerts();
 
-  const menuItems = role === "director" ? directorMenuItems : teacherMenuItems;
+  const menuItems =
+    role === "director" ? directorMenuItems :
+    isLead ? leadMenuItems :
+    teacherMenuItems;
 
   const handleSignOut = async () => {
     await signOut();

@@ -3,9 +3,10 @@ import { supabase } from "@/lib/atlasSupabase";
 import { useAuth } from "@/hooks/useAuth";
 
 export interface UserRole {
-  /** profiles.role value ('teacher' | 'admin' | 'super_admin'), or null while unknown. */
+  /** profiles.role value ('teacher' | 'admin' | 'super_admin' | 'lead'), or null while unknown. */
   role: string | null;
   isAdmin: boolean;
+  isLead: boolean;
   isTeacher: boolean;
   /** The user's auth id — used as action_plan_items.teacher_id. */
   teacherId: string | null;
@@ -52,11 +53,13 @@ export function useUserRole(): UserRole {
     appRole === "director" ||
     profileRole === "admin" ||
     profileRole === "super_admin";
-  const isTeacher = !!user && !isAdmin;
+  const isLead = profileRole === "lead";
+  const isTeacher = !!user && !isAdmin && !isLead;
 
   return {
     role: profileRole,
     isAdmin,
+    isLead,
     isTeacher,
     teacherId: user?.id ?? null,
     teacherName:
