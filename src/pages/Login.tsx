@@ -67,10 +67,10 @@ export default function Login() {
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 animate-pulse-glow">
             <Brain className="h-8 w-8 text-primary" />
           </div>
-          <p className="text-xs text-muted-foreground tracking-wide">
+          <p className="text-base font-semibold text-foreground/80 tracking-wide">
             โรงเรียนวรนาถวิทยากำแพงเพชร
           </p>
-          <h1 className="text-2xl font-bold text-foreground">ATLAS</h1>
+          <h1 className="text-3xl font-bold text-foreground">ATLAS</h1>
           <p className="text-sm text-muted-foreground">
             แพลตฟอร์มติดตามและพัฒนาการสอน
           </p>
