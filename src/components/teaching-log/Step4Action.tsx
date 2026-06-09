@@ -8,6 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sparkles, Users, AlertTriangle, UserX } from "lucide-react";
 import { RemedialStatusSelector } from "./RemedialStatusSelector";
+import { StrategyEffectivenessAlert } from "./StrategyEffectivenessAlert";
+import { useStrategyHistory } from "@/hooks/useStrategyHistory";
+import { useAuth } from "@/hooks/useAuth";
 import type { GapValue } from "@/lib/gapOptions";
 
 interface Step4Props {
@@ -16,12 +19,16 @@ interface Step4Props {
     nextStrategy: string;
     reflection: string;
     remedialStatuses: Record<string, "pass" | "stay">;
+    subject: string;
+    classroom: string;
+    gradeLevel: string;
   };
   onChange: (field: string, value: unknown) => void;
   errors: Record<string, string>;
   masteryScore?: number | null;
   totalStudents?: number | null;
   majorGap?: GapValue | null;
+  previousMastery?: number | null;
 }
 
 const REMEDIAL_NONE_SENTINEL = "[None]";
@@ -42,34 +49,51 @@ function useInterventionBadge(remedialIds: string, totalStudents: number | null 
 const QUICK_FILL_TEXT = "นักเรียนทุกคนเข้าใจเนื้อหาทะลุปรุโปร่ง ไม่พบจุดเข้าใจผิดในคาบนี้";
 
 const STRATEGIES = {
+  // Core Teaching Strategies
   scaffolding: "Scaffolding (ย่อยเนื้อหาใหม่ / ให้ตัวช่วย)",
+  reteach: "Re-teach/Review (สอนซ้ำ / อธิบายเพิ่มเติม)",
+  demonstration: "Demonstration/Visual Aids (เหมาะกับ: วิทย์, ศิลปะ)",
+  // Practice-focused
+  activePractice: "Active Practice/Drill (เหมาะกับ: คณิต, พละ)",
+  // Engagement-focused
   gamification: "Gamification/Role-play (เหมาะกับ: ภาษา, สังคม)",
   peerTutor: "Peer Tutor (จับคู่เพื่อนช่วยเพื่อน)",
-  activePractice: "Active Practice/Drill (เหมาะกับ: คณิต, พละ)",
-  demonstration: "Demonstration/Visual Aids (เหมาะกับ: วิทย์, ศิลปะ)",
+  // Differentiation
+  individualGroup: "Individual/Small Group (ซ่อมเสริมรายบุคคล/กลุ่มย่อย)",
   challenge: "Challenge (ยกระดับเด็กเก่ง)",
+  // Special Cases
+  continueForward: "Continue Forward (สอนเนื้อหาใหม่ต่อได้เลย)",
   immediateReferral: "🚨 Immediate Referral (ส่งต่อผู้บริหารทันที — A2 Safety)",
 } as const;
 
 // Strategies ranked by relevance to each Gap (most relevant first)
 const STRATEGY_BY_GAP: Record<string, string[]> = {
-  "k-gap":      [STRATEGIES.scaffolding, STRATEGIES.demonstration, STRATEGIES.peerTutor, STRATEGIES.activePractice, STRATEGIES.gamification],
-  "p-gap":      [STRATEGIES.activePractice, STRATEGIES.demonstration, STRATEGIES.scaffolding, STRATEGIES.peerTutor, STRATEGIES.gamification],
-  "a-gap":      [STRATEGIES.gamification, STRATEGIES.peerTutor, STRATEGIES.scaffolding, STRATEGIES.demonstration, STRATEGIES.activePractice],
+  "k-gap":      [STRATEGIES.reteach, STRATEGIES.scaffolding, STRATEGIES.demonstration, STRATEGIES.individualGroup, STRATEGIES.peerTutor, STRATEGIES.activePractice],
+  "p-gap":      [STRATEGIES.activePractice, STRATEGIES.demonstration, STRATEGIES.individualGroup, STRATEGIES.peerTutor, STRATEGIES.scaffolding],
+  "a-gap":      [STRATEGIES.gamification, STRATEGIES.individualGroup, STRATEGIES.peerTutor, STRATEGIES.scaffolding, STRATEGIES.demonstration],
   "a2-gap":     [STRATEGIES.immediateReferral],
-  "system-gap": [STRATEGIES.scaffolding, STRATEGIES.demonstration, STRATEGIES.activePractice, STRATEGIES.peerTutor, STRATEGIES.gamification],
-  "success":    [STRATEGIES.challenge, STRATEGIES.peerTutor, STRATEGIES.gamification],
+  "system-gap": [STRATEGIES.scaffolding, STRATEGIES.reteach, STRATEGIES.demonstration, STRATEGIES.individualGroup, STRATEGIES.activePractice],
+  "success":    [STRATEGIES.continueForward, STRATEGIES.challenge, STRATEGIES.peerTutor, STRATEGIES.gamification],
 };
 
 const ALL_STRATEGIES = Object.values(STRATEGIES);
 
-export function Step4Action({ data, onChange, errors, masteryScore, totalStudents, majorGap }: Step4Props) {
+export function Step4Action({ data, onChange, errors, masteryScore, totalStudents, majorGap, previousMastery }: Step4Props) {
+  const { user } = useAuth();
   const intervention = useInterventionBadge(data.remedialIds, totalStudents);
   const isSuccess = majorGap === "success";
   const isA2 = majorGap === "a2-gap";
   const isHighMastery = masteryScore != null && masteryScore >= 4;
   const remedialOptional = isSuccess && isHighMastery;
   const remedialIsNone = data.remedialIds === REMEDIAL_NONE_SENTINEL;
+
+  // Strategy History & Effectiveness
+  const { effectiveness } = useStrategyHistory({
+    teacherId: user?.id || "",
+    subject: data.subject || "",
+    classroom: data.classroom || "",
+    gradeLevel: data.gradeLevel || "",
+  });
 
   // Strategy list: gap-relevant first, then the rest (de-duplicated)
   const sortedStrategies = useMemo(() => {
@@ -178,6 +202,16 @@ export function Step4Action({ data, onChange, errors, masteryScore, totalStudent
           </SelectContent>
         </Select>
         {errors.nextStrategy && <p className="text-xs text-destructive">{errors.nextStrategy}</p>}
+
+        {/* Strategy Effectiveness Alert */}
+        {data.nextStrategy && effectiveness.length > 0 && (
+          <StrategyEffectivenessAlert
+            currentStrategy={data.nextStrategy}
+            effectiveness={effectiveness}
+            currentMastery={masteryScore}
+            previousMastery={previousMastery}
+          />
+        )}
       </div>
 
       {/* Reflection */}

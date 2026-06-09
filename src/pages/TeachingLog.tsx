@@ -426,7 +426,7 @@ export default function TeachingLog() {
           {currentStep === 1 && <Step1General data={form} onChange={handleChange} errors={errors} teacherName={teacherName} />}
           {currentStep === 2 && <Step2Quality data={form} majorGap={form.majorGap} onChange={handleChange} errors={errors} />}
           {currentStep === 3 && <Step3Gap data={form} onChange={handleChange} errors={errors} masteryScore={form.masteryScore} />}
-          {currentStep === 4 && <Step4Action data={form} onChange={handleChange} errors={errors} masteryScore={form.masteryScore} totalStudents={form.totalStudents} majorGap={form.majorGap} />}
+          {currentStep === 4 && <Step4Action data={form} onChange={handleChange} errors={errors} masteryScore={form.masteryScore} totalStudents={form.totalStudents} majorGap={form.majorGap} previousMastery={previousMasteryScore} />}
         </div>
 
         {/* Real-time validation summary — shown on the final (submit) step. */}
