@@ -238,10 +238,10 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss, onPass
             const canResolve = item.status === "open" || item.status === "resolved";
             const visit = nidetVisits.get(item.id) ?? null;
 
-            // Resolution flow depends on issue_type. MasteryDrop/RedZone need a
+            // Resolution flow depends on issue_type. MasteryDrop/RedZone/UnitBlindSpot need a
             // classroom supervision visit; IntegrityFlag is a data-entry fix.
             const isSupervisionNeeded =
-              item.issue_type === "MasteryDrop" || item.issue_type === "RedZone";
+              item.issue_type === "MasteryDrop" || item.issue_type === "RedZone" || item.issue_type === "UnitBlindSpot";
             const isIntegrityFlag = item.issue_type === "IntegrityFlag";
             const isFlag5 =
               isIntegrityFlag &&

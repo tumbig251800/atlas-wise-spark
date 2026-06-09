@@ -41,6 +41,7 @@ export function IssueTypeBadge({ type }: { type: string }) {
     RedZone: { label: "Red Zone", className: "bg-red-100 text-red-800 border border-red-300" },
     MasteryDrop: { label: "Mastery Drop", className: "bg-orange-100 text-orange-800 border border-orange-300" },
     IntegrityFlag: { label: "Integrity", className: "bg-purple-100 text-purple-800 border border-purple-300" },
+    UnitBlindSpot: { label: "Blind Spot หลังหน่วย", className: "bg-indigo-100 text-indigo-800 border border-indigo-300" },
   };
   const info = map[type] ?? { label: type, className: "bg-gray-100 text-gray-800" };
   return (

@@ -20,6 +20,11 @@ const REDZONE_HIGHLIGHT: RubricKey[] = [
   "rubric_collaborative",
   "rubric_feedback",
 ];
+const UNITBLINDSPOT_HIGHLIGHT: RubricKey[] = [
+  "rubric_formative_assess",
+  "rubric_individual_care",
+  "rubric_feedback",
+];
 
 // Teacher-facing, preparation-oriented framing for each highlighted dimension.
 const DIMENSION_TIPS: Partial<Record<RubricKey, string>> = {
@@ -87,7 +92,11 @@ function WatchingCard({ item }: { item: ActionItem }) {
 
 function SupervisionPrepCard({ item }: { item: ActionItem }) {
   const highlight = new Set<RubricKey>(
-    item.issue_type === "RedZone" ? REDZONE_HIGHLIGHT : MASTERY_HIGHLIGHT
+    item.issue_type === "RedZone"
+      ? REDZONE_HIGHLIGHT
+      : item.issue_type === "UnitBlindSpot"
+      ? UNITBLINDSPOT_HIGHLIGHT
+      : MASTERY_HIGHLIGHT
   );
 
   return (
@@ -179,7 +188,7 @@ function TeacherCard({ item }: { item: ActionItem }) {
   if (item.status === "resolved") return <ResolvedCard item={item} />;
   // status === 'open' from here.
   if (item.issue_type === "IntegrityFlag") return <IntegrityFlagCard item={item} />;
-  if (item.issue_type === "MasteryDrop" || item.issue_type === "RedZone")
+  if (item.issue_type === "MasteryDrop" || item.issue_type === "RedZone" || item.issue_type === "UnitBlindSpot")
     return <SupervisionPrepCard item={item} />;
   return null;
 }
