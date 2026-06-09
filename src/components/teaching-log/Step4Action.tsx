@@ -29,7 +29,7 @@ const REMEDIAL_NONE_SENTINEL = "[None]";
 function useInterventionBadge(remedialIds: string, totalStudents: number | null | undefined) {
   return useMemo(() => {
     if (remedialIds === REMEDIAL_NONE_SENTINEL) return null;
-    const ids = remedialIds.split(",").map(id => id.trim()).filter(Boolean);
+    const ids = remedialIds.split(/[\s,]+/).map(id => id.trim()).filter(Boolean);
     const count = ids.length;
     if (!count || !totalStudents || totalStudents < 1) return null;
     const pct = Math.round((count / totalStudents) * 100);

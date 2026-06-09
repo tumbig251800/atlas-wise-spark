@@ -31,7 +31,7 @@ const MODE_LABELS: Record<string, string> = {
 
 function useGapPercent(remedialIds: string, totalStudents: number | null) {
   return useMemo(() => {
-    const ids = remedialIds.split(",").map(id => id.trim()).filter(Boolean);
+    const ids = remedialIds.split(/[\s,]+/).map(id => id.trim()).filter(Boolean);
     if (!ids.length || !totalStudents || totalStudents < 1) return null;
     const pct = Math.round((ids.length / totalStudents) * 100);
     if (pct <= 20) return { label: "Individual Support", pct, count: ids.length, color: "bg-[hsl(var(--atlas-info))]/20 text-[hsl(var(--atlas-info))] border-[hsl(var(--atlas-info))]/30" };

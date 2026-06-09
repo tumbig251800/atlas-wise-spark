@@ -206,7 +206,7 @@ export default function TeachingLog() {
       }
       // Validate PASS/STAY only when real IDs are entered (not [None] sentinel)
       if (form.remedialIds.trim() && !remedialIsNone) {
-        const ids = form.remedialIds.split(",").map(id => id.trim()).filter(Boolean);
+        const ids = form.remedialIds.split(/[\s,]+/).map(id => id.trim()).filter(Boolean);
         const missingStatus = ids.filter(id => !form.remedialStatuses[id]);
         if (missingStatus.length > 0) {
           errs.remedialStatuses = `กรุณาเลือกสถานะ PASS/STAY ให้ครบ (ยังไม่ได้เลือก ${missingStatus.length} คน)`;
@@ -382,7 +382,7 @@ export default function TeachingLog() {
 
       let willShowSpecialCare = false;
       if (form.majorGap === "a-gap" && form.remedialIds.trim() && logData?.id) {
-        const ids = form.remedialIds.split(",").map((s) => s.trim()).filter(Boolean);
+        const ids = form.remedialIds.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
         if (ids.length > 0) {
           setScStudentIds(ids);
           setScLogId(logData.id);

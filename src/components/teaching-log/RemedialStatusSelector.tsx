@@ -11,7 +11,7 @@ interface RemedialStatusSelectorProps {
 
 export function RemedialStatusSelector({ remedialIds, statuses, onChange, error }: RemedialStatusSelectorProps) {
   const ids = remedialIds
-    .split(",")
+    .split(/[\s,]+/)  // แยกโดย comma หรือช่องว่าง (หรือทั้ง 2 แบบผสม)
     .map((id) => id.trim())
     .filter(Boolean);
 
