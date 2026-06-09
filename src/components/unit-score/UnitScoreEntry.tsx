@@ -29,6 +29,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { UnitScoreGrid, type StudentScoreRow, type Setup } from "./UnitScoreGrid";
 
 type SetupWithId = Setup & { id: string };
@@ -52,6 +59,18 @@ export function UnitScoreEntry() {
 
   const [deletingUnit, setDeletingUnit] = useState(false);
   const [deleteUnitError, setDeleteUnitError] = useState<string | null>(null);
+
+  // ── Add new unit (copy roster) ────────────────────────────────────────────
+  const [showAddUnit, setShowAddUnit] = useState(false);
+  const [newUnitSourceId, setNewUnitSourceId] = useState("");
+  const [newUnitName, setNewUnitName] = useState("");
+  const [newUnitDisplayName, setNewUnitDisplayName] = useState("");
+  const [newUnitDate, setNewUnitDate] = useState(new Date().toISOString().slice(0, 10));
+  const [newUnitK, setNewUnitK] = useState(0);
+  const [newUnitP, setNewUnitP] = useState(0);
+  const [newUnitA, setNewUnitA] = useState(0);
+  const [addingUnit, setAddingUnit] = useState(false);
+  const [addUnitError, setAddUnitError] = useState<string | null>(null);
 
   // Edit K/P/A totals
   const [editingKPA, setEditingKPA] = useState(false);
@@ -245,6 +264,112 @@ export function UnitScoreEntry() {
     }
   }
 
+  // ── Add new unit by copying roster ───────────────────────────────────────
+  async function handleAddUnit() {
+    if (!teacherId || !newUnitSourceId || !newUnitName.trim() || !newUnitDisplayName.trim()) {
+      setAddUnitError("กรุณากรอกข้อมูลให้ครบ");
+      return;
+    }
+    const total = newUnitK + newUnitP + newUnitA;
+    if (total <= 0) { setAddUnitError("K + P + A ต้องมากกว่า 0"); return; }
+
+    const source = setups.find((s) => s.id === newUnitSourceId);
+    if (!source) return;
+
+    // Check duplicate unit name
+    const duplicate = setups.find(
+      (s) =>
+        s.grade_level === source.grade_level &&
+        s.classroom === source.classroom &&
+        s.subject === source.subject &&
+        s.academic_term === source.academic_term &&
+        s.unit_name === newUnitName.trim()
+    );
+    if (duplicate) { setAddUnitError(`มีหน่วย "${newUnitName.trim()}" อยู่แล้ว`); return; }
+
+    setAddingUnit(true);
+    setAddUnitError(null);
+    try {
+      // 1. Create new setup
+      const { data: newSetup, error: setupErr } = await supabase
+        .from("unit_assessment_setups")
+        .insert({
+          teacher_id: teacherId,
+          subject: source.subject,
+          grade_level: source.grade_level,
+          classroom: source.classroom,
+          academic_term: source.academic_term,
+          unit_name: newUnitName.trim(),
+          unit_display_name: newUnitDisplayName.trim(),
+          assessed_date: newUnitDate,
+          k_total: newUnitK,
+          p_total: newUnitP,
+          a_total: newUnitA,
+        })
+        .select("id,subject,academic_term,grade_level,classroom,unit_name,unit_display_name,k_total,p_total,a_total")
+        .single();
+      if (setupErr) throw setupErr;
+
+      // 2. Load source unit's student rows
+      const { data: sourceRows, error: rowsErr } = await supabase
+        .from("unit_assessments")
+        .select("student_id,student_name")
+        .eq("teacher_id", teacherId)
+        .eq("subject", source.subject)
+        .eq("grade_level", source.grade_level)
+        .eq("classroom", source.classroom)
+        .eq("academic_term", source.academic_term)
+        .eq("unit_name", source.unit_name)
+        .order("student_id");
+      if (rowsErr) throw rowsErr;
+
+      // 3. Insert blank assessment rows
+      if (sourceRows && sourceRows.length > 0) {
+        const inserts = sourceRows.map((r) => ({
+          teacher_id: teacherId,
+          assessed_by: teacherId,
+          student_id: r.student_id,
+          student_name: r.student_name,
+          subject: source.subject,
+          grade_level: source.grade_level,
+          classroom: source.classroom,
+          academic_term: source.academic_term,
+          unit_name: newUnitName.trim(),
+          score: null,
+          total_score: total,
+          assessed_date: newUnitDate,
+          k_score: null,
+          p_score: null,
+          a_score: null,
+          k_total: newUnitK,
+          p_total: newUnitP,
+          a_total: newUnitA,
+        }));
+        const { error: insErr } = await supabase.from("unit_assessments").insert(inserts);
+        if (insErr) throw insErr;
+      }
+
+      // 4. Update local state
+      setSetups((prev) => [...prev, newSetup as SetupWithId]);
+      setShowAddUnit(false);
+      setNewUnitSourceId("");
+      setNewUnitName("");
+      setNewUnitDisplayName("");
+      setNewUnitK(0);
+      setNewUnitP(0);
+      setNewUnitA(0);
+
+      // Auto-select the new unit
+      if (newSetup) {
+        setFilterUnitId(newSetup.id);
+      }
+    } catch (err) {
+      setAddUnitError(`สร้างหน่วยไม่สำเร็จ: ${err instanceof Error ? err.message : "Unknown error"}`);
+    } finally {
+      setAddingUnit(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <Card>
@@ -317,6 +442,23 @@ export function UnitScoreEntry() {
                   </Select>
                 </div>
               </div>
+
+              {/* Add new unit button */}
+              {filterGrade && filterSubject && (
+                <div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setAddUnitError(null);
+                      setNewUnitSourceId(filterUnitId || (unitOptions[0]?.id ?? ""));
+                      setShowAddUnit(true);
+                    }}
+                  >
+                    ➕ เพิ่มหน่วยใหม่ (คัดลอกรายชื่อ)
+                  </Button>
+                </div>
+              )}
 
               {/* Delete unit button */}
               {filterUnitId && (
@@ -470,6 +612,113 @@ export function UnitScoreEntry() {
 
         </CardContent>
       </Card>
+
+      {/* ── Add New Unit Dialog ── */}
+      <Dialog open={showAddUnit} onOpenChange={(o) => { if (!addingUnit) setShowAddUnit(o); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>➕ เพิ่มหน่วยใหม่</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* Source unit */}
+            <div>
+              <Label className="text-sm">คัดลอกรายชื่อจากหน่วย</Label>
+              <Select value={newUnitSourceId} onValueChange={setNewUnitSourceId}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="— เลือกหน่วยต้นทาง —" />
+                </SelectTrigger>
+                <SelectContent>
+                  {unitOptions.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.unit_name}{u.unit_display_name ? `: ${u.unit_display_name}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* New unit name */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-sm">ชื่อหน่วย <span className="text-red-500">*</span></Label>
+                <Input
+                  className="mt-1"
+                  value={newUnitName}
+                  onChange={(e) => setNewUnitName(e.target.value)}
+                  placeholder="เช่น หน่วยที่ 2"
+                  disabled={addingUnit}
+                />
+              </div>
+              <div>
+                <Label className="text-sm">ชื่อเรื่อง <span className="text-red-500">*</span></Label>
+                <Input
+                  className="mt-1"
+                  value={newUnitDisplayName}
+                  onChange={(e) => setNewUnitDisplayName(e.target.value)}
+                  placeholder="เช่น สิ่งมีชีวิต"
+                  disabled={addingUnit}
+                />
+              </div>
+            </div>
+
+            {/* Date */}
+            <div>
+              <Label className="text-sm">วันที่สอบ</Label>
+              <Input
+                className="mt-1"
+                type="date"
+                value={newUnitDate}
+                onChange={(e) => setNewUnitDate(e.target.value)}
+                disabled={addingUnit}
+              />
+            </div>
+
+            {/* K/P/A */}
+            <div>
+              <Label className="text-sm">คะแนนเต็ม K / P / A <span className="text-red-500">*</span></Label>
+              <div className="flex gap-2 mt-1 items-center">
+                <div className="flex-1">
+                  <Label className="text-xs text-muted-foreground">K</Label>
+                  <Input type="number" min={0} value={newUnitK}
+                    onChange={(e) => setNewUnitK(Math.max(0, Number(e.target.value)))}
+                    disabled={addingUnit} className="h-8" />
+                </div>
+                <div className="flex-1">
+                  <Label className="text-xs text-muted-foreground">P</Label>
+                  <Input type="number" min={0} value={newUnitP}
+                    onChange={(e) => setNewUnitP(Math.max(0, Number(e.target.value)))}
+                    disabled={addingUnit} className="h-8" />
+                </div>
+                <div className="flex-1">
+                  <Label className="text-xs text-muted-foreground">A</Label>
+                  <Input type="number" min={0} value={newUnitA}
+                    onChange={(e) => setNewUnitA(Math.max(0, Number(e.target.value)))}
+                    disabled={addingUnit} className="h-8" />
+                </div>
+                <div className="pt-4 text-sm font-medium whitespace-nowrap">
+                  รวม {newUnitK + newUnitP + newUnitA}
+                </div>
+              </div>
+            </div>
+
+            {addUnitError && (
+              <Alert variant="destructive">
+                <AlertDescription>{addUnitError}</AlertDescription>
+              </Alert>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddUnit(false)} disabled={addingUnit}>
+              ยกเลิก
+            </Button>
+            <Button onClick={handleAddUnit} disabled={addingUnit || !newUnitSourceId}>
+              {addingUnit ? "กำลังสร้าง..." : "สร้างหน่วยใหม่"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

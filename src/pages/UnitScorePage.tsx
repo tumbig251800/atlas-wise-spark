@@ -16,7 +16,7 @@ export default function UnitScorePage() {
 
         <Tabs defaultValue="import" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="import">📤 นำเข้าหน่วย 1 (Excel)</TabsTrigger>
+            <TabsTrigger value="import">📤 นำเข้ารายชื่อ (Excel)</TabsTrigger>
             <TabsTrigger value="grid">📝 บันทึกคะแนน Grid</TabsTrigger>
           </TabsList>
 
