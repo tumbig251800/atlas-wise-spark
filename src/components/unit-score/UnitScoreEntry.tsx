@@ -288,6 +288,13 @@ export function UnitScoreEntry() {
     const total = newUnitK + newUnitP + newUnitA;
     if (total <= 0) { setAddUnitError("K + P + A ต้องมากกว่า 0"); return; }
 
+    // Block future dates
+    if (newUnitDate) {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const picked = new Date(newUnitDate + "T00:00:00");
+      if (picked > today) { setAddUnitError("วันที่สอบไม่สามารถเป็นวันในอนาคตได้"); return; }
+    }
+
     const source = setups.find((s) => s.id === newUnitSourceId);
     if (!source) return;
 

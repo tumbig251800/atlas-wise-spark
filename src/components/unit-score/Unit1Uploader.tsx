@@ -118,6 +118,11 @@ export function Unit1Uploader() {
     if (!unitDisplayName.trim()) return "กรุณากรอกชื่อเรื่อง";
     if (!assessedDate) return "กรุณาเลือกวันที่สอบ";
 
+    // Block future dates
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const pickedDate = new Date(assessedDate + "T00:00:00");
+    if (pickedDate > today) return "วันที่สอบไม่สามารถเป็นวันในอนาคตได้";
+
     // Check K/P/A total vs scores
     const totalScore = kTotal + pTotal + aTotal;
 
