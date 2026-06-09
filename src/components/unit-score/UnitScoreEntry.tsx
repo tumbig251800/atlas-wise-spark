@@ -37,11 +37,13 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { UnitScoreGrid, type StudentScoreRow, type Setup } from "./UnitScoreGrid";
+import { useUserRole } from "@/hooks/useUserRole";
 
-type SetupWithId = Setup & { id: string };
+type SetupWithId = Setup & { id: string; teacher_id?: string };
 
 export function UnitScoreEntry() {
   const { user } = useAuth();
+  const { isAdmin } = useUserRole();
   const teacherId = user?.id;
 
   const [setups, setSetups] = useState<SetupWithId[]>([]);
@@ -81,21 +83,21 @@ export function UnitScoreEntry() {
   const [kpaError, setKpaError] = useState<string | null>(null);
   const [kpaSuccess, setKpaSuccess] = useState(false);
 
-  // Load all setups
+  // Load all setups — admin เห็นทุกครู, ครูธรรมดาเห็นแค่ของตัวเอง
   useEffect(() => {
     if (!teacherId) return;
     setLoadingSetups(true);
-    supabase
+    let query = supabase
       .from("unit_assessment_setups")
-      .select("id,subject,academic_term,grade_level,classroom,unit_name,unit_display_name,k_total,p_total,a_total")
-      .eq("teacher_id", teacherId)
-      .order("grade_level")
-      .then(({ data, error }) => {
-        if (error) setSetupError(error.message);
-        else setSetups((data as SetupWithId[]) ?? []);
-        setLoadingSetups(false);
-      });
-  }, [teacherId]);
+      .select("id,teacher_id,subject,academic_term,grade_level,classroom,unit_name,unit_display_name,k_total,p_total,a_total")
+      .order("grade_level");
+    if (!isAdmin) query = query.eq("teacher_id", teacherId);
+    query.then(({ data, error }) => {
+      if (error) setSetupError(error.message);
+      else setSetups((data as SetupWithId[]) ?? []);
+      setLoadingSetups(false);
+    });
+  }, [teacherId, isAdmin]);
 
   // Derived filter options
   const gradeOptions = useMemo(() => {
@@ -146,10 +148,12 @@ export function UnitScoreEntry() {
 
     setLoadingRows(true);
     setRowsError(null);
+    // ใช้ teacher_id จาก setup (admin อาจดูของครูคนอื่น)
+    const ownerTeacherId = setup.teacher_id ?? teacherId;
     supabase
       .from("unit_assessments")
       .select("id,student_id,student_name,score,total_score,k_score,p_score,a_score")
-      .eq("teacher_id", teacherId)
+      .eq("teacher_id", ownerTeacherId)
       .eq("subject", setup.subject)
       .eq("grade_level", setup.grade_level)
       .eq("classroom", setup.classroom)
