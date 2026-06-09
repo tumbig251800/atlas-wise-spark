@@ -166,4 +166,33 @@ describe("validateAiChatOutput", () => {
     const r = validateAiChatOutput(sampleCtx, "Mastery 3/5 ตาม [REF-1]");
     expect(r.ok).toBe(true);
   });
+
+  describe("Advisory Bypass", () => {
+    it("allows advice-only answers without REF when advisory phrase matches and there are no factual claims", () => {
+      const r = validateAiChatOutput(
+        sampleCtx,
+        "ภาพรวมของการสอนวิชานี้เป็นไปด้วยดี ควรแนะนำแนวทางเสริมให้นักเรียนเพิ่มเติม"
+      );
+      expect(r.ok).toBe(true);
+      expect(r.reason).toBe("advice_only");
+    });
+
+    it("rejects advice answers if they contain factual claims like Mastery", () => {
+      const r = validateAiChatOutput(
+        sampleCtx,
+        "ภาพรวมของการสอนวิชานี้เป็นไปด้วยดี โดยมี Mastery 4/5"
+      );
+      expect(r.ok).toBe(false);
+      expect(r.reason).toBe("claims_without_refs");
+    });
+
+    it("rejects advice answers if they contain factual claims like numbers", () => {
+      const r = validateAiChatOutput(
+        sampleCtx,
+        "สรุปแนวทางการสอน: ควรแนะนำกิจกรรมเพิ่ม 12 แบบ"
+      );
+      expect(r.ok).toBe(false);
+      expect(r.reason).toBe("claims_without_refs");
+    });
+  });
 });

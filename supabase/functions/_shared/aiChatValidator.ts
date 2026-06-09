@@ -273,6 +273,17 @@ export function validateAiChatOutput(context: string, output: string): AiChatVal
   // If output cites teaching logs / metrics, require at least one numeric REF.
   const hasNumericRef = /\[REF-\d+\]/i.test(output);
   if (!hasNumericRef) {
+    FRACTION_RE.lastIndex = 0;
+    PERCENT_RE.lastIndex = 0;
+    DATE_RE.lastIndex = 0;
+    ID_RE.lastIndex = 0;
+    const hasAdvisoryPhrase = /(แนะนำ|ควร|อย่างไร|เป็นอย่างไร|แบบไหน|ภาพรวม|สรุป)/.test(output);
+    const hasNoFactualClaims = !/\b\d{2,}\b/.test(output) && !/\bMastery\b/i.test(output) &&
+      !/\bRemedial\b/i.test(output) && !FRACTION_RE.test(output) && !PERCENT_RE.test(output) &&
+      !DATE_RE.test(output) && !ID_RE.test(output);
+    if (hasAdvisoryPhrase && hasNoFactualClaims) {
+      return { ok: true, reason: "advice_only" };
+    }
     return { ok: false, reason: "claims_without_refs" };
   }
 

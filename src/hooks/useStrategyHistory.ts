@@ -52,7 +52,12 @@ export function useStrategyHistory({
         const termYear = (month >= 1 && month <= 3) ? year - 1 : year;
         const currentTerm = `${termYear}/${term}`;
 
-        // ดึงประวัติ teaching logs เฉพาะภาคเรียนปัจจุบัน
+        // คำนวณวันที่ย้อนหลัง 30 วัน
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+          .toISOString()
+          .split("T")[0];
+
+        // ดึงประวัติ teaching logs: เฉพาะภาคเรียนปัจจุบัน + ย้อนหลังไม่เกิน 30 วัน
         const { data: logs, error } = await supabase
           .from("teaching_logs")
           .select("teaching_date, next_strategy, mastery_score, major_gap, academic_term")
@@ -61,6 +66,7 @@ export function useStrategyHistory({
           .eq("classroom", classroom)
           .eq("grade_level", gradeLevel)
           .eq("academic_term", currentTerm)
+          .gte("teaching_date", thirtyDaysAgo)
           .order("teaching_date", { ascending: true });
 
         if (error) throw error;
