@@ -10,6 +10,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ThaiDateInput } from "@/components/ui/ThaiDateInput";
 import {
   Select,
   SelectContent,
@@ -695,12 +696,11 @@ export function UnitScoreEntry() {
             {/* Date */}
             <div>
               <Label className="text-sm">วันที่สอบ</Label>
-              <Input
-                className="mt-1"
-                type="date"
+              <ThaiDateInput
                 value={newUnitDate}
-                onChange={(e) => setNewUnitDate(e.target.value)}
+                onChange={setNewUnitDate}
                 disabled={addingUnit}
+                className="mt-1"
               />
             </div>
 

@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ThaiDateInput } from "@/components/ui/ThaiDateInput";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -622,12 +623,11 @@ export function Unit1Uploader() {
                   <Label htmlFor="assessed-date">
                     วันที่สอบ<span className="text-red-500">*</span>
                   </Label>
-                  <Input
-                    id="assessed-date"
-                    type="date"
+                  <ThaiDateInput
                     value={assessedDate}
-                    onChange={(e) => setAssessedDate(e.target.value)}
+                    onChange={setAssessedDate}
                     disabled={saving}
+                    className="mt-1"
                   />
                 </div>
               </div>
