@@ -169,13 +169,11 @@ export function Unit1Uploader() {
       let studentsUpdated = 0;
 
       for (const student of parseResult!.students) {
+        // student_code is GLOBALLY unique — look up by student_code only
         const { data: existing, error: selectErr } = await supabase
           .from("students")
           .select("id")
-          .eq("teacher_id", teacherId!)
-          .eq("student_id", student.student_code)
-          .eq("grade_level", normalizedGradeLevel)
-          .eq("classroom", normalizedClassroom)
+          .eq("student_code", student.student_code)
           .maybeSingle();
 
         if (selectErr) throw selectErr;
@@ -184,9 +182,10 @@ export function Unit1Uploader() {
           const { error: updateErr } = await supabase
             .from("students")
             .update({
-              student_code: student.student_code,
               first_name: student.first_name,
               last_name: student.last_name,
+              grade_level: normalizedGradeLevel,
+              classroom: normalizedClassroom,
             })
             .eq("id", existing.id);
 
