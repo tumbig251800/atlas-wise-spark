@@ -101,6 +101,23 @@ export default function ActionBoard() {
     return filtered.filter((i) => i.status === "open" || i.status === "watching");
   }, [filtered]);
 
+  // Separate UnitBlindSpot for grouped view
+  const blindSpotQueue = useMemo(() => queueItems.filter(i => i.issue_type === "UnitBlindSpot"), [queueItems]);
+  const otherQueue = useMemo(() => queueItems.filter(i => i.issue_type !== "UnitBlindSpot"), [queueItems]);
+
+  // Group blindspot by teacher → grade/classroom/subject
+  const blindSpotGroups = useMemo(() => {
+    const byTeacher: Record<string, { teacher: string; classes: Record<string, ActionItem[]> }> = {};
+    for (const item of blindSpotQueue) {
+      const teacher = item.teacher_name ?? "ไม่ระบุครู";
+      const classKey = `${item.grade_level ?? ""}/${item.classroom ?? ""} · ${item.subject ?? ""}`;
+      if (!byTeacher[teacher]) byTeacher[teacher] = { teacher, classes: {} };
+      if (!byTeacher[teacher].classes[classKey]) byTeacher[teacher].classes[classKey] = [];
+      byTeacher[teacher].classes[classKey].push(item);
+    }
+    return Object.values(byTeacher).sort((a, b) => a.teacher.localeCompare(b.teacher, "th"));
+  }, [blindSpotQueue]);
+
   const historyItems = useMemo(() => {
     return filtered.filter((i) => i.status === "verified" || i.status === "dismissed" || i.status === "resolved");
   }, [filtered]);
@@ -250,18 +267,58 @@ export default function ActionBoard() {
             />
 
             {/* Section 1: คิวนิเทศ (open + watching) */}
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-semibold">คิวนิเทศ</h2>
                 <span className="text-sm text-muted-foreground">({queueItems.length} รายการ)</span>
               </div>
-              <ActionTable
-                items={queueItems}
-                startIndex={0}
-                onVerify={handleVerify}
-                onDismiss={handleDismiss}
-                onPass={handlePass}
-              />
+
+              {/* รายการอื่น (RedZone, MasteryDrop, IntegrityFlag) */}
+              {otherQueue.length > 0 && (
+                <ActionTable
+                  items={otherQueue}
+                  startIndex={0}
+                  onVerify={handleVerify}
+                  onDismiss={handleDismiss}
+                  onPass={handlePass}
+                />
+              )}
+
+              {/* UnitBlindSpot — grouped by teacher → grade/class/subject */}
+              {blindSpotGroups.length > 0 && (
+                <div className="space-y-3">
+                  {blindSpotGroups.map((tg) => (
+                    <div key={tg.teacher} className="border border-indigo-200 rounded-lg overflow-hidden">
+                      {/* Teacher header */}
+                      <div className="bg-indigo-50 px-4 py-2 flex items-center gap-2">
+                        <span className="text-indigo-700 font-semibold text-sm">👤 {tg.teacher}</span>
+                        <span className="text-indigo-400 text-xs ml-auto">
+                          {Object.values(tg.classes).reduce((s, arr) => s + arr.length, 0)} นักเรียน · {Object.keys(tg.classes).length} กลุ่ม
+                        </span>
+                      </div>
+                      {/* Per class/subject sub-groups */}
+                      {Object.entries(tg.classes).sort(([a], [b]) => a.localeCompare(b, "th")).map(([classKey, classItems]) => (
+                        <Collapsible key={classKey} defaultOpen>
+                          <CollapsibleTrigger className="w-full text-left px-4 py-2 bg-indigo-50/50 hover:bg-indigo-100/50 flex items-center gap-2 border-t border-indigo-100">
+                            <ChevronDown className="h-3 w-3 text-indigo-400 shrink-0" />
+                            <span className="text-xs font-medium text-indigo-800">{classKey}</span>
+                            <span className="ml-auto text-xs text-indigo-400">{classItems.length} คน</span>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <ActionTable
+                              items={classItems}
+                              startIndex={0}
+                              onVerify={handleVerify}
+                              onDismiss={handleDismiss}
+                              onPass={handlePass}
+                            />
+                          </CollapsibleContent>
+                        </Collapsible>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Section 2: ประวัติ (verified + dismissed + resolved) - Collapsible */}
