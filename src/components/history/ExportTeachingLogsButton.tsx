@@ -182,7 +182,7 @@ export function ExportTeachingLogsButton({
       content += `จำนวนนักเรียน: ${log.student_count || "-"}\n`;
       content += `Mastery: ${log.mastery_score || "-"}/5\n`;
       content += `Gap: ${capitalizeGap(log.major_gap)}\n`;
-      content += `รูปแบบกิจกรรม: ${formatActivityLevel(log.activity_level)}\n`;
+      content += `รูปแบบกิจกรรม: ${formatActivityLevel(log.activity_mode)}\n`;
       content += `Key Issue: ${log.key_issue || "-"}\n`;
       content += `Next Strategy: ${log.next_strategy || "-"}\n`;
       content += `Reflection: ${log.reflection || "-"}\n`;
