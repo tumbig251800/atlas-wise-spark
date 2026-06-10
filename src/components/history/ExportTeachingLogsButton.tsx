@@ -185,10 +185,19 @@ export function ExportTeachingLogsButton({
       content += `รูปแบบกิจกรรม: ${formatActivityLevel(log.activity_mode)}\n`;
       content += `Key Issue: ${log.key_issue || "-"}\n`;
       content += `Next Strategy: ${log.next_strategy || "-"}\n`;
-      content += `Reflection: ${log.reflection || "-"}\n`;
-      if (log.health_care_status) {
-        content += `🏥 SC Status: ${log.health_care_status}\n`;
+      if (log.remedial_ids && log.remedial_ids !== '[None]') {
+        content += `นักเรียนซ่อมเสริม: ${log.remedial_ids}\n`;
       }
+      if (log.health_care_ids && log.health_care_ids !== '[None]') {
+        content += `Health Care: ${log.health_care_ids}\n`;
+      }
+      if (log.health_care_status) {
+        content += `SC Status: ${log.health_care_status}\n`;
+      }
+      if (log.classroom_management) {
+        content += `Classroom Mgmt: ${log.classroom_management}\n`;
+      }
+      content += `Reflection: ${log.reflection || "-"}\n`;
       content += `\n------------------------------\n`;
     });
 
