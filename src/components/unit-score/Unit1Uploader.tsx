@@ -5,6 +5,7 @@
  */
 import { useState, useEffect } from "react";
 import { parseUnit1Excel, type Unit1ParseResult } from "@/lib/excelUnit1Parser";
+import { cleanClassroomData } from "@/lib/utils";
 import { supabase } from "@/lib/atlasSupabase";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -157,7 +158,7 @@ export function Unit1Uploader() {
       const normalizedSubject = subject.trim();
       const normalizedAcademicTerm = academicTerm.trim();
       const normalizedGradeLevel = gradeLevel.trim();
-      const normalizedClassroom = classroom.trim();
+      const normalizedClassroom = cleanClassroomData(classroom.trim());
       const normalizedUnitName = unitName.trim();
       const normalizedUnitDisplayName = unitDisplayName.trim();
       const totalScore = kTotal + pTotal + aTotal;

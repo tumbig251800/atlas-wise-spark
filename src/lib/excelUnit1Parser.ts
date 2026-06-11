@@ -64,9 +64,10 @@ function parseSheetName(name: string): { grade_level: string; classroom: string 
   const trimmedName = name.trim();
   const m = trimmedName.match(/^ป\.(\d+)\.(.+)$/);
   if (!m) return null;
+  const classroom = m[2].trim();
   return {
     grade_level: `ป.${m[1]}`,
-    classroom: m[2].trim(),
+    classroom: classroom === "1" ? "KBW" : classroom,
   };
 }
 
