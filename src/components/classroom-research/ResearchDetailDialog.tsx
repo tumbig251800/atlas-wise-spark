@@ -1,0 +1,295 @@
+import { useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { Edit, CheckCircle2, XCircle, FileText } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { useUpdateResearchStatus } from "@/hooks/useClassroomResearch";
+import { StatusBadge, IssueTypeBadge } from "./StatusBadge";
+import type { ClassroomResearchSuggestion } from "@/types/classroomResearch";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
+interface Props {
+  research: ClassroomResearchSuggestion | null;
+  open: boolean;
+  onClose: () => void;
+  onEdit: (research: ClassroomResearchSuggestion) => void;
+  canEdit: boolean;
+}
+
+function formatThaiDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString("th-TH", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+export function ResearchDetailDialog({
+  research,
+  open,
+  onClose,
+  onEdit,
+  canEdit,
+}: Props) {
+  const { toast } = useToast();
+  const updateStatus = useUpdateResearchStatus();
+  const [confirmAbandonOpen, setConfirmAbandonOpen] = useState(false);
+
+  if (!research) return null;
+
+  const handleSelectResearch = () => {
+    updateStatus.mutate(
+      { id: research.id, status: "selected" },
+      {
+        onSuccess: () => {
+          toast({
+            title: "เลือกหัวข้อแล้ว",
+            description: "คุณสามารถแก้ไขเนื้อหาหรือสร้างเค้าโครงวิจัยได้",
+          });
+          onClose();
+        },
+        onError: (error) => {
+          toast({
+            title: "เกิดข้อผิดพลาด",
+            description: error.message,
+            variant: "destructive",
+          });
+        },
+      }
+    );
+  };
+
+  const handleAbandon = () => {
+    updateStatus.mutate(
+      { id: research.id, status: "abandoned" },
+      {
+        onSuccess: () => {
+          toast({
+            title: "ไม่ทำหัวข้อนี้",
+            description: "หัวข้อถูกย้ายไปยังรายการที่ไม่ทำแล้ว",
+          });
+          setConfirmAbandonOpen(false);
+          onClose();
+        },
+        onError: (error) => {
+          toast({
+            title: "เกิดข้อผิดพลาด",
+            description: error.message,
+            variant: "destructive",
+          });
+        },
+      }
+    );
+  };
+
+  // TODO: Edge Function integration for document generation
+  const handleGenerateDocument = () => {
+    toast({
+      title: "ฟีเจอร์กำลังจะเปิดใช้งาน",
+      description: "ระบบสร้างเอกสารจะพร้อมใช้งานในเร็วๆ นี้",
+    });
+  };
+
+  const isReadOnly = research.status === "in_progress" || research.status === "completed";
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onClose}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-lg sm:text-xl pr-8">
+              {research.research_title}
+            </DialogTitle>
+            <DialogDescription className="space-y-2 pt-2">
+              <div className="flex flex-wrap gap-2">
+                <IssueTypeBadge issueType={research.issue_type} />
+                <StatusBadge status={research.status} />
+              </div>
+              <div className="text-sm">
+                {research.grade_level}/{research.classroom} · {research.subject}
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 text-sm">
+            {/* Evidence Section */}
+            <div className="bg-muted/50 p-3 rounded-md space-y-2">
+              <h4 className="font-semibold text-foreground">ปัญหาที่ตรวจพบ</h4>
+              <p className="text-muted-foreground whitespace-pre-wrap">
+                {research.detected_problem}
+              </p>
+              <Separator className="my-2" />
+              <h4 className="font-semibold text-foreground">หลักฐาน</h4>
+              <p className="text-muted-foreground whitespace-pre-wrap">
+                {research.evidence_summary}
+              </p>
+              {research.before_data && (
+                <div className="pt-2 text-xs space-y-1">
+                  <div className="font-medium text-foreground">ข้อมูลก่อนทำวิจัย:</div>
+                  <div>
+                    {research.before_data.label}: <strong>{research.before_data.value}</strong>
+                  </div>
+                  <div className="text-muted-foreground">
+                    วันที่บันทึก: {formatThaiDate(research.before_data.captured_at)}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <Separator />
+
+            {/* Research Details */}
+            <div className="space-y-3">
+              <DetailRow label="คำถามวิจัย" value={research.research_question} />
+              <DetailRow label="วัตถุประสงค์" value={research.objective} />
+              <DetailRow label="กลุ่มเป้าหมาย" value={research.target_group} />
+              <DetailRow label="การจัดการเรียนรู้/นวัตกรรม" value={research.intervention} />
+              <DetailRow label="เครื่องมือ" value={research.tools} />
+              <DetailRow
+                label="วิธีเก็บข้อมูล"
+                value={research.data_collection_method}
+              />
+              <DetailRow label="วิธีวิเคราะห์ข้อมูล" value={research.analysis_method} />
+              <DetailRow
+                label="ตัวชี้วัดความสำเร็จ"
+                value={research.success_indicator}
+              />
+            </div>
+
+            {/* Action Buttons */}
+            {canEdit && !isReadOnly && (
+              <>
+                <Separator />
+                <div className="flex flex-col sm:flex-row gap-2">
+                  {research.status === "suggested" && (
+                    <>
+                      <Button
+                        onClick={handleSelectResearch}
+                        className="w-full sm:flex-1"
+                        disabled={updateStatus.isPending}
+                      >
+                        <CheckCircle2 className="h-4 w-4 mr-1" />
+                        เลือกทำหัวข้อนี้
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => onEdit(research)}
+                        className="w-full sm:flex-1"
+                      >
+                        <Edit className="h-4 w-4 mr-1" />
+                        ปรับแก้
+                      </Button>
+                    </>
+                  )}
+
+                  {research.status === "selected" && (
+                    <>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="w-full sm:flex-1">
+                              <Button
+                                onClick={handleGenerateDocument}
+                                disabled
+                                className="w-full"
+                              >
+                                <FileText className="h-4 w-4 mr-1" />
+                                สร้างเค้าโครงวิจัย
+                              </Button>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>ฟีเจอร์สร้างเอกสารกำลังจะเปิดใช้งาน</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      <Button
+                        variant="outline"
+                        onClick={() => onEdit(research)}
+                        className="w-full sm:flex-1"
+                      >
+                        <Edit className="h-4 w-4 mr-1" />
+                        ปรับแก้
+                      </Button>
+                    </>
+                  )}
+
+                  {(research.status === "suggested" || research.status === "selected") && (
+                    <Button
+                      variant="outline"
+                      onClick={() => setConfirmAbandonOpen(true)}
+                      className="w-full sm:w-auto text-destructive hover:bg-destructive/10"
+                      disabled={updateStatus.isPending}
+                    >
+                      <XCircle className="h-4 w-4 mr-1" />
+                      ไม่ทำหัวข้อนี้
+                    </Button>
+                  )}
+                </div>
+              </>
+            )}
+
+            {isReadOnly && (
+              <div className="bg-muted/50 p-3 rounded-md text-center text-sm text-muted-foreground">
+                หัวข้อนี้อยู่ในสถานะ "{research.status === "in_progress" ? "กำลังทำวิจัย" : "เสร็จสมบูรณ์"}" — ดูได้อย่างเดียว
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Abandon Dialog */}
+      <AlertDialog open={confirmAbandonOpen} onOpenChange={setConfirmAbandonOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยืนยันไม่ทำหัวข้อนี้</AlertDialogTitle>
+            <AlertDialogDescription>
+              คุณแน่ใจหรือไม่ว่าต้องการไม่ทำหัวข้อวิจัย "{research.research_title}"
+              หัวข้อจะถูกย้ายไปยังรายการที่ไม่ทำ
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleAbandon}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              ยืนยัน ไม่ทำ
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="space-y-1">
+      <div className="font-medium text-foreground">{label}</div>
+      <div className="text-muted-foreground whitespace-pre-wrap">{value}</div>
+    </div>
+  );
+}

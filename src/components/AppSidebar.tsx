@@ -14,7 +14,7 @@ import {
   SidebarFooter,
   SidebarHeader,
 } from "@/components/ui/sidebar";
-import { Brain, ClipboardList, BarChart3, Upload, Building2, LogOut, Settings, History, BookOpen, FileBarChart, Home, Radar, Bot, BookMarked, ListChecks, FileSpreadsheet } from "lucide-react";
+import { Brain, ClipboardList, BarChart3, Upload, Building2, LogOut, Settings, History, BookOpen, FileBarChart, Home, Radar, Bot, BookMarked, ListChecks, FileSpreadsheet, FileSearch } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTrendAlerts } from "@/hooks/useTrendAlerts";
 
@@ -22,6 +22,7 @@ const teacherMenuItems = [
   { title: "หน้าแรก", url: "/", icon: Home },
   { title: "บันทึกหลังสอน", url: "/log", icon: ClipboardList },
   { title: "ประวัติการสอน", url: "/history", icon: History },
+  { title: "วิจัยชั้นเรียน", url: "/classroom-research", icon: FileSearch },
   { title: "สร้างแผนการสอน", url: "/lesson-plan", icon: BookOpen },
   { title: "AI ที่ปรึกษา & ข้อสอบ", url: "/consultant", icon: Bot },
   { title: "รายงานสมรรถนะ", url: "/smart-report", icon: FileBarChart },
@@ -35,6 +36,7 @@ const directorMenuItems = [
   { title: "แดชบอร์ด", url: "/dashboard", icon: BarChart3 },
   { title: "ภาพรวมผู้บริหาร", url: "/executive", icon: Building2 },
   { title: "Action Board", url: "/action-board", icon: ListChecks },
+  { title: "วิจัยชั้นเรียน", url: "/classroom-research", icon: FileSearch },
   { title: "บันทึกหลังสอน", url: "/log", icon: ClipboardList },
   { title: "ประวัติการสอน", url: "/history", icon: History },
   { title: "สร้างแผนการสอน", url: "/lesson-plan", icon: BookOpen },
