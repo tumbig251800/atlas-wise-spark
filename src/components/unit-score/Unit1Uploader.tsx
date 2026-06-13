@@ -52,11 +52,14 @@ export function Unit1Uploader() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveProgress, setSaveProgress] = useState<string[]>([]);
 
-  // Auto-fill grade/classroom from parseResult
+  // Auto-fill grade/classroom/topic from parseResult
   useEffect(() => {
     if (parseResult?.metadata) {
       setGradeLevel(parseResult.metadata.grade_level);
       setClassroom(parseResult.metadata.classroom);
+      if (parseResult.metadata.topicName) {
+        setUnitDisplayName(parseResult.metadata.topicName);
+      }
     }
   }, [parseResult]);
 
