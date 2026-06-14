@@ -38,6 +38,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { UnitScoreGrid, type StudentScoreRow, type Setup } from "./UnitScoreGrid";
+import { UnitScoreImporter } from "./UnitScoreImporter";
 import { useUserRole } from "@/hooks/useUserRole";
 
 type SetupWithId = Setup & { id: string; teacher_id?: string };
@@ -84,6 +85,9 @@ export function UnitScoreEntry() {
   const [savingKPA, setSavingKPA] = useState(false);
   const [kpaError, setKpaError] = useState<string | null>(null);
   const [kpaSuccess, setKpaSuccess] = useState(false);
+
+  // Import dialog
+  const [showImporter, setShowImporter] = useState(false);
 
   // Load all setups — admin เห็นทุกครู, ครูธรรมดาเห็นแค่ของตัวเอง
   useEffect(() => {
@@ -466,21 +470,42 @@ export function UnitScoreEntry() {
                 </div>
               </div>
 
-              {/* Add new unit button */}
+              {/* Add new unit button + Template download + Import buttons */}
               {filterGrade && filterSubject && (
-                <div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setAddUnitError(null);
-                      setNewUnitSourceId(filterUnitId || (unitOptions[0]?.id ?? ""));
-                      setNewUnitSubject(filterSubject);
-                      setShowAddUnit(true);
-                    }}
-                  >
-                    ➕ เพิ่มหน่วยใหม่ (คัดลอกรายชื่อ)
-                  </Button>
+                <div className="space-y-3">
+                  <div className="flex gap-3 flex-wrap">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setAddUnitError(null);
+                        setNewUnitSourceId(filterUnitId || (unitOptions[0]?.id ?? ""));
+                        setNewUnitSubject(filterSubject);
+                        setShowAddUnit(true);
+                      }}
+                    >
+                      ➕ เพิ่มหน่วยใหม่ (คัดลอกรายชื่อ)
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const link = document.createElement("a");
+                        link.href = "/templates/แบบบันทึกคะแนนหลังหน่วย_ATLAS.xlsx";
+                        link.download = "แบบบันทึกคะแนนหลังหน่วย_ATLAS.xlsx";
+                        link.click();
+                      }}
+                    >
+                      🔽 ดาวน์โหลด Template
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowImporter(true)}
+                    >
+                      📤 นำเข้าจาก Excel
+                    </Button>
+                  </div>
                 </div>
               )}
 
@@ -756,6 +781,64 @@ export function UnitScoreEntry() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── Import Dialog ── */}
+      <UnitScoreImporter
+        open={showImporter}
+        onOpenChange={setShowImporter}
+        onImportSuccess={() => {
+          // Reload setups และ rows
+          setLoadingSetups(true);
+          let query = supabase
+            .from("unit_assessment_setups")
+            .select("id,teacher_id,subject,academic_term,grade_level,classroom,unit_name,unit_display_name,k_total,p_total,a_total")
+            .order("grade_level");
+          if (!isAdmin) query = query.eq("teacher_id", teacherId!);
+          query.then(({ data, error }) => {
+            if (error) setSetupError(error.message);
+            else setSetups((data as SetupWithId[]) ?? []);
+            setLoadingSetups(false);
+          });
+
+          // Reload rows ถ้ามี unit ถูกเลือกอยู่
+          if (filterUnitId) {
+            const setup = setups.find((s) => s.id === filterUnitId);
+            if (setup) {
+              const ownerTeacherId = setup.teacher_id ?? teacherId;
+              setLoadingRows(true);
+              supabase
+                .from("unit_assessments")
+                .select("id,student_id,student_name,score,total_score,k_score,p_score,a_score")
+                .eq("teacher_id", ownerTeacherId!)
+                .eq("subject", setup.subject)
+                .eq("grade_level", setup.grade_level)
+                .eq("classroom", setup.classroom)
+                .eq("academic_term", setup.academic_term)
+                .eq("unit_name", setup.unit_name)
+                .order("student_id")
+                .then(({ data, error }) => {
+                  if (error) setRowsError(error.message);
+                  else {
+                    setRows(
+                      (data ?? []).map((r, idx) => ({
+                        id: r.id,
+                        seq: idx + 1,
+                        student_id: r.student_id,
+                        student_name: r.student_name ?? "",
+                        score: r.score,
+                        total_score: r.total_score,
+                        k_score: r.k_score,
+                        p_score: r.p_score,
+                        a_score: r.a_score,
+                      }))
+                    );
+                  }
+                  setLoadingRows(false);
+                });
+            }
+          }
+        }}
+      />
     </div>
   );
 }
