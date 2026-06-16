@@ -58,6 +58,33 @@ export function useFetchPlcSessionsForItem(actionItemId: number) {
   });
 }
 
+/** Returns a Map<actionItemId, nextPlcDate> for open items that have a future PLC scheduled */
+export function useNextPlcDates(itemIds: number[]) {
+  return useQuery({
+    queryKey: [...PLC_SESSIONS_KEY, "next-plc-dates", itemIds.slice().sort().join(",")],
+    enabled: itemIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("plc_sessions")
+        .select("linked_action_item_ids, next_plc_date")
+        .not("next_plc_date", "is", null)
+        .gte("next_plc_date", new Date().toISOString().slice(0, 10));
+      if (error) throw error;
+
+      const map = new Map<number, string>();
+      for (const row of data ?? []) {
+        for (const id of row.linked_action_item_ids ?? []) {
+          if (itemIds.includes(id) && !map.has(id)) {
+            map.set(id, row.next_plc_date as string);
+          }
+        }
+      }
+      return map;
+    },
+    staleTime: 60_000,
+  });
+}
+
 export function useTeacherList() {
   return useQuery({
     queryKey: ["teachers"],
