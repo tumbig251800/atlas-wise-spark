@@ -313,7 +313,7 @@ export async function downloadPlcDocx(session: Partial<PlcSession>, items: Actio
   const subject = firstItem?.subject ?? "";
   const teacher = (session.facilitator_name ?? "").replace(/\s+/g, "-");
   const gradeClass = [grade, classroom].filter(Boolean).join("");
-  const parts = ["PLC", dateStr, teacher, gradeClass, subject].filter(Boolean);
+  const parts = [teacher, "PLC", dateStr, gradeClass, subject].filter(Boolean);
   a.href = url;
   a.download = `${parts.join("_")}.docx`;
   a.click();
