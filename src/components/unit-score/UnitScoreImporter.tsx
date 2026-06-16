@@ -3,7 +3,7 @@
  * Dialog สำหรับนำเข้าคะแนน K/P/A รายข้อจาก Excel
  * 4 ขั้นตอน: เลือกไฟล์ → Validate → Preview → บันทึก
  */
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { parseUnitScoreExcel, type UnitScoreParseResult } from "@/lib/unitScoreExcelParser";
 import { supabase } from "@/lib/atlasSupabase";
 import { useAuth } from "@/hooks/useAuth";
@@ -44,6 +44,14 @@ export function UnitScoreImporter({ open, onOpenChange, onImportSuccess }: Props
   const [parseResult, setParseResult] = useState<UnitScoreParseResult | null>(null);
   const [parsing, setParsing] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
+  const [unitDisplayName, setUnitDisplayName] = useState("");
+
+  // Auto-fill unit display name when parse result arrives
+  useEffect(() => {
+    if (parseResult?.metadata) {
+      setUnitDisplayName(`หน่วยที่ ${parseResult.metadata.unit_name}`);
+    }
+  }, [parseResult]);
 
   // Validation state
   const [notFoundIds, setNotFoundIds] = useState<string[]>([]);
@@ -183,7 +191,7 @@ export function UnitScoreImporter({ open, onOpenChange, onImportSuccess }: Props
             classroom: metadata.classroom,
             academic_term: metadata.academic_term,
             unit_name: metadata.unit_name,
-            unit_display_name: metadata.unit_name,
+            unit_display_name: unitDisplayName || `หน่วยที่ ${metadata.unit_name}`,
             assessed_date: metadata.assessed_date,
             k_total: metadata.k_total,
             p_total: metadata.p_total,
@@ -295,6 +303,7 @@ export function UnitScoreImporter({ open, onOpenChange, onImportSuccess }: Props
     setFile(null);
     setParseResult(null);
     setParseError(null);
+    setUnitDisplayName("");
     setNotFoundIds([]);
     setDuplicateCount(0);
     setSaveProgress([]);
@@ -386,6 +395,18 @@ export function UnitScoreImporter({ open, onOpenChange, onImportSuccess }: Props
                   <div>
                     <span className="text-muted-foreground">หน่วย:</span>{" "}
                     <span className="font-medium">{parseResult.metadata.unit_name}</span>
+                  </div>
+                  <div className="col-span-2">
+                    <Label htmlFor="unit-display-name" className="text-muted-foreground">
+                      ชื่อหน่วยการเรียนรู้ <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="unit-display-name"
+                      value={unitDisplayName}
+                      onChange={(e) => setUnitDisplayName(e.target.value)}
+                      placeholder="เช่น หน่วยที่ 1: ศาสนาและวัฒนธรรม"
+                      className="mt-1"
+                    />
                   </div>
                   <div>
                     <span className="text-muted-foreground">ภาคเรียน:</span>{" "}
