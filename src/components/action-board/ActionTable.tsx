@@ -32,6 +32,7 @@ interface Props {
   onVerify: (item: ActionItem) => void;
   onDismiss: (item: ActionItem) => void;
   onPass: (item: ActionItem) => void;
+  onResolve: (item: ActionItem) => void;
 }
 
 function formatDate(d: string | null): string {
@@ -82,7 +83,7 @@ function buildAiPrompt(item: ActionItem, visit?: NidetVisit | null): string {
   return prompt;
 }
 
-export function ActionTable({ items, startIndex = 0, onVerify, onDismiss, onPass }: Props) {
+export function ActionTable({ items, startIndex = 0, onVerify, onDismiss, onPass, onResolve }: Props) {
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const { toast } = useToast();
@@ -420,7 +421,7 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss, onPass
                             </Button>
                           )}
 
-                          {/* MasteryDrop / RedZone — classroom supervision flow. */}
+                          {/* MasteryDrop / RedZone / UnitBlindSpot — classroom supervision flow. */}
                           {isSupervisionNeeded && (
                             <>
                               {/* Watch items are not supervised yet — no "บันทึกนิเทศ". */}
@@ -467,7 +468,19 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss, onPass
                                   </Button>
                                 </>
                               )}
-                              {canResolve && (
+                              {/* ครูแก้แล้ว — open items only (not yet resolved) */}
+                              {item.status === "open" && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="border-emerald-400 text-emerald-700 hover:bg-emerald-50"
+                                  onClick={(e) => { e.stopPropagation(); onResolve(item); }}
+                                >
+                                  <CheckCircle2 className="h-4 w-4 mr-1" /> ครูแก้แล้ว
+                                </Button>
+                              )}
+                              {/* Verify — for resolved items waiting for admin confirmation */}
+                              {item.status === "resolved" && (
                                 <Button
                                   size="sm"
                                   onClick={(e) => { e.stopPropagation(); onVerify(item); }}

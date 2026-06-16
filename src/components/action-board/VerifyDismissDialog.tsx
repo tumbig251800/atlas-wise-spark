@@ -15,7 +15,7 @@ import { useResolveActionItem, type ActionItem } from "@/hooks/useActionItems";
 
 interface Props {
   open: boolean;
-  mode: "verify" | "dismiss";
+  mode: "verify" | "dismiss" | "resolve";
   item: ActionItem | null;
   onClose: () => void;
 }
@@ -33,11 +33,18 @@ export function VerifyDismissDialog({ open, mode, item, onClose }: Props) {
   if (!item) return null;
 
   const isDismiss = mode === "dismiss";
-  const title = isDismiss ? "ปิดรายการ (Dismiss)" : "ยืนยันรายการ (Verify)";
+  const isResolve = mode === "resolve";
+  const title = isDismiss
+    ? "ปิดรายการ (Dismiss)"
+    : isResolve
+    ? "ครูแก้ไขแล้ว (Resolved)"
+    : "ยืนยันรายการ (Verify)";
   const description = isDismiss
     ? "รายการนี้จะถูกปิดและไม่ปรากฏในรายการค้างอีก กรุณาระบุเหตุผล"
+    : isResolve
+    ? "บันทึกว่าครูได้แก้ไขปัญหาแล้ว รอผู้บริหารยืนยัน (Verify)"
     : "ยืนยันว่าปัญหานี้ได้รับการแก้ไขแล้ว";
-  const buttonLabel = isDismiss ? "Dismiss" : "Verify";
+  const buttonLabel = isDismiss ? "Dismiss" : isResolve ? "บันทึกว่าแก้แล้ว" : "Verify";
 
   const handleConfirm = async () => {
     if (!user) return;
@@ -48,12 +55,12 @@ export function VerifyDismissDialog({ open, mode, item, onClose }: Props) {
     try {
       await resolve.mutateAsync({
         id: item.id,
-        status: isDismiss ? "dismissed" : "verified",
+        status: isDismiss ? "dismissed" : isResolve ? "resolved" : "verified",
         note: note.trim() || null,
         userId: user.id,
       });
       toast({
-        title: isDismiss ? "Dismissed เรียบร้อย" : "Verified เรียบร้อย",
+        title: isDismiss ? "Dismissed เรียบร้อย" : isResolve ? "บันทึกว่าแก้แล้ว" : "Verified เรียบร้อย",
         description: `${item.teacher_name ?? "—"} • ${item.metric_label ?? ""}`,
       });
       onClose();
@@ -101,6 +108,7 @@ export function VerifyDismissDialog({ open, mode, item, onClose }: Props) {
             onClick={handleConfirm}
             disabled={resolve.isPending}
             variant={isDismiss ? "outline" : "default"}
+            className={isResolve ? "bg-emerald-600 hover:bg-emerald-700 text-white" : ""}
           >
             {resolve.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
             {buttonLabel}
