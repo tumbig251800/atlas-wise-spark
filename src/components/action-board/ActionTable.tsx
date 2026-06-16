@@ -378,14 +378,43 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss, onPass
                           <NidetVisitCard visit={visit} onEdit={() => openNidetModal(item)} />
                         )}
 
-                        {/* PLC sessions */}
-                        {plcSessions.get(item.id)?.map((session) => (
-                          <PlcSessionCard
-                            key={session.id}
-                            session={session}
-                            onEdit={() => openPlcModal(item, session)}
-                          />
-                        ))}
+                        {/* PLC sessions + download hint */}
+                        {(() => {
+                          const sessions = plcSessions.get(item.id) ?? [];
+                          if (sessions.length > 0) {
+                            return (
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-semibold text-purple-700 uppercase tracking-wide">ประวัติ PLC</span>
+                                  <span className="text-[11px] bg-purple-100 text-purple-700 border border-purple-200 rounded px-1.5 py-0.5">
+                                    📥 กดปุ่ม ↓ เพื่อดาวน์โหลด .docx หลักฐานแต่ละ session
+                                  </span>
+                                </div>
+                                {sessions.map((session) => (
+                                  <PlcSessionCard
+                                    key={session.id}
+                                    session={session}
+                                    onEdit={() => openPlcModal(item, session)}
+                                  />
+                                ))}
+                              </div>
+                            );
+                          }
+                          const isCloseable = item.status !== "verified" && item.status !== "dismissed";
+                          return (
+                            <div className="rounded-md border border-dashed border-purple-200 bg-purple-50/40 px-4 py-3 text-sm text-purple-700 flex items-start gap-2">
+                              <span className="text-base">📋</span>
+                              <div>
+                                <div className="font-medium">ยังไม่มีประวัติ PLC</div>
+                                <div className="text-xs text-purple-500 mt-0.5">
+                                  {isCloseable
+                                    ? "บันทึก PLC ผ่านปุ่ม \"จัดการทั้งครูนี้\" หรือปุ่ม PLC ด้านล่าง → จะดาวน์โหลด .docx ได้ทันที"
+                                    : "เคสนี้ปิดแล้วโดยไม่มีการบันทึก PLC"}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
 
                         {/* IntegrityFlag (non-FLAG5) — record of how/when the teacher was told. */}
                         {isIntegrityFlag && !isFlag5 && item.notify_date && (
