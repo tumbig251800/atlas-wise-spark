@@ -1,12 +1,27 @@
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Pencil } from "lucide-react";
+import { Pencil, FileDown, Loader2 } from "lucide-react";
 import type { PlcSession } from "@/types/plc";
 import { PLC_OUTCOME_LABELS } from "@/types/plc";
+import { supabase } from "@/lib/atlasSupabase";
+import { downloadPlcDocx } from "@/lib/downloadPlcDocx";
+import { useToast } from "@/hooks/use-toast";
+import type { ActionItem } from "@/hooks/useActionItems";
 
 interface PlcSessionCardProps {
   session: PlcSession;
   onEdit: () => void;
+}
+
+async function fetchLinkedItems(ids: number[]): Promise<ActionItem[]> {
+  if (!ids.length) return [];
+  const { data, error } = await supabase
+    .from("action_plan_items")
+    .select("*")
+    .in("id", ids);
+  if (error) throw error;
+  return (data ?? []) as ActionItem[];
 }
 
 function formatDate(d: string | null): string {
@@ -32,6 +47,23 @@ function getOutcomeBadgeClass(outcome: PlcSession["outcome_type"]): string {
 }
 
 export function PlcSessionCard({ session, onEdit }: PlcSessionCardProps) {
+  const { toast } = useToast();
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownload = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDownloading(true);
+    try {
+      const items = await fetchLinkedItems(session.linked_action_item_ids ?? []);
+      await downloadPlcDocx(session, items);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "ดาวน์โหลดไม่สำเร็จ";
+      toast({ title: "เกิดข้อผิดพลาด", description: message, variant: "destructive" });
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   return (
     <div className="rounded-md border border-purple-200 bg-purple-50 p-3 text-sm space-y-2">
       <div className="flex items-start justify-between gap-2">
@@ -66,17 +98,29 @@ export function PlcSessionCard({ session, onEdit }: PlcSessionCardProps) {
             </div>
           )}
         </div>
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={(e) => {
-            e.stopPropagation();
-            onEdit();
-          }}
-          className="text-purple-700 hover:text-purple-900 hover:bg-purple-100"
-        >
-          <Pencil className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-1 shrink-0">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={handleDownload}
+            disabled={downloading}
+            className="text-purple-700 hover:text-purple-900 hover:bg-purple-100"
+            title="ดาวน์โหลดหลักฐาน PLC (.docx)"
+          >
+            {downloading
+              ? <Loader2 className="h-4 w-4 animate-spin" />
+              : <FileDown className="h-4 w-4" />}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={(e) => { e.stopPropagation(); onEdit(); }}
+            className="text-purple-700 hover:text-purple-900 hover:bg-purple-100"
+            title="แก้ไข PLC"
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {session.problem_statement && (
