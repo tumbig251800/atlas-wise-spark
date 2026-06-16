@@ -10,7 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useActionItems, usePassActionItem, ACTION_ITEMS_KEY, daysRemaining, type ActionItem } from "@/hooks/useActionItems";
 import { ActionStatsBar } from "@/components/action-board/ActionStatsBar";
-import { ActionFilters, type ActionFilterChip } from "@/components/action-board/ActionFilters";
+import { ActionFilters, type ActionFilterChip, type IssueTypeFilter } from "@/components/action-board/ActionFilters";
 import { ActionTable } from "@/components/action-board/ActionTable";
 import { TeacherActionView } from "@/components/action-board/TeacherActionView";
 import { VerifyDismissDialog } from "@/components/action-board/VerifyDismissDialog";
@@ -71,6 +71,7 @@ export default function ActionBoard() {
   const { data: items, isLoading, error } = useActionItems();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<ActionFilterChip>("all");
+  const [issueType, setIssueType] = useState<IssueTypeFilter>("all");
   const [page, setPage] = useState(0);
   const [historyOpen, setHistoryOpen] = useState(false);
 
@@ -98,9 +99,25 @@ export default function ActionBoard() {
     dismissed: all.filter((i) => matchesFilter(i, "dismissed")).length,
   }), [all]);
 
+  const ISSUE_TYPES: IssueTypeFilter[] = ["RedZone", "MasteryDrop", "UnitBlindSpot", "IntegrityFlag"];
+  const issueCounts = useMemo((): Record<IssueTypeFilter, number> => {
+    const base = { all: all.length, RedZone: 0, MasteryDrop: 0, UnitBlindSpot: 0, IntegrityFlag: 0 };
+    for (const item of all) {
+      const t = item.issue_type as IssueTypeFilter;
+      if (ISSUE_TYPES.includes(t)) base[t]++;
+    }
+    return base;
+  }, [all]);
+
   const filtered = useMemo(() => {
-    return sortItems(all.filter((i) => matchesFilter(i, filter) && matchesSearch(i, search)));
-  }, [all, filter, search]);
+    return sortItems(
+      all.filter((i) =>
+        matchesFilter(i, filter) &&
+        matchesSearch(i, search) &&
+        (issueType === "all" || i.issue_type === issueType)
+      )
+    );
+  }, [all, filter, search, issueType]);
 
   // Split into queue (open/watching) and history (verified/dismissed/resolved)
   const queueItems = useMemo(() => {
@@ -274,6 +291,9 @@ export default function ActionBoard() {
               filter={filter}
               onFilterChange={(f) => { setFilter(f); setPage(0); }}
               counts={counts}
+              issueType={issueType}
+              onIssueTypeChange={(t) => { setIssueType(t); setPage(0); }}
+              issueCounts={issueCounts}
             />
 
             {/* Section 1: คิวนิเทศ (open + watching) */}

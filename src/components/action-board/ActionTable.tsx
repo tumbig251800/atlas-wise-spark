@@ -21,7 +21,7 @@ import { ReferralModal } from "./ReferralModal";
 import { PlcModal } from "./PlcModal";
 import { PlcSessionCard } from "./PlcSessionCard";
 import { RUBRIC_DIMENSIONS, type NidetVisit } from "@/types/nidet";
-import { useFetchPlcSessionsForItem } from "@/hooks/usePlcSessions";
+import { useFetchPlcSessionsForItem, useNextPlcDates } from "@/hooks/usePlcSessions";
 import type { PlcSession } from "@/types/plc";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/atlasSupabase";
@@ -100,6 +100,10 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss, onPass
   const [notifyModalItem, setNotifyModalItem] = useState<ActionItem | null>(null);
   const [referralModalOpen, setReferralModalOpen] = useState(false);
   const [referralModalItem, setReferralModalItem] = useState<ActionItem | null>(null);
+
+  // Next PLC dates for all items (badge on row)
+  const openItemIds = items.filter((i) => i.status === "open" || i.status === "watching").map((i) => i.id);
+  const { data: nextPlcDates } = useNextPlcDates(openItemIds);
 
   // PLC modal state
   const [plcModalOpen, setPlcModalOpen] = useState(false);
@@ -260,11 +264,16 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss, onPass
                   <TableCell className="text-muted-foreground">{startIndex + idx + 1}</TableCell>
                   <TableCell><IssueTypeBadge type={item.issue_type} /></TableCell>
                   <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span>{item.teacher_name ?? "—"}</span>
                       {visit && (
                         <span className="text-[11px] bg-sky-100 text-sky-800 border border-sky-200 rounded px-1.5 py-0.5">
                           นิเทศแล้ว
+                        </span>
+                      )}
+                      {nextPlcDates?.get(item.id) && (
+                        <span className="text-[11px] bg-purple-100 text-purple-800 border border-purple-200 rounded px-1.5 py-0.5">
+                          📅 PLC {new Date(nextPlcDates.get(item.id)! + "T00:00:00").toLocaleDateString("th-TH", { day: "numeric", month: "short" })}
                         </span>
                       )}
                     </div>
