@@ -30,8 +30,14 @@ function parseDetail(item: ActionItem): Omit<StudentRow, "item"> {
 
 function pctColor(pct: number) {
   if (pct < 50) return "text-red-600 font-bold";
-  if (pct < 70) return "text-orange-500 font-semibold";
+  if (pct < 60) return "text-orange-500 font-semibold";
   return "text-yellow-600";
+}
+
+function pctLabel(pct: number) {
+  if (pct < 50) return <span className="ml-1 text-xs bg-red-100 text-red-700 px-1 rounded">วิกฤต</span>;
+  if (pct < 60) return <span className="ml-1 text-xs bg-orange-100 text-orange-700 px-1 rounded">ไม่ผ่าน</span>;
+  return null;
 }
 
 interface Props {
@@ -90,7 +96,7 @@ export function UnitBlindSpotStudentList({ items, onResolve, onDismiss }: Props)
                           {row.score}/{row.totalScore}
                         </td>
                         <td className={`px-3 py-2 text-center text-sm ${pctColor(row.pct)}`}>
-                          {row.pct}%
+                          {row.pct}%{pctLabel(row.pct)}
                         </td>
                         <td className="px-3 py-2 text-center">
                           {isClosed ? (
