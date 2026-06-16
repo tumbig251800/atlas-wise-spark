@@ -25,11 +25,11 @@ const STATUS_TABS: { value: ActionFilterChip; label: string }[] = [
 ];
 
 const ISSUE_TABS: { value: IssueTypeFilter; label: string; color: string }[] = [
-  { value: "all",            label: "ทุกประเภท",       color: "" },
-  { value: "RedZone",        label: "🔴 RedZone",       color: "data-[state=active]:bg-red-100 data-[state=active]:text-red-800" },
-  { value: "MasteryDrop",    label: "📉 MasteryDrop",   color: "data-[state=active]:bg-orange-100 data-[state=active]:text-orange-800" },
-  { value: "UnitBlindSpot",  label: "📦 UnitBlindSpot", color: "data-[state=active]:bg-blue-100 data-[state=active]:text-blue-800" },
-  { value: "IntegrityFlag",  label: "🚩 IntegrityFlag", color: "data-[state=active]:bg-gray-100 data-[state=active]:text-gray-800" },
+  { value: "all",            label: "ทุกประเภท",              color: "" },
+  { value: "RedZone",        label: "🔴 เสี่ยงสูง",           color: "data-[state=active]:bg-red-100 data-[state=active]:text-red-800" },
+  { value: "MasteryDrop",    label: "📉 คะแนนร่วง",           color: "data-[state=active]:bg-orange-100 data-[state=active]:text-orange-800" },
+  { value: "UnitBlindSpot",  label: "📦 คะแนนหลังหน่วยต่ำ",   color: "data-[state=active]:bg-blue-100 data-[state=active]:text-blue-800" },
+  { value: "IntegrityFlag",  label: "🚩 ข้อมูลผิดปกติ",       color: "data-[state=active]:bg-gray-100 data-[state=active]:text-gray-800" },
 ];
 
 export function ActionFilters({ search, onSearchChange, filter, onFilterChange, counts, issueType, onIssueTypeChange, issueCounts }: Props) {

@@ -405,17 +405,17 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss, onPass
                             <div className="rounded-md border border-dashed border-purple-200 bg-purple-50/40 px-4 py-3 text-sm text-purple-700 flex items-start gap-2">
                               <span className="text-base">📋</span>
                               <div className="space-y-1">
-                                <div className="font-medium">ยังไม่มีประวัติ PLC — โหลดไฟล์ .docx ไม่ได้</div>
+                                <div className="font-medium">ยังไม่มีบันทึกการประชุม PLC — ดาวน์โหลดไฟล์หลักฐานไม่ได้</div>
                                 <div className="text-xs text-purple-600">
-                                  ⚠ ไฟล์หลักฐาน .docx จะสร้างได้ก็ต่อเมื่อ<strong>บันทึก PLC ไว้ในระบบก่อน</strong> เพราะระบบนำข้อมูลจากการประชุม (หัวข้อ, สมาชิก, แผนปฏิบัติการ ฯลฯ) มาสร้างเอกสารให้อัตโนมัติ
+                                  ⚠ ไฟล์หลักฐานจะสร้างได้ก็ต่อเมื่อ<strong>มีการบันทึกการประชุม PLC ในระบบก่อน</strong> เพราะระบบนำข้อมูลจากการประชุม เช่น หัวข้อที่คุย สาเหตุปัญหา แนวทางแก้ไข และรายชื่อครูที่เข้าร่วม มาสร้างเป็นเอกสารให้อัตโนมัติ
                                 </div>
                                 {isCloseable ? (
                                   <div className="text-xs text-purple-500 pt-0.5">
-                                    ✅ วิธีแก้: กดปุ่ม <strong>"📋 จัดการทั้งครูนี้"</strong> ที่ชื่อครู หรือปุ่ม <strong>PLC</strong> ด้านล่าง → กรอกข้อมูล → กด "บันทึก + ดาวน์โหลด .docx"
+                                    ✅ วิธีดาวน์โหลด: กดปุ่ม <strong>"📋 จัดการทั้งครูนี้"</strong> ที่แถบชื่อครู หรือปุ่ม <strong>บันทึก PLC</strong> ด้านล่าง → กรอกข้อมูลการประชุม → กด "บันทึก + ดาวน์โหลด"
                                   </div>
                                 ) : (
                                   <div className="text-xs text-purple-500 pt-0.5">
-                                    เคสนี้ถูกปิดไปแล้วโดยไม่มีการบันทึก PLC — ไม่สามารถสร้างเอกสารย้อนหลังได้
+                                    รายการนี้ถูกปิดไปแล้วโดยไม่มีการบันทึกการประชุม PLC จึงไม่สามารถสร้างเอกสารย้อนหลังได้
                                   </div>
                                 )}
                               </div>

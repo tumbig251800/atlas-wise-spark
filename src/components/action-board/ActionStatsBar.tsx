@@ -6,10 +6,10 @@ interface Props {
 }
 
 const ISSUE_CONFIGS = [
-  { key: "RedZone",       label: "RedZone",       icon: "🔴", bar: "bg-red-500" },
-  { key: "MasteryDrop",   label: "MasteryDrop",   icon: "📉", bar: "bg-orange-400" },
-  { key: "UnitBlindSpot", label: "UnitBlindSpot", icon: "📦", bar: "bg-blue-500" },
-  { key: "IntegrityFlag", label: "IntegrityFlag", icon: "🚩", bar: "bg-gray-400" },
+  { key: "RedZone",       label: "เสี่ยงสูง",           icon: "🔴", bar: "bg-red-500" },
+  { key: "MasteryDrop",   label: "คะแนนร่วง",            icon: "📉", bar: "bg-orange-400" },
+  { key: "UnitBlindSpot", label: "คะแนนหลังหน่วยต่ำ",    icon: "📦", bar: "bg-blue-500" },
+  { key: "IntegrityFlag", label: "ข้อมูลผิดปกติ",        icon: "🚩", bar: "bg-gray-400" },
 ] as const;
 
 export function ActionStatsBar({ items }: Props) {
