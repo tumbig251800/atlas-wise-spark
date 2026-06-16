@@ -17,7 +17,11 @@ import { VerifyDismissDialog } from "@/components/action-board/VerifyDismissDial
 import { BulkDismissDialog } from "@/components/action-board/BulkDismissDialog";
 import { PlcModal } from "@/components/action-board/PlcModal";
 import { UnitBlindSpotStudentList } from "@/components/action-board/UnitBlindSpotStudentList";
+import { PlcQueueCard } from "@/components/action-board/PlcQueueCard";
+import { IntegrityFlagBanner } from "@/components/action-board/IntegrityFlagBanner";
 import { useUserRole } from "@/hooks/useUserRole";
+import { usePlcQueue, type PlcQueueGroup } from "@/hooks/usePlcQueue";
+import { usePlcBundleDraft } from "@/hooks/usePlcBundleDraft";
 import type { PlcSession } from "@/types/plc";
 
 const PAGE_SIZE = 20;
@@ -78,6 +82,10 @@ export default function ActionBoard() {
   const [bulkDismissLabel, setBulkDismissLabel] = useState("");
   const [plcModalOpen, setPlcModalOpen] = useState(false);
   const [prefilledPlcData, setPrefilledPlcData] = useState<Partial<PlcSession> | null>(null);
+  const [draftingGroupId, setDraftingGroupId] = useState<string | null>(null);
+
+  const { queueGroups, integrityFlags } = usePlcQueue();
+  const plcBundleDraft = usePlcBundleDraft();
 
   const all = items ?? [];
 
@@ -189,6 +197,31 @@ export default function ActionBoard() {
     setPrefilledPlcData(null);
   };
 
+  const handleAiDraft = (group: PlcQueueGroup) => {
+    setDraftingGroupId(group.id);
+    plcBundleDraft.mutate(
+      { items: group.items, subject: group.subject, gradeBand: group.gradeBand },
+      {
+        onSuccess: (draft) => {
+          setPrefilledPlcData({
+            topic: draft.topic,
+            problem_statement: draft.problem_statement,
+            root_cause: draft.root_cause,
+            approach: draft.approach,
+            action_steps: draft.action_steps_per_teacher?.map((t: { teacher_name: string; action_steps: string }) => `${t.teacher_name}:\n${t.action_steps}`).join("\n\n") ?? "",
+            discussion_points: draft.discussion_points ?? null,
+            subject: group.subject,
+            members: group.teacherIds.map((id, i) => ({ teacher_id: id, teacher_name: group.teacherNames[i] ?? "" })),
+            linked_action_item_ids: group.items.map((i) => i.id),
+          });
+          setPlcModalOpen(true);
+          setDraftingGroupId(null);
+        },
+        onError: () => setDraftingGroupId(null),
+      }
+    );
+  };
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -245,6 +278,33 @@ export default function ActionBoard() {
               onIssueTypeChange={(t) => { setIssueType(t); setPage(0); }}
               issueCounts={issueCounts}
             />
+
+            {/* IntegrityFlag banner */}
+            {integrityFlags.length > 0 && (
+              <IntegrityFlagBanner items={integrityFlags} />
+            )}
+
+            {/* PLC Queue — admin/director only */}
+            {(role === "director" || role === "admin") && queueGroups.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-semibold">คิว PLC ที่แนะนำ</h2>
+                  <span className="text-xs text-muted-foreground bg-violet-50 border border-violet-200 text-violet-700 px-2 py-0.5 rounded-full">
+                    {queueGroups.length} กลุ่ม · เรียงตามความเร่งด่วน
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {queueGroups.slice(0, 6).map((group) => (
+                    <PlcQueueCard
+                      key={group.id}
+                      group={group}
+                      onAiDraft={handleAiDraft}
+                      isLoading={draftingGroupId === group.id}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Section 1: คิวนิเทศ (open + watching) */}
             <div className="space-y-4">
