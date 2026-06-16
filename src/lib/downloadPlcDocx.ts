@@ -247,33 +247,43 @@ export async function downloadPlcDocx(session: Partial<PlcSession>, items: Actio
           blank(100),
 
           // Problem
-          sectionTitle("1. ประเด็นปัญหาที่จะพัฒนา  (เน้นคุณภาพผู้เรียน)"),
+          sectionTitle("1. ประเด็นปัญหาที่จะพัฒนา  (เน้นคุณภาวผู้เรียน)"),
           textBlock(session.problem_statement || "—"),
           blank(80),
 
+          // Discussion points
+          sectionTitle("2. ประเด็นที่อภิปรายในที่ประชุม"),
+          ...((session.discussion_points?.length ?? 0) > 0
+            ? session.discussion_points!.map((pt, i) =>
+                para([tr(`${i + 1}. ${pt}`, 20)], { spacing: { after: 60 }, indent: { left: 200 } })
+              )
+            : [textBlock("—")]
+          ),
+          blank(80),
+
           // Cause
-          sectionTitle("2. สาเหตุของปัญหา"),
+          sectionTitle("3. สาเหตุของปัญหา"),
           textBlock(session.root_cause || "—"),
           blank(80),
 
           // Knowledge
-          sectionTitle("3. ความรู้ / หลักการที่นำมาใช้ / แนวทางการแก้ปัญหา"),
+          sectionTitle("4. ความรู้ / หลักการที่นำมาใช้ / แนวทางการแก้ปัญหา"),
           textBlock(session.approach || "—"),
           blank(80),
 
           // Action
-          sectionTitle("4. การออกแบบกิจกรรม / เครื่องมือ / วิธีการเพื่อแก้ปัญหา"),
+          sectionTitle("5. การออกแบบกิจกรรม / เครื่องมือ / วิธีการเพื่อแก้ปัญหา"),
           textBlock(session.action_steps || "—"),
           blank(80),
 
           // Outcome + follow up
-          sectionTitle("5. ผลลัพธ์และการติดตาม"),
+          sectionTitle("6. ผลลัพธ์และการติดตาม"),
           fieldLine("ผลลัพธ์ PLC", outcomeMap[session.outcome_type ?? "continue_plc"] ?? "—"),
           fieldLine("วันนัด PLC ครั้งต่อไป", formatThaiDate(session.next_plc_date)),
           blank(80),
 
           // Evidence
-          sectionTitle("6. ภาพ / ร่องรอย / หลักฐานประกอบการ PLC"),
+          sectionTitle("7. ภาพ / ร่องรอย / หลักฐานประกอบการ PLC"),
           para([tr("(แนบภาพถ่าย / เอกสารประกอบด้านหลัง)", 18, "9CA3AF")],
             { spacing: { after: 20 }, indent: { left: 200 } }),
           new Table({
