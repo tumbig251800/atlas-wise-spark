@@ -11,6 +11,7 @@ export type PlcQueueGroup = {
   averageMetric: number | null;
   teacherIds: string[];
   teacherNames: string[];
+  weekSlot: number; // สัปดาห์ที่ควรจัด (1, 2, 3, ...) — ครูที่ซ้ำกันต้องไม่อยู่สัปดาห์เดียวกัน
 };
 
 function calculatePriority(item: ActionItem): number {
@@ -107,7 +108,29 @@ export function usePlcQueue() {
       });
     });
 
-    return groups.sort((a, b) => b.priority - a.priority);
+    const sorted = groups.sort((a, b) => b.priority - a.priority);
+
+    // Assign week slots: greedy — for each group (highest priority first),
+    // pick the earliest week where none of its teachers already appear
+    const teacherWeekMap = new Map<string, Set<number>>(); // teacherId → weeks already used
+
+    sorted.forEach((group) => {
+      let week = 1;
+      while (true) {
+        const conflict = group.teacherIds.some((tid) =>
+          teacherWeekMap.get(tid)?.has(week)
+        );
+        if (!conflict) break;
+        week++;
+      }
+      group.weekSlot = week;
+      group.teacherIds.forEach((tid) => {
+        if (!teacherWeekMap.has(tid)) teacherWeekMap.set(tid, new Set());
+        teacherWeekMap.get(tid)!.add(week);
+      });
+    });
+
+    return sorted;
   }, [allItems]);
 
   const integrityFlags = useMemo(() => {

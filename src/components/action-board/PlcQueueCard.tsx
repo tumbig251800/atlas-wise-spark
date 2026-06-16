@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Users, FileText, TrendingDown, AlertTriangle } from "lucide-react";
+import { Sparkles, Users, FileText, TrendingDown, Calendar } from "lucide-react";
 import type { PlcQueueGroup } from "@/hooks/usePlcQueue";
 
 interface PlcQueueCardProps {
@@ -42,6 +42,10 @@ export function PlcQueueCard({ group, onAiDraft, isLoading }: PlcQueueCardProps)
             </CardDescription>
           </div>
           <div className="text-right">
+            <div className="flex items-center gap-1 justify-end text-muted-foreground mb-1">
+              <Calendar className="h-3 w-3" />
+              <span className="text-xs">สัปดาห์ที่ {group.weekSlot}</span>
+            </div>
             <div className="text-2xl font-bold">{group.priority}</div>
             <div className="text-xs text-muted-foreground">Priority</div>
           </div>
