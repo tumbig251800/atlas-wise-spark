@@ -190,7 +190,7 @@ export async function downloadPlcDocx(session: Partial<PlcSession>, items: Actio
                 alignment: AlignmentType.RIGHT,
                 spacing: { after: 0 },
                 children: [
-                  tr("ระบบ ATLAS · โรงเรียนวรนาถวิทยา   หน้า ", 18, "9CA3AF"),
+                  tr("ระบบ ATLAS · โรงเรียนวรนาถวิทยากำแพงเพชร   หน้า", 18, "9CA3AF"),
                   new TextRun({ children: [PageNumber.CURRENT], size: 18, font: "TH SarabunPSK", color: "9CA3AF" }),
                 ],
               }),
@@ -203,7 +203,7 @@ export async function downloadPlcDocx(session: Partial<PlcSession>, items: Actio
             { alignment: AlignmentType.CENTER, spacing: { after: 40 } }),
           para([b("(Professional Learning Community : PLC)", 26, "3B82F6")],
             { alignment: AlignmentType.CENTER, spacing: { after: 20 } }),
-          para([tr("โรงเรียนวรนาถวิทยา  สำนักงานเขตพื้นที่การศึกษาประถมศึกษา", 22, "374151")],
+          para([tr("โรงเรียนวรนาถวิทยากำแพงเพชร  สำนักงานคณะกรรมการส่งเสริมการศึกษาเอกชน", 22, "374151")],
             { alignment: AlignmentType.CENTER, spacing: { after: 40 } }),
           hLine("1E40AF", 12),
           blank(80),
@@ -294,7 +294,7 @@ export async function downloadPlcDocx(session: Partial<PlcSession>, items: Actio
           signatureTable(),
 
           blank(80),
-          para([tr("* เอกสารนี้สร้างอัตโนมัติจากระบบ ATLAS Intelligence Platform · โรงเรียนวรนาถวิทยา", 18, "9CA3AF")],
+          para([tr("* เอกสารนี้สร้างอัตโนมัติจากระบบ ATLAS Intelligence Platform · โรงเรียนวรนาถวิทยากำแพงเพชร", 18, "9CA3AF")],
             { alignment: AlignmentType.CENTER }),
           para([tr("ใช้เป็นหลักฐานประกอบแฟ้ม SAR และการนิเทศภายใน", 18, "9CA3AF")],
             { alignment: AlignmentType.CENTER }),
