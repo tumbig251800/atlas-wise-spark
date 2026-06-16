@@ -11,6 +11,25 @@ export function usePlcSessions() {
 
   const savePlcSession = useMutation({
     mutationFn: async (data: Partial<PlcSession> & { id?: string }) => {
+      // Duplicate guard: only on insert (not edit)
+      if (!data.id && data.session_date && data.linked_action_item_ids?.length) {
+        const { data: existing } = await supabase
+          .from("plc_sessions")
+          .select("id, topic, linked_action_item_ids")
+          .eq("session_date", data.session_date);
+
+        const overlap = (existing ?? []).find((s) =>
+          (s.linked_action_item_ids as number[])?.some((id) =>
+            data.linked_action_item_ids!.includes(id as unknown as string)
+          )
+        );
+        if (overlap) {
+          throw new Error(
+            `มี PLC session วันนี้อยู่แล้ว (หัวข้อ: "${overlap.topic}") — กรุณาแก้ไข session เดิมแทนการสร้างใหม่`
+          );
+        }
+      }
+
       const payload = {
         ...data,
         updated_at: new Date().toISOString(),
