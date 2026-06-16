@@ -70,6 +70,7 @@ export function PlcModal({
   const [rootCause, setRootCause] = useState("");
   const [approach, setApproach] = useState("");
   const [actionSteps, setActionSteps] = useState("");
+  const [discussionPoints, setDiscussionPoints] = useState<string[]>([]);
   const [outcomeType, setOutcomeType] = useState<PlcSession["outcome_type"]>("continue_plc");
   const [nextPlcDate, setNextPlcDate] = useState("");
 
@@ -89,6 +90,7 @@ export function PlcModal({
       setRootCause(existingSession.root_cause || "");
       setApproach(existingSession.approach || "");
       setActionSteps(existingSession.action_steps || "");
+      setDiscussionPoints(existingSession.discussion_points ?? []);
       setOutcomeType(existingSession.outcome_type);
       setNextPlcDate(existingSession.next_plc_date || "");
     } else if (prefilledData) {
@@ -105,6 +107,7 @@ export function PlcModal({
       setRootCause(prefilledData.root_cause || "");
       setApproach(prefilledData.approach || "");
       setActionSteps(prefilledData.action_steps || "");
+      setDiscussionPoints(prefilledData.discussion_points ?? []);
       setOutcomeType(prefilledData.outcome_type || "continue_plc");
       setNextPlcDate(prefilledData.next_plc_date || "");
     } else {
@@ -149,6 +152,7 @@ export function PlcModal({
       root_cause: rootCause,
       approach,
       action_steps: actionSteps,
+      discussion_points: discussionPoints.length > 0 ? discussionPoints : null,
       outcome_type: outcomeType,
       next_plc_date: outcomeType === "continue_plc" && nextPlcDate ? nextPlcDate : null,
       linked_action_item_ids: prefilledData?.linked_action_item_ids ?? [actionItem.id],
@@ -327,6 +331,28 @@ export function PlcModal({
                 placeholder="อธิบายปัญหาที่พบ..."
               />
             </div>
+
+            {discussionPoints.length > 0 && (
+              <div>
+                <Label>ประเด็นอภิปรายในที่ประชุม</Label>
+                <div className="mt-1 space-y-1">
+                  {discussionPoints.map((pt, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <span className="text-muted-foreground text-sm mt-1 shrink-0">{i + 1}.</span>
+                      <input
+                        className="flex-1 text-sm border border-input rounded-md px-2 py-1 bg-background"
+                        value={pt}
+                        onChange={(e) => {
+                          const updated = [...discussionPoints];
+                          updated[i] = e.target.value;
+                          setDiscussionPoints(updated);
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div>
               <Label htmlFor="root_cause">สาเหตุของปัญหา</Label>

@@ -199,6 +199,39 @@ export function UnitScoreGrid({ rows, setup, onSaved, onRowDeleted, onRowAdded }
     });
   }
 
+  function fireBlindSpotWebhook(row: StudentScoreRow, savedScores: { k: number | null; p: number | null; a: number | null; score: number | null }) {
+    const base = import.meta.env.VITE_N8N_WEBHOOK_BASE;
+    if (!base) return;
+    const totalScore = setup.k_total + setup.p_total + setup.a_total;
+    const payload = {
+      record: {
+        id: row.id,
+        student_id: row.student_id,
+        student_name: row.student_name,
+        grade_level: setup.grade_level,
+        classroom: setup.classroom,
+        subject: setup.subject,
+        unit_name: setup.unit_name,
+        academic_term: setup.academic_term,
+        teacher_id: teacherId ?? null,
+        assessed_date: new Date().toISOString().split("T")[0],
+        score: savedScores.score,
+        total_score: totalScore,
+        k_score: savedScores.k,
+        k_total: setup.k_total,
+        p_score: savedScores.p,
+        p_total: setup.p_total,
+        a_score: savedScores.a,
+        a_total: setup.a_total,
+      },
+    };
+    fetch(`${base}/atlas-unit-blindspot`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-atlas-secret": "atlas-2026-secret" },
+      body: JSON.stringify(payload),
+    }).catch(() => {});
+  }
+
   async function handleSave() {
     if (hasValidationErrors()) {
       setSaveError("มีคะแนนที่กรอกเกินคะแนนเต็ม กรุณาตรวจสอบก่อนบันทึก");
@@ -216,11 +249,20 @@ export function UnitScoreGrid({ rows, setup, onSaved, onRowDeleted, onRowAdded }
           .eq("id", row.id);
         if (error) throw error;
       }
-      onSaved(rows.map((r) => {
+      const updatedRows = rows.map((r) => {
         const d = dirty.find((x) => x.id === r.id);
         return d ? { ...r, k_score: d.k, p_score: d.p, a_score: d.a, score: d.score } : r;
-      }));
+      });
+      onSaved(updatedRows);
       setSaveSuccess(true);
+
+      // ยิง WF-6 สำหรับนักเรียนที่กรอกคะแนนรวมแล้ว (fire-and-forget)
+      for (const d of dirty) {
+        if (d.score !== null) {
+          const row = rows.find((r) => r.id === d.id);
+          if (row) fireBlindSpotWebhook(row, d);
+        }
+      }
     } catch (err) {
       setSaveError(`บันทึกไม่สำเร็จ: ${err instanceof Error ? err.message : "Unknown error"}`);
     } finally {

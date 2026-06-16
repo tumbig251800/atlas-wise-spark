@@ -11,6 +11,7 @@ export type PlcQueueGroup = {
   averageMetric: number | null;
   teacherIds: string[];
   teacherNames: string[];
+  weekSlot: number; // สัปดาห์ที่ควรจัด (1, 2, 3, ...) — ครูที่ซ้ำกันต้องไม่อยู่สัปดาห์เดียวกัน
 };
 
 function calculatePriority(item: ActionItem): number {
@@ -54,31 +55,24 @@ export function usePlcQueue() {
 
     if (queueableItems.length === 0) return [];
 
-    // Group by teacher + subject (1 PLC per teacher per subject, all grades together)
+    // Group by grade band — each PLC session covers all teachers in the same band
     const groupMap = new Map<string, ActionItem[]>();
 
     queueableItems.forEach((item) => {
-      const teacherKey = item.teacher_id ?? item.teacher_name ?? "unknown";
-      const subject = item.subject ?? "ไม่ระบุวิชา";
-      const key = `${teacherKey}|${subject}`;
-      if (!groupMap.has(key)) groupMap.set(key, []);
-      groupMap.get(key)!.push(item);
+      const band = getGradeBand(item.grade_level) ?? "ป.1-2";
+      if (!groupMap.has(band)) groupMap.set(band, []);
+      groupMap.get(band)!.push(item);
     });
 
     const groups: PlcQueueGroup[] = [];
     let groupIndex = 0;
 
-    groupMap.forEach((items) => {
-      const subject = items[0].subject ?? "ไม่ระบุวิชา";
+    groupMap.forEach((items, band) => {
+      const gradeBand = band as "ป.1-2" | "ป.3-4" | "ป.5-6";
 
-      // Pick representative grade band (most common)
-      const bandCounts: Record<string, number> = {};
-      items.forEach((i) => {
-        const b = getGradeBand(i.grade_level);
-        if (b) bandCounts[b] = (bandCounts[b] ?? 0) + 1;
-      });
-      const gradeBand = (Object.entries(bandCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "ป.1-2") as
-        "ป.1-2" | "ป.3-4" | "ป.5-6";
+      // Subject label: list unique subjects in this band
+      const uniqueSubjects = [...new Set(items.map((i) => i.subject).filter(Boolean))];
+      const subject = uniqueSubjects.slice(0, 3).join(", ") + (uniqueSubjects.length > 3 ? "..." : "");
 
       const maxPriority = Math.max(...items.map(calculatePriority));
 
@@ -86,7 +80,10 @@ export function usePlcQueue() {
       items.forEach((item) => {
         typeCounts[item.issue_type] = (typeCounts[item.issue_type] ?? 0) + 1;
       });
-      const dominantType = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] as
+      // Prioritise severe types: MasteryDrop > RedZone > UnitBlindSpot
+      const TYPE_RANK: Record<string, number> = { RedZone: 3, MasteryDrop: 2, UnitBlindSpot: 1 };
+      const dominantType = Object.entries(typeCounts)
+        .sort((a, b) => (TYPE_RANK[b[0]] ?? 0) - (TYPE_RANK[a[0]] ?? 0))[0]?.[0] as
         "RedZone" | "MasteryDrop" | "UnitBlindSpot";
 
       const metricsWithValues = items.filter((i) => i.metric_value !== null);
@@ -111,7 +108,29 @@ export function usePlcQueue() {
       });
     });
 
-    return groups.sort((a, b) => b.priority - a.priority);
+    const sorted = groups.sort((a, b) => b.priority - a.priority);
+
+    // Assign week slots: greedy — for each group (highest priority first),
+    // pick the earliest week where none of its teachers already appear
+    const teacherWeekMap = new Map<string, Set<number>>(); // teacherId → weeks already used
+
+    sorted.forEach((group) => {
+      let week = 1;
+      while (true) {
+        const conflict = group.teacherIds.some((tid) =>
+          teacherWeekMap.get(tid)?.has(week)
+        );
+        if (!conflict) break;
+        week++;
+      }
+      group.weekSlot = week;
+      group.teacherIds.forEach((tid) => {
+        if (!teacherWeekMap.has(tid)) teacherWeekMap.set(tid, new Set());
+        teacherWeekMap.get(tid)!.add(week);
+      });
+    });
+
+    return sorted;
   }, [allItems]);
 
   const integrityFlags = useMemo(() => {
