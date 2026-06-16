@@ -282,9 +282,22 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss, onPass
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div className="text-sm">{item.metric_label ?? "—"}</div>
-                    {item.metric_value != null && (
-                      <div className="text-xs text-muted-foreground">{item.metric_value}</div>
+                    {item.issue_type === "MasteryDrop" && item.mastery_avg_previous != null && item.mastery_avg_recent != null ? (
+                      <>
+                        <div className="text-sm">
+                          Mastery ลดลง {Number(item.metric_value) > 0 ? "-" : ""}{Math.abs(Number(item.metric_value)).toFixed(2)}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {Number(item.mastery_avg_previous).toFixed(2)} → {Number(item.mastery_avg_recent).toFixed(2)}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="text-sm">{item.metric_label ?? "—"}</div>
+                        {item.metric_value != null && (
+                          <div className="text-xs text-muted-foreground">{item.metric_value}</div>
+                        )}
+                      </>
                     )}
                   </TableCell>
                   <TableCell><SeverityBadge severity={item.severity} /></TableCell>
