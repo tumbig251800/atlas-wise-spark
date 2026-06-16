@@ -307,8 +307,15 @@ export async function downloadPlcDocx(session: Partial<PlcSession>, items: Actio
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   const dateStr = (session.session_date ?? new Date().toISOString().slice(0, 10)).replace(/-/g, "");
+  const firstItem = items[0];
+  const grade = firstItem?.grade_level ?? "";
+  const classroom = firstItem?.classroom ?? "";
+  const subject = firstItem?.subject ?? "";
+  const teacher = (session.facilitator_name ?? "").replace(/\s+/g, "-");
+  const gradeClass = [grade, classroom].filter(Boolean).join("");
+  const parts = ["PLC", dateStr, teacher, gradeClass, subject].filter(Boolean);
   a.href = url;
-  a.download = `ATLAS_PLC_${session.facilitator_name ?? ""}__${dateStr}.docx`;
+  a.download = `${parts.join("_")}.docx`;
   a.click();
   URL.revokeObjectURL(url);
 }
