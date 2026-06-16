@@ -92,6 +92,7 @@ function getItemScore(
 
 /**
  * แปลงวันที่จาก Excel serial number หรือ string
+ * รองรับปี พ.ศ. (> 2500 → ลบ 543)
  */
 function parseExcelDate(val: any): string {
   if (!val) return new Date().toISOString().slice(0, 10);
@@ -100,7 +101,9 @@ function parseExcelDate(val: any): string {
   if (typeof val === "number") {
     const date = XLSX.SSF.parse_date_code(val);
     if (date) {
-      const y = date.y;
+      let y = date.y;
+      // แปลง พ.ศ. เป็น ค.ศ. ถ้า > 2500
+      if (y > 2500) y -= 543;
       const m = String(date.m).padStart(2, "0");
       const d = String(date.d).padStart(2, "0");
       return `${y}-${m}-${d}`;
@@ -120,9 +123,12 @@ function parseExcelDate(val: any): string {
       if (y > 2500) y -= 543;
       return `${y}-${m}-${d}`;
     }
-    // ถ้าเป็น ISO format แล้ว
-    if (trimmed.match(/^\d{4}-\d{2}-\d{2}$/)) {
-      return trimmed;
+    // ถ้าเป็น ISO format แล้ว (อาจมี timestamp ต่อท้าย)
+    const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoMatch) {
+      let y = parseInt(isoMatch[1]);
+      if (y > 2500) y -= 543;
+      return `${y}-${isoMatch[2]}-${isoMatch[3]}`;
     }
   }
 
@@ -153,18 +159,18 @@ export async function parseUnitScoreExcel(
     const sheet = workbook.Sheets[sheetName];
 
     // === อ่าน metadata จากแถว 2 ===
-    // ตามโครงสร้างจริง:
-    // B2 = วิชา
-    // D2 = ชั้น/ห้อง (รวมกัน เช่น "ป.3/A")
-    // F2 = หน่วยที่
-    // H2 = ภาคเรียน
-    // J2 = วันที่สอบ
+    // Template ปัจจุบัน (label + blank + value format):
+    // A2 = "วิชา:"   B2 = blank  C2 = วิชา
+    // D2 = "ชั้น/ห้อง:"  E2 = blank  F2 = ชั้น/ห้อง (เช่น "ป.4/KBW")
+    // G2 = "หน่วยที่:"  H2 = blank  I2 = หน่วยที่
+    // J2 = "ภาคเรียน:"  K2 = blank  L2 = ภาคเรียน
+    // M2 = "วันที่สอบ:"  N2 = blank  O2 = วันที่สอบ
 
-    const subject = getCellString(sheet, "B2");
-    const gradeClassroom = getCellString(sheet, "D2"); // "ป.3/A"
-    const unitName = getCellString(sheet, "F2");
-    const academicTerm = getCellString(sheet, "H2");
-    const assessedDateRaw = getCellValue(sheet, "J2");
+    const subject = getCellString(sheet, "C2");
+    const gradeClassroom = getCellString(sheet, "F2"); // "ป.4/KBW"
+    const unitName = String(getCellValue(sheet, "I2") ?? "").trim();
+    const academicTerm = String(getCellValue(sheet, "L2") ?? "").trim();
+    const assessedDateRaw = getCellValue(sheet, "O2");
     const assessedDate = parseExcelDate(assessedDateRaw);
 
     // แยก ชั้น/ห้อง จาก D2 (format: "ป.3/A" หรือ "ป.3/1")
@@ -178,11 +184,11 @@ export async function parseUnitScoreExcel(
     const aTotal = getCellNumber(sheet, "I3");
 
     // Validate metadata
-    if (!subject) errors.push("ไม่พบวิชา (cell B2)");
-    if (!gradeLevel) errors.push("ไม่พบชั้น/ห้อง (cell D2)");
-    if (!classroom) warnings.push("ไม่พบห้อง — ตรวจสอบ format ชั้น/ห้อง ใน cell D2 (ควรเป็น 'ป.3/A')");
-    if (!unitName) errors.push("ไม่พบหน่วย (cell F2)");
-    if (!academicTerm) errors.push("ไม่พบภาคเรียน (cell H2)");
+    if (!subject) errors.push("ไม่พบวิชา (cell C2)");
+    if (!gradeLevel) errors.push("ไม่พบชั้น/ห้อง (cell F2)");
+    if (!classroom) warnings.push("ไม่พบห้อง — ตรวจสอบ format ชั้น/ห้อง ใน cell F2 (ควรเป็น 'ป.4/KBW')");
+    if (!unitName) errors.push("ไม่พบหน่วย (cell I2)");
+    if (!academicTerm) errors.push("ไม่พบภาคเรียน (cell L2)");
     if (kTotal + pTotal + aTotal === 0) {
       errors.push("คะแนนเต็ม K+P+A ต้องมากกว่า 0");
     }
