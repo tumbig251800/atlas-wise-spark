@@ -86,6 +86,24 @@ export function usePassActionItem() {
   });
 }
 
+export function useBulkDismissActionItems() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ ids, note }: { ids: number[]; note: string }) => {
+      const now = new Date().toISOString();
+      const { error } = await supabase
+        .from("action_plan_items")
+        .update({ status: "dismissed", resolution_note: note, updated_at: now })
+        .in("id", ids)
+        .in("status", ["open", "resolved", "watching"]);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ACTION_ITEMS_KEY });
+    },
+  });
+}
+
 export function daysRemaining(dueDate: string | null): number | null {
   if (!dueDate) return null;
   const due = new Date(dueDate + "T00:00:00");

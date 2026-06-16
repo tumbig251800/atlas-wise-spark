@@ -14,6 +14,7 @@ import { ActionFilters, type ActionFilterChip } from "@/components/action-board/
 import { ActionTable } from "@/components/action-board/ActionTable";
 import { TeacherActionView } from "@/components/action-board/TeacherActionView";
 import { VerifyDismissDialog } from "@/components/action-board/VerifyDismissDialog";
+import { BulkDismissDialog } from "@/components/action-board/BulkDismissDialog";
 import { PlcModal } from "@/components/action-board/PlcModal";
 import { PlcPlannerModal } from "@/components/action-board/PlcPlannerModal";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -74,6 +75,8 @@ export default function ActionBoard() {
 
   const [dialogMode, setDialogMode] = useState<"verify" | "dismiss" | "resolve">("verify");
   const [dialogItem, setDialogItem] = useState<ActionItem | null>(null);
+  const [bulkDismissItems, setBulkDismissItems] = useState<ActionItem[] | null>(null);
+  const [bulkDismissLabel, setBulkDismissLabel] = useState("");
 
   // PLC Planner state
   const [plannerOpen, setPlannerOpen] = useState(false);
@@ -304,10 +307,24 @@ export default function ActionBoard() {
                       {/* Per class/subject sub-groups */}
                       {Object.entries(tg.classes).sort(([a], [b]) => a.localeCompare(b, "th")).map(([classKey, classItems]) => (
                         <Collapsible key={classKey} defaultOpen>
-                          <CollapsibleTrigger className="w-full text-left px-4 py-2 bg-indigo-50/50 hover:bg-indigo-100/50 flex items-center gap-2 border-t border-indigo-100">
-                            <ChevronDown className="h-3 w-3 text-indigo-400 shrink-0" />
-                            <span className="text-xs font-medium text-indigo-800">{classKey}</span>
-                            <span className="ml-auto text-xs text-indigo-400">{classItems.length} คน</span>
+                          <CollapsibleTrigger asChild>
+                            <div className="w-full text-left px-4 py-2 bg-indigo-50/50 hover:bg-indigo-100/50 flex items-center gap-2 border-t border-indigo-100 cursor-pointer">
+                              <ChevronDown className="h-3 w-3 text-indigo-400 shrink-0" />
+                              <span className="text-xs font-medium text-indigo-800">{classKey}</span>
+                              <span className="text-xs text-indigo-400">{classItems.length} คน</span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="ml-auto h-6 px-2 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setBulkDismissItems(classItems);
+                                  setBulkDismissLabel(`${tg.teacher} · ${classKey}`);
+                                }}
+                              >
+                                ปิดทั้งกลุ่ม
+                              </Button>
+                            </div>
                           </CollapsibleTrigger>
                           <CollapsibleContent>
                             <ActionTable
@@ -368,6 +385,13 @@ export default function ActionBoard() {
           mode={dialogMode}
           item={dialogItem}
           onClose={closeDialog}
+        />
+
+        <BulkDismissDialog
+          open={bulkDismissItems !== null}
+          items={bulkDismissItems ?? []}
+          groupLabel={bulkDismissLabel}
+          onClose={() => setBulkDismissItems(null)}
         />
 
         <PlcPlannerModal
