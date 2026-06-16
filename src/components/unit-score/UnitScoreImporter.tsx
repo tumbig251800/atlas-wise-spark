@@ -576,9 +576,12 @@ export function UnitScoreImporter({ open, onOpenChange, onImportSuccess }: Props
               <Button variant="outline" onClick={handleClose}>
                 ยกเลิก
               </Button>
-              <Button onClick={handleValidateAndPreview} disabled={!parseResult}>
+              <Button onClick={handleValidateAndPreview} disabled={!parseResult || !unitDisplayName.trim()}>
                 ถัดไป →
               </Button>
+              {!unitDisplayName.trim() && (
+                <p className="text-xs text-red-500 w-full text-right mt-1">กรุณากรอกชื่อหน่วยการเรียนรู้ก่อน</p>
+              )}
             </>
           )}
 
