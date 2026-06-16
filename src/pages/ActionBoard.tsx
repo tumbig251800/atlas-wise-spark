@@ -18,6 +18,7 @@ import { BulkDismissDialog } from "@/components/action-board/BulkDismissDialog";
 import { PlcModal } from "@/components/action-board/PlcModal";
 import { PlcPlannerModal } from "@/components/action-board/PlcPlannerModal";
 import { PlcBundleDialog } from "@/components/action-board/PlcBundleDialog";
+import { UnitBlindSpotStudentList } from "@/components/action-board/UnitBlindSpotStudentList";
 import { useUserRole } from "@/hooks/useUserRole";
 import { usePlcPlanner } from "@/hooks/usePlcPlanner";
 import type { PlcPlan } from "@/types/plc";
@@ -362,12 +363,13 @@ export default function ActionBoard() {
                             </div>
                           </CollapsibleTrigger>
                           <CollapsibleContent>
-                            <ActionTable
+                            <UnitBlindSpotStudentList
                               items={classItems}
-                              startIndex={0}
-                              onVerify={handleVerify}
-                              onDismiss={handleDismiss}
-                              onPass={handlePass}
+                              onResolve={handleResolve}
+                              onDismiss={(item) => {
+                                setDialogMode("dismiss");
+                                setDialogItem(item);
+                              }}
                             />
                           </CollapsibleContent>
                         </Collapsible>
