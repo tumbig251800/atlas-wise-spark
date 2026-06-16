@@ -25,18 +25,19 @@ interface ResolveInput {
   status: "verified" | "dismissed" | "resolved";
   note: string | null;
   userId: string;
+  dueDate?: string;
 }
 
 export function useResolveActionItem() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, status, note, userId }: ResolveInput) => {
+    mutationFn: async ({ id, status, note, userId, dueDate }: ResolveInput) => {
       const now = new Date().toISOString();
       const payload =
         status === "verified"
           ? { status, resolution_note: note, verified_by: userId, verified_at: now, updated_at: now }
           : status === "resolved"
-          ? { status, resolution_note: note, resolved_at: now, updated_at: now }
+          ? { status, resolution_note: note, resolved_at: now, updated_at: now, ...(dueDate ? { due_date: dueDate } : {}) }
           : { status, resolution_note: note, updated_at: now };
 
       const { data, error } = await supabase

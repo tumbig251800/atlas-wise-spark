@@ -22,12 +22,13 @@ interface Props {
 
 export function VerifyDismissDialog({ open, mode, item, onClose }: Props) {
   const [note, setNote] = useState("");
+  const [nextDueDate, setNextDueDate] = useState("");
   const { user } = useAuth();
   const { toast } = useToast();
   const resolve = useResolveActionItem();
 
   useEffect(() => {
-    if (open) setNote("");
+    if (open) { setNote(""); setNextDueDate(""); }
   }, [open]);
 
   if (!item) return null;
@@ -58,6 +59,7 @@ export function VerifyDismissDialog({ open, mode, item, onClose }: Props) {
         status: isDismiss ? "dismissed" : isResolve ? "resolved" : "verified",
         note: note.trim() || null,
         userId: user.id,
+        dueDate: isResolve && nextDueDate ? nextDueDate : undefined,
       });
       toast({
         title: isDismiss ? "Dismissed เรียบร้อย" : isResolve ? "บันทึกว่าแก้แล้ว" : "Verified เรียบร้อย",
@@ -84,6 +86,21 @@ export function VerifyDismissDialog({ open, mode, item, onClose }: Props) {
             <div><span className="text-muted-foreground">ชั้น/วิชา:</span> {item.grade_level ?? "—"} {item.classroom ?? ""} · {item.subject ?? "—"}</div>
             <div><span className="text-muted-foreground">ตัวชี้วัด:</span> {item.metric_label ?? "—"} {item.metric_value != null ? `(${item.metric_value})` : ""}</div>
           </div>
+
+          {isResolve && (
+            <div>
+              <label className="block text-sm font-medium mb-1" htmlFor="next-due-date">
+                วันนัดติดตามครั้งต่อไป <span className="text-muted-foreground">(optional)</span>
+              </label>
+              <input
+                id="next-due-date"
+                type="date"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                value={nextDueDate}
+                onChange={(e) => setNextDueDate(e.target.value)}
+              />
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium mb-1" htmlFor="resolution-note">
