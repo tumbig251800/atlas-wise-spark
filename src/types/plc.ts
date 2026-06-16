@@ -12,6 +12,7 @@ export interface PlcSession {
   root_cause: string;
   approach: string;
   action_steps: string;
+  discussion_points: string[] | null;
   outcome_type: 'resolved' | 'need_supervision' | 'continue_plc';
   next_plc_date: string | null;
   linked_action_item_ids: number[];
