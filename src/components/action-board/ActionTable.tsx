@@ -404,13 +404,20 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss, onPass
                           return (
                             <div className="rounded-md border border-dashed border-purple-200 bg-purple-50/40 px-4 py-3 text-sm text-purple-700 flex items-start gap-2">
                               <span className="text-base">📋</span>
-                              <div>
-                                <div className="font-medium">ยังไม่มีประวัติ PLC</div>
-                                <div className="text-xs text-purple-500 mt-0.5">
-                                  {isCloseable
-                                    ? "บันทึก PLC ผ่านปุ่ม \"จัดการทั้งครูนี้\" หรือปุ่ม PLC ด้านล่าง → จะดาวน์โหลด .docx ได้ทันที"
-                                    : "เคสนี้ปิดแล้วโดยไม่มีการบันทึก PLC"}
+                              <div className="space-y-1">
+                                <div className="font-medium">ยังไม่มีประวัติ PLC — โหลดไฟล์ .docx ไม่ได้</div>
+                                <div className="text-xs text-purple-600">
+                                  ⚠ ไฟล์หลักฐาน .docx จะสร้างได้ก็ต่อเมื่อ<strong>บันทึก PLC ไว้ในระบบก่อน</strong> เพราะระบบนำข้อมูลจากการประชุม (หัวข้อ, สมาชิก, แผนปฏิบัติการ ฯลฯ) มาสร้างเอกสารให้อัตโนมัติ
                                 </div>
+                                {isCloseable ? (
+                                  <div className="text-xs text-purple-500 pt-0.5">
+                                    ✅ วิธีแก้: กดปุ่ม <strong>"📋 จัดการทั้งครูนี้"</strong> ที่ชื่อครู หรือปุ่ม <strong>PLC</strong> ด้านล่าง → กรอกข้อมูล → กด "บันทึก + ดาวน์โหลด .docx"
+                                  </div>
+                                ) : (
+                                  <div className="text-xs text-purple-500 pt-0.5">
+                                    เคสนี้ถูกปิดไปแล้วโดยไม่มีการบันทึก PLC — ไม่สามารถสร้างเอกสารย้อนหลังได้
+                                  </div>
+                                )}
                               </div>
                             </div>
                           );
