@@ -32,13 +32,13 @@ export function PlcQueueCard({ group, onAiDraft, isLoading }: PlcQueueCardProps)
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1">
             <CardTitle className="text-lg flex items-center gap-2">
-              <span>{group.subject}</span>
+              <span>PLC {group.gradeBand}</span>
               <Badge variant="outline" className="text-xs">
-                {group.gradeBand}
+                {issueTypeLabel}
               </Badge>
             </CardTitle>
             <CardDescription className="mt-1 text-sm">
-              {issueTypeLabel} · {group.items.length} รายการ
+              {group.subject}
             </CardDescription>
           </div>
           <div className="text-right">
