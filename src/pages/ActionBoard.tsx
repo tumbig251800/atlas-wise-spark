@@ -17,6 +17,7 @@ import { VerifyDismissDialog } from "@/components/action-board/VerifyDismissDial
 import { BulkDismissDialog } from "@/components/action-board/BulkDismissDialog";
 import { PlcModal } from "@/components/action-board/PlcModal";
 import { PlcPlannerModal } from "@/components/action-board/PlcPlannerModal";
+import { PlcBundleDialog } from "@/components/action-board/PlcBundleDialog";
 import { useUserRole } from "@/hooks/useUserRole";
 import { usePlcPlanner } from "@/hooks/usePlcPlanner";
 import type { PlcPlan } from "@/types/plc";
@@ -77,6 +78,8 @@ export default function ActionBoard() {
   const [dialogItem, setDialogItem] = useState<ActionItem | null>(null);
   const [bulkDismissItems, setBulkDismissItems] = useState<ActionItem[] | null>(null);
   const [bulkDismissLabel, setBulkDismissLabel] = useState("");
+  const [plcBundleTeacher, setPlcBundleTeacher] = useState<string | null>(null);
+  const [plcBundleItems, setPlcBundleItems] = useState<ActionItem[]>([]);
 
   // PLC Planner state
   const [plannerOpen, setPlannerOpen] = useState(false);
@@ -300,9 +303,21 @@ export default function ActionBoard() {
                       {/* Teacher header */}
                       <div className="bg-indigo-50 px-4 py-2 flex items-center gap-2">
                         <span className="text-indigo-700 font-semibold text-sm">👤 {tg.teacher}</span>
-                        <span className="text-indigo-400 text-xs ml-auto">
-                          {Object.values(tg.classes).reduce((s, arr) => s + arr.length, 0)} นักเรียน · {Object.keys(tg.classes).length} กลุ่ม
+                        <span className="text-indigo-400 text-xs">
+                          {Object.values(tg.classes).reduce((s, arr) => s + arr.length, 0)} รายการ · {Object.keys(tg.classes).length} กลุ่ม
                         </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="ml-auto h-7 px-3 text-xs border-purple-300 text-purple-700 hover:bg-purple-50"
+                          onClick={() => {
+                            const allTeacherItems = Object.values(tg.classes).flat();
+                            setPlcBundleTeacher(tg.teacher);
+                            setPlcBundleItems(allTeacherItems);
+                          }}
+                        >
+                          📋 จัดการทั้งครูนี้
+                        </Button>
                       </div>
                       {/* Per class/subject sub-groups */}
                       {Object.entries(tg.classes).sort(([a], [b]) => a.localeCompare(b, "th")).map(([classKey, classItems]) => (
@@ -400,6 +415,13 @@ export default function ActionBoard() {
           onPlanSelected={handlePlanSelected}
           plans={plcPlans}
           isLoading={plcPlanner.isPending}
+        />
+
+        <PlcBundleDialog
+          open={plcBundleTeacher !== null}
+          teacherName={plcBundleTeacher ?? ""}
+          items={plcBundleItems}
+          onClose={() => { setPlcBundleTeacher(null); setPlcBundleItems([]); }}
         />
 
         {plcModalOpen && (
