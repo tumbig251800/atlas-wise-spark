@@ -342,7 +342,7 @@ export default function ActionBoard() {
                       </div>
                       {/* Per class/subject sub-groups */}
                       {Object.entries(tg.classes).sort(([a], [b]) => a.localeCompare(b, "th")).map(([classKey, classItems]) => (
-                        <Collapsible key={classKey} defaultOpen>
+                        <Collapsible key={classKey} defaultOpen={false}>
                           <CollapsibleTrigger asChild>
                             <div className="w-full text-left px-4 py-2 bg-indigo-50/50 hover:bg-indigo-100/50 flex items-center gap-2 border-t border-indigo-100 cursor-pointer">
                               <ChevronDown className="h-3 w-3 text-indigo-400 shrink-0" />
