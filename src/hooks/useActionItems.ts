@@ -22,7 +22,7 @@ export function useActionItems() {
 
 interface ResolveInput {
   id: number;
-  status: "verified" | "dismissed";
+  status: "verified" | "dismissed" | "resolved";
   note: string | null;
   userId: string;
 }
@@ -35,6 +35,8 @@ export function useResolveActionItem() {
       const payload =
         status === "verified"
           ? { status, resolution_note: note, verified_by: userId, verified_at: now, updated_at: now }
+          : status === "resolved"
+          ? { status, resolution_note: note, resolved_at: now, updated_at: now }
           : { status, resolution_note: note, updated_at: now };
 
       const { data, error } = await supabase

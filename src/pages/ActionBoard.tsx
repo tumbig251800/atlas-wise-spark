@@ -72,7 +72,7 @@ export default function ActionBoard() {
   const [page, setPage] = useState(0);
   const [historyOpen, setHistoryOpen] = useState(false);
 
-  const [dialogMode, setDialogMode] = useState<"verify" | "dismiss">("verify");
+  const [dialogMode, setDialogMode] = useState<"verify" | "dismiss" | "resolve">("verify");
   const [dialogItem, setDialogItem] = useState<ActionItem | null>(null);
 
   // PLC Planner state
@@ -164,6 +164,10 @@ export default function ActionBoard() {
   };
   const handlePass = (item: ActionItem) => {
     passItem.mutate(item.id);
+  };
+  const handleResolve = (item: ActionItem) => {
+    setDialogItem(item);
+    setDialogMode("resolve");
   };
   const closeDialog = () => setDialogItem(null);
 
@@ -281,6 +285,7 @@ export default function ActionBoard() {
                   onVerify={handleVerify}
                   onDismiss={handleDismiss}
                   onPass={handlePass}
+                  onResolve={handleResolve}
                 />
               )}
 
@@ -351,6 +356,7 @@ export default function ActionBoard() {
                   onVerify={handleVerify}
                   onDismiss={handleDismiss}
                   onPass={handlePass}
+                  onResolve={handleResolve}
                 />
               </CollapsibleContent>
             </Collapsible>
