@@ -21,7 +21,7 @@ import { PlcQueueCard } from "@/components/action-board/PlcQueueCard";
 import { IntegrityFlagBanner } from "@/components/action-board/IntegrityFlagBanner";
 import { useUserRole } from "@/hooks/useUserRole";
 import { usePlcQueue, type PlcQueueGroup } from "@/hooks/usePlcQueue";
-import { usePlcBundleDraft } from "@/hooks/usePlcBundleDraft";
+import { usePlcBundleDraft, draftToPrefilledPlc } from "@/hooks/usePlcBundleDraft";
 import type { PlcSession } from "@/types/plc";
 
 const PAGE_SIZE = 20;
@@ -149,7 +149,7 @@ export default function ActionBoard() {
 
   const passItem = usePassActionItem();
   const { role } = useAuth();
-  const { isTeacher, teacherId, loading: roleLoading } = useUserRole();
+  const { isTeacher, teacherId, teacherName, loading: roleLoading } = useUserRole();
   const { toast } = useToast();
   const qc = useQueryClient();
   const [running, setRunning] = useState(false);
@@ -199,21 +199,15 @@ export default function ActionBoard() {
 
   const handleAiDraft = (group: PlcQueueGroup) => {
     setDraftingGroupId(group.id);
+    const currentUser =
+      teacherId && teacherName
+        ? { teacher_id: teacherId, teacher_name: teacherName }
+        : undefined;
     plcBundleDraft.mutate(
       { items: group.items, subject: group.subject, gradeBand: group.gradeBand },
       {
         onSuccess: (draft) => {
-          setPrefilledPlcData({
-            topic: draft.topic,
-            problem_statement: draft.problem_statement,
-            root_cause: draft.root_cause,
-            approach: draft.approach,
-            action_steps: draft.action_steps_per_teacher?.map((t: { teacher_name: string; action_steps: string }) => `${t.teacher_name}:\n${t.action_steps}`).join("\n\n") ?? "",
-            discussion_points: draft.discussion_points ?? null,
-            subject: group.subject,
-            members: group.teacherIds.map((id, i) => ({ teacher_id: id, teacher_name: group.teacherNames[i] ?? "" })),
-            linked_action_item_ids: group.items.map((i) => i.id),
-          });
+          setPrefilledPlcData(draftToPrefilledPlc(draft, group.items, currentUser));
           setPlcModalOpen(true);
           setDraftingGroupId(null);
         },
