@@ -23,7 +23,7 @@ const History = lazy(() => import("./pages/History"));
 const LessonPlan = lazy(() => import("./pages/LessonPlan"));
 const LessonPlanHistory = lazy(() => import("./pages/LessonPlanHistory"));
 const SmartReportView = lazy(() => import("./pages/SmartReportView"));
-const CompetencyReport = lazy(() => import("./pages/CompetencyReport"));
+// const CompetencyReport = lazy(() => import("./pages/CompetencyReport")); // Hidden - replaced by PBL
 const Consultant = lazy(() => import("./pages/Consultant"));
 const Launch = lazy(() => import("./pages/Launch"));
 const ActionBoard = lazy(() => import("./pages/ActionBoard"));
@@ -142,14 +142,14 @@ const App = () => (
                   </ProtectedRoute>
                 }
               />
-              <Route
+              {/* <Route
                 path="/competency-report"
                 element={
                   <ProtectedRoute allowedRoles={["teacher", "director", "lead"]}>
                     <CompetencyReport />
                   </ProtectedRoute>
                 }
-              />
+              /> */}
               <Route
                 path="/consultant"
                 element={
