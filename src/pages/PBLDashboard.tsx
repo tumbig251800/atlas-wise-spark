@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { AppLayout } from "@/components/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -213,7 +214,7 @@ const PBLDashboard = () => {
   })) || [];
 
   return (
-    <div className="min-h-screen bg-background p-6">
+    <AppLayout>
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex justify-between items-center">
@@ -447,7 +448,7 @@ const PBLDashboard = () => {
           </Card>
         )}
       </div>
-    </div>
+    </AppLayout>
   );
 };
 
