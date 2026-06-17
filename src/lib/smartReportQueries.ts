@@ -47,6 +47,11 @@ export async function fetchTeachingLogs(
 /**
  * Fetch unit assessments filtered by SmartReportFilter.
  * Applies .eq() only when filter value is non-empty.
+ *
+ * NOTE: academic_term format differs between tables:
+ * - teaching_logs: "2569-1" (year-semester)
+ * - unit_assessments: "1/2569" (semester/year)
+ * We normalize by converting filter "2569-1" → "1/2569" when querying unit_assessments.
  */
 export async function fetchUnitAssessments(
   filter: SmartReportFilter
@@ -59,12 +64,33 @@ export async function fetchUnitAssessments(
   if (filter.subject) q = q.eq("subject", filter.subject);
   if (filter.gradeLevel) q = q.eq("grade_level", filter.gradeLevel);
   if (filter.classroom) q = q.eq("classroom", filter.classroom);
-  if (filter.academicTerm) q = q.eq("academic_term", filter.academicTerm);
+
+  // Convert academic_term format: "2569-1" → "1/2569"
+  if (filter.academicTerm) {
+    const normalized = normalizeAcademicTerm(filter.academicTerm);
+    q = q.eq("academic_term", normalized);
+  }
+
   if (filter.teacherId) q = q.eq("teacher_id", filter.teacherId);
 
   const { data, error } = await q;
   if (error) throw error;
   return (data ?? []) as UnitAssessmentRaw[];
+}
+
+/**
+ * Normalize academic term format
+ * Input: "2569-1" or "2568-2" (year-semester)
+ * Output: "1/2569" or "2/2568" (semester/year)
+ */
+function normalizeAcademicTerm(term: string): string {
+  const match = term.match(/^(\d{4})-(\d)$/);
+  if (match) {
+    const [, year, semester] = match;
+    return `${semester}/${year}`;
+  }
+  // If already in "1/2569" format, return as-is
+  return term;
 }
 
 export interface SmartReportFilterOptions {
