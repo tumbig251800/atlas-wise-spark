@@ -28,6 +28,7 @@ const Consultant = lazy(() => import("./pages/Consultant"));
 const Launch = lazy(() => import("./pages/Launch"));
 const ActionBoard = lazy(() => import("./pages/ActionBoard"));
 const ClassroomResearch = lazy(() => import("./pages/ClassroomResearch"));
+const PBLDashboard = lazy(() => import("./pages/PBLDashboard"));
 
 const queryClient = new QueryClient();
 
@@ -154,6 +155,14 @@ const App = () => (
                 element={
                   <ProtectedRoute allowedRoles={["teacher", "director", "lead"]}>
                     <Consultant />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/pbl"
+                element={
+                  <ProtectedRoute allowedRoles={["teacher", "director", "lead"]}>
+                    <PBLDashboard />
                   </ProtectedRoute>
                 }
               />

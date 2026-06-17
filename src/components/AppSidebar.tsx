@@ -14,7 +14,7 @@ import {
   SidebarFooter,
   SidebarHeader,
 } from "@/components/ui/sidebar";
-import { Brain, ClipboardList, BarChart3, Upload, Building2, LogOut, Settings, History, BookOpen, FileBarChart, Home, Radar, Bot, BookMarked, ListChecks, FileSpreadsheet, FileSearch } from "lucide-react";
+import { Brain, ClipboardList, BarChart3, Upload, Building2, LogOut, Settings, History, BookOpen, FileBarChart, Home, Radar, Bot, BookMarked, ListChecks, FileSpreadsheet, FileSearch, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTrendAlerts } from "@/hooks/useTrendAlerts";
 
@@ -27,6 +27,7 @@ const teacherMenuItems = [
   { title: "AI ที่ปรึกษา & ข้อสอบ", url: "/consultant", icon: Bot },
   { title: "รายงานสมรรถนะ", url: "/smart-report", icon: FileBarChart },
   { title: "สมรรถนะรายบุคคล", url: "/competency-report", icon: Radar },
+  { title: "สมรรถนะ PBL", url: "/pbl", icon: Sparkles },
   { title: "อัปโหลด CSV", url: "/upload", icon: Upload },
   { title: "บันทึกคะแนนหน่วย", url: "/unit-scores", icon: FileSpreadsheet },
 ];
@@ -43,6 +44,7 @@ const directorMenuItems = [
   { title: "AI ที่ปรึกษา & ข้อสอบ", url: "/consultant", icon: Bot },
   { title: "รายงานสมรรถนะ", url: "/smart-report", icon: FileBarChart },
   { title: "สมรรถนะรายบุคคล", url: "/competency-report", icon: Radar },
+  { title: "สมรรถนะ PBL", url: "/pbl", icon: Sparkles },
   { title: "อัปโหลด CSV", url: "/upload", icon: Upload },
   { title: "บันทึกคะแนนหน่วย", url: "/unit-scores", icon: FileSpreadsheet },
   { title: "ประวัติการสร้างแผนการสอน", url: "/admin/lesson-plans", icon: BookMarked },
