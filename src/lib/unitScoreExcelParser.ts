@@ -8,6 +8,7 @@
  * - คอลัมน์: C=student_id, D=ชื่อ-สกุล, E-H=K รายข้อ, I-N=P รายข้อ, O=A score
  */
 import * as XLSX from "xlsx";
+import { validateExcelMetadata, validateStudentId } from "./dataValidator";
 
 export type UnitScoreMetadata = {
   subject: string;
@@ -166,39 +167,41 @@ export async function parseUnitScoreExcel(
     // J2 = "ภาคเรียน:"  K2 = blank  L2 = ภาคเรียน
     // M2 = "วันที่สอบ:"  N2 = blank  O2 = วันที่สอบ
 
-    const subject = getCellString(sheet, "C2");
-    const gradeClassroom = getCellString(sheet, "F2"); // "ป.4/KBW"
-    const unitName = String(getCellValue(sheet, "I2") ?? "").trim();
-    const academicTerm = String(getCellValue(sheet, "L2") ?? "").trim();
+    const subjectRaw = getCellString(sheet, "C2");
+    const gradeClassroomRaw = getCellString(sheet, "F2"); // "ป.4/KBW"
+    const unitNameRaw = String(getCellValue(sheet, "I2") ?? "").trim();
+    const academicTermRaw = String(getCellValue(sheet, "L2") ?? "").trim();
     const assessedDateRaw = getCellValue(sheet, "O2");
     const assessedDate = parseExcelDate(assessedDateRaw);
 
-    // แยก ชั้น/ห้อง จาก D2 (format: "ป.3/A" หรือ "ป.3/1")
-    const [gradeLevel, classroom] = gradeClassroom.includes("/")
-      ? gradeClassroom.split("/").map(s => s.trim())
-      : [gradeClassroom.trim(), ""];
+    // === Validate และ Normalize metadata ===
+    const validationResult = validateExcelMetadata({
+      subject: subjectRaw,
+      gradeClassroom: gradeClassroomRaw,
+      unitName: unitNameRaw,
+      academicTerm: academicTermRaw,
+    });
+
+    // รวม warnings และ errors
+    warnings.push(...validationResult.warnings);
+    errors.push(...validationResult.errors);
 
     // === อ่าน K/P/A total จากแถว 3 ===
     const kTotal = getCellNumber(sheet, "C3");
     const pTotal = getCellNumber(sheet, "F3");
     const aTotal = getCellNumber(sheet, "I3");
 
-    // Validate metadata
-    if (!subject) errors.push("ไม่พบวิชา (cell C2)");
-    if (!gradeLevel) errors.push("ไม่พบชั้น/ห้อง (cell F2)");
-    if (!classroom) warnings.push("ไม่พบห้อง — ตรวจสอบ format ชั้น/ห้อง ใน cell F2 (ควรเป็น 'ป.4/KBW')");
-    if (!unitName) errors.push("ไม่พบหน่วย (cell I2)");
-    if (!academicTerm) errors.push("ไม่พบภาคเรียน (cell L2)");
     if (kTotal + pTotal + aTotal === 0) {
       errors.push("คะแนนเต็ม K+P+A ต้องมากกว่า 0");
     }
 
+    // ใช้ค่าที่ normalize แล้ว
     const metadata: UnitScoreMetadata = {
-      subject,
-      grade_level: gradeLevel,
-      classroom,
-      unit_name: unitName,
-      academic_term: academicTerm,
+      subject: validationResult.normalized.subject,
+      grade_level: validationResult.normalized.gradeLevel,
+      classroom: validationResult.normalized.classroom,
+      unit_name: validationResult.normalized.unitName,
+      academic_term: validationResult.normalized.academicTerm,
       assessed_date: assessedDate,
       k_total: kTotal,
       p_total: pTotal,
@@ -218,9 +221,17 @@ export async function parseUnitScoreExcel(
       // I-N = P รายข้อ (6 ข้อ)
       // O = A score
 
-      const studentId = getCellString(sheet, `C${rowNum}`);
-      if (!studentId) continue; // ข้ามแถวว่าง
+      const studentIdRaw = getCellString(sheet, `C${rowNum}`);
+      if (!studentIdRaw) continue; // ข้ามแถวว่าง
 
+      // Validate รหัสนักเรียน
+      const studentIdResult = validateStudentId(studentIdRaw);
+      if (!studentIdResult.isValid) {
+        warnings.push(`แถว ${rowNum}: ${studentIdResult.errors.join(", ")}`);
+        continue; // ข้ามนักเรียนที่รหัสไม่ถูกต้อง
+      }
+
+      const studentId = studentIdResult.normalized;
       const studentName = getCellString(sheet, `D${rowNum}`);
 
       // อ่านรายข้อ K (E-H) และคำนวณผลรวม (ไม่ใช้คอลัมน์ P)
