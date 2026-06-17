@@ -105,13 +105,25 @@ export function UnitScoreEntry() {
     });
   }, [teacherId, isAdmin]);
 
-  // Derived filter options
+  // Hardcoded valid grade options — ป้องกันชื่อห้องผิดจาก DB
   const gradeOptions = useMemo(() => {
-    const seen = new Set<string>();
-    return setups
-      .map((s) => `${s.grade_level}/${s.classroom}`)
-      .filter((g) => { if (seen.has(g)) return false; seen.add(g); return true; })
-      .sort();
+    const validGrades = [
+      "ป.1/KBW",
+      "ป.2/2",
+      "ป.3/2",
+      "ป.3/KBW",
+      "ป.4/2",
+      "ป.4/KBW",
+      "ป.5/2",
+      "ป.5/KBW",
+      "ป.6/2",
+      "ป.6/KBW",
+    ];
+    // Filter เฉพาะชั้นที่มีข้อมูลจริงใน DB
+    const existingGrades = new Set(
+      setups.map((s) => `${s.grade_level}/${s.classroom}`)
+    );
+    return validGrades.filter((g) => existingGrades.has(g));
   }, [setups]);
 
   const subjectOptions = useMemo(() => {
