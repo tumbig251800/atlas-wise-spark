@@ -22,7 +22,7 @@ export function LessonPlanResult({ content, loading }: Props) {
         </div>
       )}
       {content && (
-        <div className="prose prose-invert prose-sm max-w-none text-foreground">
+        <div className="prose prose-lg prose-invert prose-lesson-plan max-w-none text-foreground">
           <ReactMarkdown>{sanitizedContent}</ReactMarkdown>
         </div>
       )}

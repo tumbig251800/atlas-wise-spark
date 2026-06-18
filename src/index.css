@@ -148,4 +148,68 @@
   .animate-pivot-pulse {
     animation: pivot-pulse 1.5s ease-in-out infinite;
   }
+
+  /* Lesson Plan Prose Styling - Readable spacing */
+  .prose-lesson-plan {
+    line-height: 1.8;
+  }
+
+  .prose-lesson-plan h2 {
+    margin-top: 2rem;
+    margin-bottom: 1.5rem;
+    font-weight: 700;
+    font-size: 1.5rem;
+  }
+
+  .prose-lesson-plan h3 {
+    margin-top: 1.5rem;
+    margin-bottom: 1rem;
+    font-weight: 600;
+    font-size: 1.25rem;
+  }
+
+  .prose-lesson-plan p {
+    margin-bottom: 1rem;
+    line-height: 1.8;
+  }
+
+  .prose-lesson-plan ul,
+  .prose-lesson-plan ol {
+    margin-bottom: 1.5rem;
+    padding-left: 1.5rem;
+  }
+
+  .prose-lesson-plan li {
+    margin-bottom: 0.5rem;
+    line-height: 1.7;
+  }
+
+  .prose-lesson-plan strong {
+    font-weight: 600;
+    color: hsl(var(--primary));
+  }
+
+  .prose-lesson-plan table {
+    margin-top: 1.5rem;
+    margin-bottom: 1.5rem;
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .prose-lesson-plan th,
+  .prose-lesson-plan td {
+    padding: 0.75rem;
+    border: 1px solid hsl(var(--border));
+  }
+
+  .prose-lesson-plan th {
+    background: hsl(var(--muted));
+    font-weight: 600;
+  }
+
+  .prose-lesson-plan hr {
+    margin-top: 2rem;
+    margin-bottom: 2rem;
+    border-color: hsl(var(--border));
+  }
 }
