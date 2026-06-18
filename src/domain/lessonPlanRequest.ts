@@ -43,7 +43,7 @@ export function buildReflectionContextFromLogs(recentLogs: ReflectionLogRow[]): 
 
   return `จาก ${recentLogs.length} คาบล่าสุด:
 - Gap หลัก: ${dominantGap[0]} (${dominantGap[1]} ครั้ง)
-- Mastery เฉลี่ย: ${avgMastery}%
+- Mastery Score เฉลี่ย: ${avgMastery} จากคะแนนเต็ม 5
 - Gap Distribution: ${JSON.stringify(gapCounts)}
 - Special Care IDs: ${specialIds.size > 0 ? [...specialIds].join(", ") : "ไม่มี"}
 - หัวข้อล่าสุด: ${recentLogs.map((l) => l.topic).filter(Boolean).join(", ")}`;
