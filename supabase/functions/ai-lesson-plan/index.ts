@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import Anthropic from "npm:@anthropic-ai/sdk@0.32.1";
 import { requireAtlasUser } from "../_shared/atlasAuth.ts";
 import { parseLessonPlanBody } from "../_shared/lessonPlanRequest.ts";
 import {
@@ -9,9 +10,9 @@ import {
 } from "../_shared/lessonPlanPrompts.ts";
 
 const RATE_LIMIT_SECONDS = 10;
-const GEMINI_MAX_429_RETRIES = 2;
-const GEMINI_BACKOFF_BASE_MS = 5000;
-const GEMINI_BACKOFF_MAX_MS = 10000;
+const CLAUDE_MAX_429_RETRIES = 2;
+const CLAUDE_BACKOFF_BASE_MS = 5000;
+const CLAUDE_BACKOFF_MAX_MS = 10000;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -88,9 +89,9 @@ serve(async (req) => {
     }
     const v = parsed.value;
     const { planType, topic, gradeLevel, classroom, subject, learningUnit, hours, addonType, includeWorksheets } = v;
-    const rawKey = Deno.env.get("LOVABLE_API_KEY") ?? "";
-    const GEMINI_API_KEY = rawKey.replace(/[^\x20-\x7E]/g, "").trim();
-    if (!GEMINI_API_KEY) throw new Error("LOVABLE_API_KEY is not configured in Supabase Secrets");
+    const rawKey = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
+    const ANTHROPIC_API_KEY = rawKey.replace(/[^\x20-\x7E]/g, "").trim();
+    if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY is not configured in Supabase Secrets");
 
     const systemPrompt = addonType
       ? getAddonSystemPrompt(addonType)
@@ -108,66 +109,74 @@ serve(async (req) => {
 
     const userContent = addonType ? topic : buildLessonPlanUserContent(v);
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}`;
-    const geminiBody = JSON.stringify({
-      system_instruction: { parts: [{ text: systemPrompt }] },
-      contents: [{ role: "user", parts: [{ text: userContent }] }],
-      generationConfig: { temperature: 0 },
+    // Initialize Anthropic client
+    const anthropic = new Anthropic({
+      apiKey: ANTHROPIC_API_KEY,
     });
 
-    // Retry on Gemini 429 with Retry-After support.
-    let response: Response | null = null;
-    for (let attempt = 0; attempt <= GEMINI_MAX_429_RETRIES; attempt++) {
-      response = await fetch(geminiUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: geminiBody,
-      });
-      if (response.status !== 429 || attempt >= GEMINI_MAX_429_RETRIES) break;
-      const retryAfterMs = parseRetryAfterMs(response.headers.get("retry-after"));
-      const expBackoffMs = Math.min(
-        GEMINI_BACKOFF_BASE_MS * 2 ** attempt,
-        GEMINI_BACKOFF_MAX_MS
-      );
-      const delayMs = Math.max(1000, retryAfterMs ?? expBackoffMs);
-      console.warn(`GEMINI_429_RETRY lesson-plan attempt=${attempt + 1} delay_ms=${delayMs}`);
-      await new Promise((r) => setTimeout(r, delayMs));
+    // Stream Claude response with retry on 429
+    let claudeStream;
+    for (let attempt = 0; attempt <= CLAUDE_MAX_429_RETRIES; attempt++) {
+      try {
+        claudeStream = await anthropic.messages.stream({
+          model: "claude-sonnet-4-6",
+          max_tokens: 8192,
+          temperature: 0,
+          system: systemPrompt,
+          messages: [
+            {
+              role: "user",
+              content: userContent,
+            },
+          ],
+        });
+        break; // Success, exit retry loop
+      } catch (error: any) {
+        if (error?.status === 429 && attempt < CLAUDE_MAX_429_RETRIES) {
+          const retryAfterMs = parseRetryAfterMs(error?.headers?.["retry-after"]);
+          const expBackoffMs = Math.min(
+            CLAUDE_BACKOFF_BASE_MS * 2 ** attempt,
+            CLAUDE_BACKOFF_MAX_MS
+          );
+          const delayMs = Math.max(1000, retryAfterMs ?? expBackoffMs);
+          console.warn(`CLAUDE_429_RETRY lesson-plan attempt=${attempt + 1} delay_ms=${delayMs}`);
+          await new Promise((r) => setTimeout(r, delayMs));
+          continue;
+        }
+
+        // Handle errors
+        console.error("Claude lesson plan error:", error);
+        if (error?.status === 429) {
+          return new Response(JSON.stringify({ error: "คำขอมากเกินไป กรุณารอสักครู่" }), {
+            status: 429,
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "application/json",
+              "Retry-After": String(RATE_LIMIT_SECONDS),
+            },
+          });
+        }
+        if (error?.status === 401 || error?.status === 403) {
+          return new Response(JSON.stringify({ error: "ANTHROPIC_API_KEY ไม่ถูกต้องหรือไม่ได้ตั้งค่า กรุณาตรวจสอบใน Supabase Secrets" }), {
+            status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        return new Response(JSON.stringify({ error: `Claude error (${error?.status || "unknown"}). ดู Supabase Logs สำหรับรายละเอียด` }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
-    if (!response!.ok) {
-      const t = await response!.text();
-      console.error("Gemini lesson plan error: status=" + response!.status + ", body=" + t);
-      if (response!.status === 429) {
-        return new Response(JSON.stringify({ error: "คำขอมากเกินไป กรุณารอสักครู่" }), {
-          status: 429,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-            "Retry-After": String(RATE_LIMIT_SECONDS),
-          },
-        });
-      }
-      if (response!.status === 402) {
-        return new Response(JSON.stringify({ error: "เครดิต AI หมด" }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (response!.status === 400 || response!.status === 403) {
-        return new Response(JSON.stringify({ error: "LOVABLE_API_KEY ไม่ถูกต้องหรือไม่ได้ตั้งค่า กรุณาตรวจสอบใน Supabase Secrets" }), {
-          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      return new Response(JSON.stringify({ error: `Gemini error (${response!.status}). ดู Supabase Logs สำหรับรายละเอียด` }), {
+    if (!claudeStream) {
+      return new Response(JSON.stringify({ error: "Failed to initialize Claude stream after retries" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Transform Gemini SSE → OpenAI-compatible SSE for frontend
+    // Transform Claude streaming → OpenAI-compatible SSE for frontend
     const encoder = new TextEncoder();
-    const decoder = new TextDecoder();
     const stream = new ReadableStream({
       async start(controller) {
-        const reader = response!.body!.getReader();
         let sentDone = false;
         const sendDone = () => {
           if (sentDone) return;
@@ -180,32 +189,16 @@ serve(async (req) => {
         };
 
         try {
-          outer: while (true) {
-            const { done, value } = await reader.read();
-            if (done) {
+          for await (const event of claudeStream) {
+            if (event.type === "content_block_delta") {
+              const text = event.delta?.text ?? "";
+              if (text) {
+                const openAiChunk = { choices: [{ delta: { content: text } }] };
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify(openAiChunk)}\n\n`));
+              }
+            } else if (event.type === "message_stop") {
               sendDone();
               break;
-            }
-            const chunk = decoder.decode(value);
-            const lines = chunk.split("\n");
-            for (const line of lines) {
-              if (!line.startsWith("data: ")) continue;
-              const jsonStr = line.slice(6).trim();
-              if (!jsonStr) continue;
-              if (jsonStr === "[DONE]") {
-                sendDone();
-                break outer;
-              }
-              try {
-                const parsed = JSON.parse(jsonStr);
-                const text = parsed?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-                if (text) {
-                  const openAiChunk = { choices: [{ delta: { content: text } }] };
-                  controller.enqueue(encoder.encode(`data: ${JSON.stringify(openAiChunk)}\n\n`));
-                }
-              } catch {
-                // skip malformed chunks
-              }
             }
           }
         } catch (e) {
