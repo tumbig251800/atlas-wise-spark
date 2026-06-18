@@ -1,5 +1,6 @@
 import ReactMarkdown from "react-markdown";
 import { Loader2 } from "lucide-react";
+import { sanitizeMarkdown } from "@/lib/markdownTableSanitizer";
 
 interface Props {
   content: string;
@@ -8,6 +9,9 @@ interface Props {
 
 export function LessonPlanResult({ content, loading }: Props) {
   if (!content && !loading) return null;
+
+  // Sanitize markdown to prevent infinite empty table rows during streaming
+  const sanitizedContent = sanitizeMarkdown(content);
 
   return (
     <div className="glass-card p-6 space-y-3">
@@ -19,7 +23,7 @@ export function LessonPlanResult({ content, loading }: Props) {
       )}
       {content && (
         <div className="prose prose-invert prose-sm max-w-none text-foreground">
-          <ReactMarkdown>{content}</ReactMarkdown>
+          <ReactMarkdown>{sanitizedContent}</ReactMarkdown>
         </div>
       )}
       {loading && content && (
