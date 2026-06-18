@@ -29,8 +29,9 @@ function parseMarkdownTable(lines: string[]): Table | null {
     new TableCell({
       children: [
         new Paragraph({
-          children: [new TextRun({ text, bold: isHeader, size: isHeader ? 22 : 20 })],
+          children: [new TextRun({ text, bold: isHeader, size: 32, font: "TH Sarabun New" })],
           alignment: AlignmentType.CENTER,
+          spacing: { after: 0, line: 276 },
         }),
       ],
       width: { size: Math.floor(100 / headerCells.length), type: WidthType.PERCENTAGE },
@@ -59,17 +60,24 @@ export function ExportDocButton({ content, title }: Props) {
     const lines = content.split("\n");
     const children: (Paragraph | Table)[] = [];
     let i = 0;
+    let consecutiveBlankCount = 0;
 
     while (i < lines.length) {
       const trimmed = lines[i].trim();
 
-      // Page break / horizontal rule
+      // Page break only for worksheet separators (ใบงานชุดที่ 2)
       if (/^-{3,}$/.test(trimmed)) {
-        children.push(
-          new Paragraph({
-            children: [new PageBreak()],
-          })
-        );
+        // Check if next few lines contain "ใบงานชุดที่" or "Layer"
+        const nextLines = lines.slice(i + 1, i + 5).join(" ");
+        if (nextLines.includes("ใบงานชุดที่") || nextLines.includes("Layer")) {
+          children.push(
+            new Paragraph({
+              children: [new PageBreak()],
+              spacing: { after: 0, line: 276 },
+            })
+          );
+        }
+        // Otherwise ignore the --- line (don't add page break)
         i++;
         continue;
       }
@@ -84,42 +92,70 @@ export function ExportDocButton({ content, title }: Props) {
         const table = parseMarkdownTable(tableLines);
         if (table) {
           children.push(table);
-          children.push(new Paragraph({ text: "" }));
+          children.push(new Paragraph({
+            children: [new TextRun({ text: "", size: 32, font: "TH Sarabun New" })],
+            spacing: { after: 0, line: 276 },
+          }));
         }
         continue;
       }
 
-      if (trimmed.startsWith("### ")) {
-        children.push(new Paragraph({ text: trimmed.slice(4), heading: HeadingLevel.HEADING_3 }));
-      } else if (trimmed.startsWith("## ")) {
-        children.push(new Paragraph({ text: trimmed.slice(3), heading: HeadingLevel.HEADING_2 }));
-      } else if (trimmed.startsWith("# ")) {
-        children.push(new Paragraph({ text: trimmed.slice(2), heading: HeadingLevel.HEADING_1 }));
-      } else if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+      // Numbered section headings (1. 2. 3. etc.)
+      if (/^[0-9]+\.\s/.test(trimmed) && !/^[0-9]+\.\s.*:/.test(trimmed)) {
+        consecutiveBlankCount = 0;
         children.push(new Paragraph({
-          children: [new TextRun(trimmed.slice(2))],
+          children: [new TextRun({ text: trimmed, bold: true, size: 32, font: "TH Sarabun New" })],
+          spacing: { before: 120, after: 0, line: 276 },
+        }));
+      } else if (trimmed.startsWith("### ")) {
+        consecutiveBlankCount = 0;
+        children.push(new Paragraph({
+          children: [new TextRun({ text: trimmed.slice(4), bold: true, size: 32, font: "TH Sarabun New" })],
+          spacing: { before: 120, after: 0, line: 276 },
+        }));
+      } else if (trimmed.startsWith("## ")) {
+        consecutiveBlankCount = 0;
+        children.push(new Paragraph({
+          children: [new TextRun({ text: trimmed.slice(3), bold: true, size: 32, font: "TH Sarabun New" })],
+          spacing: { before: 120, after: 0, line: 276 },
+        }));
+      } else if (trimmed.startsWith("# ")) {
+        consecutiveBlankCount = 0;
+        children.push(new Paragraph({
+          children: [new TextRun({ text: trimmed.slice(2), bold: true, size: 32, font: "TH Sarabun New" })],
+          spacing: { before: 120, after: 0, line: 276 },
+        }));
+      } else if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+        consecutiveBlankCount = 0;
+        children.push(new Paragraph({
+          children: [new TextRun({ text: trimmed.slice(2), size: 32, font: "TH Sarabun New" })],
           bullet: { level: 0 },
+          spacing: { after: 0, line: 276 },
         }));
       } else if (trimmed.startsWith("**") && trimmed.endsWith("**")) {
+        consecutiveBlankCount = 0;
         children.push(new Paragraph({
-          children: [new TextRun({ text: trimmed.slice(2, -2), bold: true })],
+          children: [new TextRun({ text: trimmed.slice(2, -2), bold: true, size: 32, font: "TH Sarabun New" })],
+          spacing: { after: 0, line: 276 },
         }));
       } else if (trimmed.includes("**")) {
+        consecutiveBlankCount = 0;
         // Mixed bold inline: parse **bold** and normal text
         const parts = trimmed.split(/(\*\*[^*]+\*\*)/g);
         const runs = parts.filter(Boolean).map((part) => {
           if (part.startsWith("**") && part.endsWith("**")) {
-            return new TextRun({ text: part.slice(2, -2), bold: true });
+            return new TextRun({ text: part.slice(2, -2), bold: true, size: 32, font: "TH Sarabun New" });
           }
-          return new TextRun(part);
+          return new TextRun({ text: part, size: 32, font: "TH Sarabun New" });
         });
-        children.push(new Paragraph({ children: runs }));
+        children.push(new Paragraph({ children: runs, spacing: { after: 0, line: 276 } }));
     } else if (trimmed.includes("[กรอบวาดรูป]") || trimmed.includes("[DRAW_BOX]")) {
+        consecutiveBlankCount = 0;
         // Drawing box — bordered paragraph with ~5-7cm spacing for Special Care students
         children.push(new Paragraph({
-          children: [new TextRun({ text: "พื้นที่สำหรับวาดรูป / ระบายสี", italics: true, size: 20, color: "888888" })],
+          children: [new TextRun({ text: "พื้นที่สำหรับวาดรูป / ระบายสี", italics: true, size: 28, color: "888888", font: "TH Sarabun New" })],
           alignment: AlignmentType.CENTER,
-          spacing: { before: 200, after: 2800 },
+          spacing: { before: 200, after: 2800, line: 276 },
           border: {
             top: { style: BorderStyle.SINGLE, size: 1, space: 1 },
             bottom: { style: BorderStyle.SINGLE, size: 1, space: 1 },
@@ -128,21 +164,23 @@ export function ExportDocButton({ content, title }: Props) {
           },
         }));
       } else if (trimmed.includes("[DOTTED_LINE]")) {
+        consecutiveBlankCount = 0;
         // Dotted line — hint line for students
         children.push(new Paragraph({
-          children: [new TextRun({ text: trimmed.replace("[DOTTED_LINE]", "").trim() || "...", size: 20 })],
-          spacing: { after: 400 },
+          children: [new TextRun({ text: trimmed.replace("[DOTTED_LINE]", "").trim() || "...", size: 32, font: "TH Sarabun New" })],
+          spacing: { after: 0, line: 276 },
           border: {
             bottom: { style: BorderStyle.DOTTED, size: 1, space: 1 },
           },
         }));
       } else if (/\[Canva Element:/.test(trimmed)) {
+        consecutiveBlankCount = 0;
         // Canva Element placeholder — italic grey text in dotted border
         const elementName = trimmed.match(/\[Canva Element:\s*(.*?)\]/)?.[1] || "";
         children.push(new Paragraph({
-          children: [new TextRun({ text: `[แทรกรูป: ${elementName}]`, italics: true, size: 18, color: "666666" })],
+          children: [new TextRun({ text: `[แทรกรูป: ${elementName}]`, italics: true, size: 28, color: "666666", font: "TH Sarabun New" })],
           alignment: AlignmentType.CENTER,
-          spacing: { before: 100, after: 600 },
+          spacing: { before: 100, after: 600, line: 276 },
           border: {
             top: { style: BorderStyle.DOTTED, size: 1, space: 1 },
             bottom: { style: BorderStyle.DOTTED, size: 1, space: 1 },
@@ -151,29 +189,114 @@ export function ExportDocButton({ content, title }: Props) {
           },
         }));
       } else if (/^\d+\.\s/.test(trimmed)) {
-        // Numbered list detection
+        consecutiveBlankCount = 0;
+        // Numbered list detection (inside content, not section headings)
         const text = trimmed.replace(/^\d+\.\s/, "");
         const num = trimmed.match(/^(\d+)\./)?.[1] || "1";
         children.push(new Paragraph({
-          children: [new TextRun(`${num}. ${text}`)],
+          children: [new TextRun({ text: `${num}. ${text}`, size: 32, font: "TH Sarabun New" })],
           indent: { left: 360 },
+          spacing: { after: 0, line: 276 },
         }));
       } else if (trimmed.includes("____________")) {
+        consecutiveBlankCount = 0;
         // Answer lines — add extra spacing for writing
         children.push(new Paragraph({
-          children: [new TextRun(trimmed)],
-          spacing: { after: 800 },
+          children: [new TextRun({ text: trimmed, size: 32, font: "TH Sarabun New" })],
+          spacing: { after: 800, line: 276 },
         }));
       } else if (trimmed) {
-        children.push(new Paragraph({ children: [new TextRun(trimmed)] }));
+        consecutiveBlankCount = 0;
+        children.push(new Paragraph({
+          children: [new TextRun({ text: trimmed, size: 32, font: "TH Sarabun New" })],
+          spacing: { after: 0, line: 276 },
+        }));
       } else {
-        children.push(new Paragraph({ text: "" }));
+        // Blank line - only add if not consecutive
+        consecutiveBlankCount++;
+        if (consecutiveBlankCount === 1) {
+          children.push(new Paragraph({
+            children: [new TextRun({ text: "", size: 32, font: "TH Sarabun New" })],
+            spacing: { after: 0, line: 276 },
+          }));
+        }
       }
 
       i++;
     }
 
     const doc = new Document({
+      styles: {
+        default: {
+          document: {
+            run: {
+              font: "TH Sarabun New",
+              size: 32, // 16pt = 32 half-points
+            },
+            paragraph: {
+              spacing: {
+                line: 276, // 1.15 line spacing (276 / 240 = 1.15)
+                after: 0,
+                before: 0,
+              },
+            },
+          },
+          heading1: {
+            run: {
+              font: "TH Sarabun New",
+              size: 32,
+              bold: true,
+            },
+            paragraph: {
+              spacing: {
+                line: 276,
+                after: 0,
+                before: 120,
+              },
+            },
+          },
+          heading2: {
+            run: {
+              font: "TH Sarabun New",
+              size: 32,
+              bold: true,
+            },
+            paragraph: {
+              spacing: {
+                line: 276,
+                after: 0,
+                before: 120,
+              },
+            },
+          },
+          heading3: {
+            run: {
+              font: "TH Sarabun New",
+              size: 32,
+              bold: true,
+            },
+            paragraph: {
+              spacing: {
+                line: 276,
+                after: 0,
+                before: 120,
+              },
+            },
+          },
+          listParagraph: {
+            run: {
+              font: "TH Sarabun New",
+              size: 32,
+            },
+            paragraph: {
+              spacing: {
+                line: 276,
+                after: 0,
+              },
+            },
+          },
+        },
+      },
       sections: [{ properties: {}, children }],
     });
 
