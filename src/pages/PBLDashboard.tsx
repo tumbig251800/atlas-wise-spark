@@ -46,7 +46,9 @@ interface FailedStudent {
 
 const PBLDashboard = () => {
   const { toast } = useToast();
-  const [academicTerm, setAcademicTerm] = useState("2568-2");
+  // Default for the empty-table state; once data exists, an effect below
+  // switches this to the newest term that actually has data.
+  const [academicTerm, setAcademicTerm] = useState("2569-1");
   const [gradeLevel, setGradeLevel] = useState<string>("all");
   const [classroom, setClassroom] = useState<string>("all");
   const [uploading, setUploading] = useState(false);

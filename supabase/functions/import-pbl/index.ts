@@ -56,6 +56,62 @@ function cellNum(ws: XLSX.WorkSheet, ref: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+// Normalise to "YYYY-S" (e.g. 2569-1) regardless of how the teacher typed the
+// year/semester. Handles "1/2569", "1-2569", swapped cells, extra spaces — we
+// pull the Buddhist year (25xx) and the term digit (1–3) out of both cells.
+function normalizeTerm(yearRaw: string, semRaw: string): string {
+  const blob = `${yearRaw} ${semRaw}`;
+  const yearMatch = blob.match(/25\d\d/);
+  const year = yearMatch ? yearMatch[0] : yearRaw.trim();
+  const rest = year ? blob.replace(year, " ") : blob;
+  const semMatch = rest.match(/[1-3]/);
+  const semester = semMatch ? semMatch[0] : semRaw.trim();
+  return `${year}-${semester}`;
+}
+
+// Normalise the "ป.4/KBW" cell into grade + classroom.
+// School structure: every grade has exactly TWO rooms — "KBW" (the only
+// alphabetic room) and "2". So:
+//   • any alphabetic value → KBW (auto-fixes typos: bkw / kwb / klb / kbw …)
+//   • "2" → "2"
+//   • any other digit (e.g. "1") or junk → ambiguous, we refuse rather than guess
+// Grade is taken from the first 1–6 digit ("ป4", "4", "ป.4 " → ป.4).
+function normalizeGradeClass(raw: string): {
+  grade: string;
+  classroom: string;
+  gradeOk: boolean;
+  classOk: boolean;
+  classCorrected: boolean;
+  rawClass: string;
+} {
+  const [gPart = "", cPart = ""] = raw.split("/").map((s) => s.trim());
+
+  const gm = gPart.match(/[1-6]/);
+  const grade = gm ? `ป.${gm[0]}` : gPart;
+
+  const c = cPart.toUpperCase().replace(/[\s.]/g, "");
+  let classroom = cPart;
+  let classOk = false;
+  let classCorrected = false;
+  if (c === "2") {
+    classroom = "2";
+    classOk = true;
+  } else if (/[A-Z]/.test(c)) {
+    classroom = "KBW";
+    classOk = true;
+    classCorrected = c !== "KBW";
+  }
+
+  return {
+    grade,
+    classroom,
+    gradeOk: !!gm,
+    classOk,
+    classCorrected,
+    rawClass: cPart,
+  };
+}
+
 // excellent: no score of 1 AND at least three scores of 3
 // fail:      any score of 1
 // pass:      everything else
@@ -131,10 +187,10 @@ serve(async (req) => {
     const monthRaw = cellStr(ws, `K${META_ROW}`);
     const semester = cellStr(ws, `L${META_ROW}`);
 
-    // Split "ป.4/KBW" → grade_level + classroom
-    const [grade_level = "", classroom = ""] = gradeClass
-      .split("/")
-      .map((s) => s.trim());
+    // Split + normalise "ป.4/KBW" → grade_level + classroom (fixes room typos)
+    const gc = normalizeGradeClass(gradeClass);
+    const grade_level = gc.gradeOk ? gc.grade : "";
+    const classroom = gc.classOk ? gc.classroom : "";
 
     // GUARD: the template ships with the word "เดือน" sitting in the month cell
     // as a placeholder/label. Teachers fill it either as "มิถุนายน" or by
@@ -147,12 +203,52 @@ serve(async (req) => {
       );
     }
 
-    const academic_term = `${year}-${semester}`;
+    const academic_term = normalizeTerm(year, semester);
 
-    if (!project_name || !grade_level || !classroom) {
+    // ─── Validate the header block, naming exactly which cell is blank ────────
+    // Required fields block the import (they're upsert keys / drive the dashboard
+    // filter); optional fields only warn so a small omission doesn't stop import.
+    const missing: string[] = [];
+    if (!project_name) missing.push(`ชื่อโปรเจกต์ (ช่อง C${META_ROW})`);
+    if (!gradeClass) {
+      missing.push(`ชั้น/ห้อง (ช่อง F${META_ROW})`);
+    } else {
+      if (!gc.gradeOk) {
+        missing.push(`ระดับชั้น ต้องเป็น ป.1–ป.6 (ช่อง F${META_ROW})`);
+      }
+      if (!gc.classOk) {
+        missing.push(
+          `ห้องเรียน ต้องเป็น KBW หรือ 2 เท่านั้น (พบ "${gc.rawClass}", ช่อง F${META_ROW})`,
+        );
+      }
+    }
+    if (!year) missing.push(`ปีการศึกษา (ช่อง J${META_ROW})`);
+    if (!semester) missing.push(`ภาคเรียน (ช่อง L${META_ROW})`);
+
+    if (missing.length > 0) {
       throw new Error(
-        `ข้อมูลโปรเจกต์ไม่ครบ — ต้องมีชื่อโปรเจกต์ (C${META_ROW}), ชั้น/ห้อง (F${META_ROW}) ให้ครบ`,
+        `ยังกรอกข้อมูลส่วนหัวไม่ครบ — กรุณาเติม: ${missing.join(" / ")}`,
       );
+    }
+
+    // Auto-fixed a room typo (e.g. "bkw" → "KBW") — tell the teacher.
+    if (gc.classCorrected) {
+      warnings.push(
+        `แก้ชื่อห้อง "${gc.rawClass}" เป็น "${classroom}" อัตโนมัติ`,
+      );
+    }
+
+    // Year + semester are present but the combined term still looks wrong — warn,
+    // don't block (otherwise the data imports but won't match the term filter).
+    if (!/^25\d\d-[1-3]$/.test(academic_term)) {
+      warnings.push(
+        `รูปแบบภาคเรียนผิดปกติ (อ่านได้ "${academic_term}") — ตรวจช่องปีการศึกษา (J${META_ROW}) และภาคเรียน (L${META_ROW}) ให้เป็นเลขปี เช่น 2569 และเทอม 1–2`,
+      );
+    }
+
+    // Optional field: warn but still import.
+    if (!teacher_name) {
+      warnings.push(`ยังไม่ได้กรอกชื่อครูผู้รับผิดชอบ (ช่อง I${META_ROW})`);
     }
 
     // ─── Student rows (from the row after the header) ────────────────────────
