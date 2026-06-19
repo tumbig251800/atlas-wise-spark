@@ -81,6 +81,7 @@ const PBLDashboard = () => {
   const [academicTerm, setAcademicTerm] = useState("2569-1");
   const [gradeLevel, setGradeLevel] = useState<string>("all");
   const [classroom, setClassroom] = useState<string>("all");
+  const [teacherName, setTeacherName] = useState<string>("all");
   const [uploading, setUploading] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState<string>("");
 
@@ -90,7 +91,7 @@ const PBLDashboard = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("pbl_projects")
-        .select("academic_term, grade_level, classroom");
+        .select("academic_term, grade_level, classroom, teacher_name");
       if (error) throw error;
       return data ?? [];
     },
@@ -122,6 +123,19 @@ const PBLDashboard = () => {
     return [...new Set(rows.map((r) => r.classroom).filter(Boolean))].sort();
   }, [filterRows, academicTerm, gradeLevel]);
 
+  // Teachers available within the selected term + grade + classroom.
+  const teacherOptions = useMemo(() => {
+    const rows = (filterRows ?? []).filter(
+      (r) =>
+        r.academic_term === academicTerm &&
+        (gradeLevel === "all" || r.grade_level === gradeLevel) &&
+        (classroom === "all" || r.classroom === classroom)
+    );
+    return [...new Set(rows.map((r) => r.teacher_name).filter(Boolean))].sort((a, b) =>
+      a.localeCompare(b, "th")
+    );
+  }, [filterRows, academicTerm, gradeLevel, classroom]);
+
   // On first load (or when data arrives), default to the newest term that
   // actually has data if the current selection has none.
   useEffect(() => {
@@ -150,9 +164,15 @@ const PBLDashboard = () => {
     }
   }, [classroomOptions, classroom]);
 
+  useEffect(() => {
+    if (teacherName !== "all" && !teacherOptions.includes(teacherName)) {
+      setTeacherName("all");
+    }
+  }, [teacherOptions, teacherName]);
+
   // Fetch project summary
   const { data: projects, isLoading, refetch } = useQuery({
-    queryKey: ["pbl-projects", academicTerm, gradeLevel, classroom],
+    queryKey: ["pbl-projects", academicTerm, gradeLevel, classroom, teacherName],
     queryFn: async () => {
       let query = supabase
         .from("pbl_projects")
@@ -172,6 +192,7 @@ const PBLDashboard = () => {
 
       if (gradeLevel !== "all") query = query.eq("grade_level", gradeLevel);
       if (classroom !== "all") query = query.eq("classroom", classroom);
+      if (teacherName !== "all") query = query.eq("teacher_name", teacherName);
 
       const { data, error } = await query;
       if (error) throw error;
@@ -199,7 +220,7 @@ const PBLDashboard = () => {
 
   // Fetch failed students
   const { data: failedStudents } = useQuery({
-    queryKey: ["pbl-failed-students", academicTerm, gradeLevel, classroom],
+    queryKey: ["pbl-failed-students", academicTerm, gradeLevel, classroom, teacherName],
     queryFn: async () => {
       let projectQuery = supabase
         .from("pbl_projects")
@@ -208,6 +229,7 @@ const PBLDashboard = () => {
 
       if (gradeLevel !== "all") projectQuery = projectQuery.eq("grade_level", gradeLevel);
       if (classroom !== "all") projectQuery = projectQuery.eq("classroom", classroom);
+      if (teacherName !== "all") projectQuery = projectQuery.eq("teacher_name", teacherName);
 
       const { data: projectIds, error: projectError } = await projectQuery;
       if (projectError) throw projectError;
@@ -335,7 +357,7 @@ const PBLDashboard = () => {
   // ── Phase 2: per-student & per-class detail ──────────────────────────────
   // All assessments in the current filter scope, with their project's name/month.
   const { data: detail } = useQuery({
-    queryKey: ["pbl-detail", academicTerm, gradeLevel, classroom],
+    queryKey: ["pbl-detail", academicTerm, gradeLevel, classroom, teacherName],
     queryFn: async () => {
       let pq = supabase
         .from("pbl_projects")
@@ -343,6 +365,7 @@ const PBLDashboard = () => {
         .eq("academic_term", academicTerm);
       if (gradeLevel !== "all") pq = pq.eq("grade_level", gradeLevel);
       if (classroom !== "all") pq = pq.eq("classroom", classroom);
+      if (teacherName !== "all") pq = pq.eq("teacher_name", teacherName);
 
       const { data: projs, error: pe } = await pq;
       if (pe) throw pe;
@@ -620,6 +643,22 @@ const PBLDashboard = () => {
                   {classroomOptions.map((c) => (
                     <SelectItem key={c} value={c}>
                       {c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium">ครูผู้รับผิดชอบ</label>
+              <Select value={teacherName} onValueChange={setTeacherName}>
+                <SelectTrigger className="w-[220px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">ทั้งหมด</SelectItem>
+                  {teacherOptions.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {t}
                     </SelectItem>
                   ))}
                 </SelectContent>
