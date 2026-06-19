@@ -9,7 +9,7 @@ import { Upload, FileSpreadsheet, TrendingUp, Award, AlertCircle, Download, Chec
 import { useToast } from "@/hooks/use-toast";
 import {
   Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis,
-  Line, LineChart, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
+  RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
 } from "recharts";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -47,17 +47,6 @@ interface FailedStudent {
   life_score: number;
   tech_score: number;
 }
-
-// Thai months in academic-year order (term starts พฤษภาคม) for sorting a
-// student's projects chronologically.
-const THAI_MONTH_ORDER = [
-  "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม",
-  "พฤศจิกายน", "ธันวาคม", "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน",
-];
-const monthOrder = (m: string) => {
-  const i = THAI_MONTH_ORDER.findIndex((x) => m?.includes(x));
-  return i === -1 ? 99 : i;
-};
 
 const DIMENSIONS = [
   { key: "com_score", label: "การสื่อสาร", color: "#8884d8" },
@@ -377,20 +366,24 @@ const PBLDashboard = () => {
     }
   }, [studentList, selectedStudentId]);
 
-  // One row per project the student appears in, ordered chronologically.
-  const studentSeries = useMemo(() => {
-    return (detail ?? [])
-      .filter((a: any) => a.student_id === selectedStudentId)
-      .slice()
-      .sort((a: any, b: any) => monthOrder(a.month) - monthOrder(b.month))
-      .map((a: any) => {
-        const row: Record<string, any> = {
-          name: a.month || a.project_name?.slice(0, 14) || "—",
-        };
-        DIMENSIONS.forEach((d) => (row[d.label] = a[d.key]));
-        return row;
-      });
-  }, [detail, selectedStudentId]);
+  // Selected student's score per dimension (averaged over their projects)
+  // alongside the class average — for a side-by-side comparison bar chart.
+  const studentCompare = useMemo(() => {
+    const rows = (detail ?? []).filter((a: any) => a.student_id === selectedStudentId);
+    if (rows.length === 0) return [] as { dim: string; นักเรียน: number; เฉลี่ยห้อง: number }[];
+    return DIMENSIONS.map((d) => ({
+      dim: d.label,
+      นักเรียน: parseFloat(
+        (rows.reduce((s: number, a: any) => s + (a[d.key] || 0), 0) / rows.length).toFixed(2)
+      ),
+      เฉลี่ยห้อง: classRadar.find((c) => c.dim === d.label)?.value ?? 0,
+    }));
+  }, [detail, selectedStudentId, classRadar]);
+
+  const studentProjectCount = useMemo(
+    () => (detail ?? []).filter((a: any) => a.student_id === selectedStudentId).length,
+    [detail, selectedStudentId]
+  );
 
   // Class average per dimension (radar).
   const classRadar = useMemo(() => {
@@ -747,28 +740,21 @@ const PBLDashboard = () => {
                       </Select>
                     </div>
                     <ResponsiveContainer width="100%" height={360}>
-                      <LineChart data={studentSeries}>
+                      <BarChart data={studentCompare}>
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" />
+                        <XAxis dataKey="dim" />
                         <YAxis domain={[0, 3]} ticks={[0, 1, 2, 3]} />
                         <Tooltip />
                         <Legend />
-                        {DIMENSIONS.map((d) => (
-                          <Line
-                            key={d.key}
-                            type="monotone"
-                            dataKey={d.label}
-                            stroke={d.color}
-                            strokeWidth={2}
-                          />
-                        ))}
-                      </LineChart>
+                        <Bar dataKey="นักเรียน" fill="#6366f1" />
+                        <Bar dataKey="เฉลี่ยห้อง" fill="#cbd5e1" />
+                      </BarChart>
                     </ResponsiveContainer>
-                    {studentSeries.length === 1 && (
-                      <p className="text-xs text-muted-foreground">
-                        * มีข้อมูลเพียง 1 โปรเจกต์ — กราฟเส้นจะเห็นพัฒนาการชัดเมื่อมีหลายโปรเจกต์ในภาคเรียน
-                      </p>
-                    )}
+                    <p className="text-xs text-muted-foreground">
+                      เทียบคะแนน 5 ด้านของนักเรียนกับค่าเฉลี่ยทั้งห้อง
+                      {studentProjectCount > 1 &&
+                        ` — นักเรียนมี ${studentProjectCount} โปรเจกต์ในภาคเรียนนี้ แสดงค่าเฉลี่ยของทุกโปรเจกต์`}
+                    </p>
                   </>
                 )}
               </CardContent>
