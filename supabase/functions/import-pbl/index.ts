@@ -56,6 +56,19 @@ function cellNum(ws: XLSX.WorkSheet, ref: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+// Normalise to "YYYY-S" (e.g. 2569-1) regardless of how the teacher typed the
+// year/semester. Handles "1/2569", "1-2569", swapped cells, extra spaces — we
+// pull the Buddhist year (25xx) and the term digit (1–3) out of both cells.
+function normalizeTerm(yearRaw: string, semRaw: string): string {
+  const blob = `${yearRaw} ${semRaw}`;
+  const yearMatch = blob.match(/25\d\d/);
+  const year = yearMatch ? yearMatch[0] : yearRaw.trim();
+  const rest = year ? blob.replace(year, " ") : blob;
+  const semMatch = rest.match(/[1-3]/);
+  const semester = semMatch ? semMatch[0] : semRaw.trim();
+  return `${year}-${semester}`;
+}
+
 // excellent: no score of 1 AND at least three scores of 3
 // fail:      any score of 1
 // pass:      everything else
@@ -147,7 +160,15 @@ serve(async (req) => {
       );
     }
 
-    const academic_term = `${year}-${semester}`;
+    const academic_term = normalizeTerm(year, semester);
+
+    // Warn (don't block) if the term still looks wrong — otherwise the data
+    // imports but silently won't match the dashboard's term filter.
+    if (!/^25\d\d-[1-3]$/.test(academic_term)) {
+      warnings.push(
+        `รูปแบบภาคเรียนผิดปกติ (อ่านได้ "${academic_term}") — ตรวจช่องปีการศึกษา (J${META_ROW}) และภาคเรียน (L${META_ROW}) ให้เป็นเลขปี เช่น 2569 และเทอม 1–2`,
+      );
+    }
 
     if (!project_name || !grade_level || !classroom) {
       throw new Error(
