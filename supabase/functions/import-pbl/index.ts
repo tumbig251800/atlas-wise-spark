@@ -182,7 +182,9 @@ serve(async (req) => {
     // ─── Metadata ────────────────────────────────────────────────────────────
     const project_name = cellStr(ws, `C${META_ROW}`);
     const gradeClass = cellStr(ws, `F${META_ROW}`);
-    const teacher_name = cellStr(ws, `I${META_ROW}`);
+    // Collapse internal/edge whitespace so the same teacher isn't counted twice
+    // ("พักตร์เพ็ญ  อ้นเก้" vs "พักตร์เพ็ญ อ้นเก้") in per-teacher reports.
+    const teacher_name = cellStr(ws, `I${META_ROW}`).replace(/\s+/g, " ");
     const year = cellStr(ws, `J${META_ROW}`);
     const monthRaw = cellStr(ws, `K${META_ROW}`);
     const semester = cellStr(ws, `L${META_ROW}`);
@@ -210,6 +212,7 @@ serve(async (req) => {
     // filter); optional fields only warn so a small omission doesn't stop import.
     const missing: string[] = [];
     if (!project_name) missing.push(`ชื่อโปรเจกต์ (ช่อง C${META_ROW})`);
+    if (!teacher_name) missing.push(`ชื่อครูผู้รับผิดชอบ (ช่อง I${META_ROW})`);
     if (!gradeClass) {
       missing.push(`ชั้น/ห้อง (ช่อง F${META_ROW})`);
     } else {
@@ -244,11 +247,6 @@ serve(async (req) => {
       warnings.push(
         `รูปแบบภาคเรียนผิดปกติ (อ่านได้ "${academic_term}") — ตรวจช่องปีการศึกษา (J${META_ROW}) และภาคเรียน (L${META_ROW}) ให้เป็นเลขปี เช่น 2569 และเทอม 1–2`,
       );
-    }
-
-    // Optional field: warn but still import.
-    if (!teacher_name) {
-      warnings.push(`ยังไม่ได้กรอกชื่อครูผู้รับผิดชอบ (ช่อง I${META_ROW})`);
     }
 
     // ─── Student rows (from the row after the header) ────────────────────────
