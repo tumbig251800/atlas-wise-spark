@@ -59,13 +59,19 @@ const monthOrder = (m: string) => {
   return i === -1 ? 99 : i;
 };
 
+// Bright, modern palette — rendered translucent (see-through / glassy) so the
+// grid shows through; works on both light and dark backgrounds.
 const DIMENSIONS = [
-  { key: "com_score", label: "การสื่อสาร", color: "#8884d8" },
-  { key: "think_score", label: "การคิด", color: "#82ca9d" },
-  { key: "problem_score", label: "การแก้ปัญหา", color: "#ffc658" },
-  { key: "life_score", label: "ทักษะชีวิต", color: "#ff8042" },
-  { key: "tech_score", label: "เทคโนโลยี", color: "#a4de6c" },
+  { key: "com_score", label: "การสื่อสาร", color: "#a855f7" },   // violet
+  { key: "think_score", label: "การคิด", color: "#22c55e" },     // green
+  { key: "problem_score", label: "การแก้ปัญหา", color: "#f59e0b" }, // amber
+  { key: "life_score", label: "ทักษะชีวิต", color: "#ec4899" },  // pink
+  { key: "tech_score", label: "เทคโนโลยี", color: "#06b6d4" },   // cyan
 ] as const;
+
+// Shared "see-through" bar styling.
+const BAR_FILL_OPACITY = 0.7;
+const BAR_RADIUS: [number, number, number, number] = [6, 6, 0, 0];
 
 const PBLDashboard = () => {
   const { toast } = useToast();
@@ -693,11 +699,17 @@ const PBLDashboard = () => {
                   <YAxis domain={[0, 3]} />
                   <Tooltip />
                   <Legend />
-                  <Bar dataKey="การสื่อสาร" fill="#8884d8" />
-                  <Bar dataKey="การคิด" fill="#82ca9d" />
-                  <Bar dataKey="การแก้ปัญหา" fill="#ffc658" />
-                  <Bar dataKey="ทักษะชีวิต" fill="#ff8042" />
-                  <Bar dataKey="เทคโนโลยี" fill="#a4de6c" />
+                  {DIMENSIONS.map((d) => (
+                    <Bar
+                      key={d.key}
+                      dataKey={d.label}
+                      fill={d.color}
+                      fillOpacity={BAR_FILL_OPACITY}
+                      stroke={d.color}
+                      strokeWidth={1}
+                      radius={BAR_RADIUS}
+                    />
+                  ))}
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -829,8 +841,22 @@ const PBLDashboard = () => {
                         <YAxis domain={[0, 3]} ticks={[0, 1, 2, 3]} />
                         <Tooltip />
                         <Legend />
-                        <Bar dataKey="นักเรียน" fill="#6366f1" />
-                        <Bar dataKey="เฉลี่ยห้อง" fill="#cbd5e1" />
+                        <Bar
+                          dataKey="นักเรียน"
+                          fill="#a855f7"
+                          fillOpacity={BAR_FILL_OPACITY}
+                          stroke="#a855f7"
+                          strokeWidth={1}
+                          radius={BAR_RADIUS}
+                        />
+                        <Bar
+                          dataKey="เฉลี่ยห้อง"
+                          fill="#06b6d4"
+                          fillOpacity={0.5}
+                          stroke="#06b6d4"
+                          strokeWidth={1}
+                          radius={BAR_RADIUS}
+                        />
                       </BarChart>
                     </ResponsiveContainer>
                     <p className="text-xs text-muted-foreground">
@@ -869,9 +895,9 @@ const PBLDashboard = () => {
                           <Radar
                             name="คะแนนเฉลี่ย"
                             dataKey="value"
-                            stroke="#6366f1"
-                            fill="#6366f1"
-                            fillOpacity={0.4}
+                            stroke="#a855f7"
+                            fill="#a855f7"
+                            fillOpacity={0.45}
                             strokeWidth={2}
                           />
                           <Tooltip />
