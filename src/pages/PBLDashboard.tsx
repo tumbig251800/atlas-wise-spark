@@ -405,6 +405,17 @@ const PBLDashboard = () => {
     [detail, selectedStudentId]
   );
 
+  // Which unit(s)/project(s) these scores come from, for the selected student.
+  const studentProjects = useMemo(() => {
+    const seen = new Map<string, string>();
+    (detail ?? [])
+      .filter((a: any) => a.student_id === selectedStudentId)
+      .forEach((a: any) => {
+        if (!seen.has(a.project_name)) seen.set(a.project_name, a.month);
+      });
+    return [...seen.entries()].map(([name, month]) => ({ name, month }));
+  }, [detail, selectedStudentId]);
+
   return (
     <AppLayout>
       <div className="max-w-7xl mx-auto space-y-6">
@@ -713,9 +724,9 @@ const PBLDashboard = () => {
           <TabsContent value="student" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>พัฒนาการรายนักเรียน</CardTitle>
+                <CardTitle>สมรรถนะผู้เรียนรายบุคคล</CardTitle>
                 <CardDescription>
-                  เลือกนักเรียนเพื่อดูคะแนน 5 ด้านข้ามโปรเจกต์ในภาคเรียนที่เลือก
+                  เลือกผู้เรียนเพื่อดูคะแนนสมรรถนะ 5 ด้าน เทียบกับค่าเฉลี่ยทั้งห้อง
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -740,6 +751,19 @@ const PBLDashboard = () => {
                         </SelectContent>
                       </Select>
                     </div>
+                    {studentProjects.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-2 text-sm">
+                        <span className="text-muted-foreground">
+                          คะแนนจากหน่วย/โปรเจกต์:
+                        </span>
+                        {studentProjects.map((p, i) => (
+                          <Badge key={i} variant="secondary">
+                            {p.name}
+                            {p.month ? ` · ${p.month}` : ""}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
                     <ResponsiveContainer width="100%" height={360}>
                       <BarChart data={studentCompare}>
                         <CartesianGrid strokeDasharray="3 3" />
