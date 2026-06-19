@@ -7,9 +7,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Upload, FileSpreadsheet, TrendingUp, Award, AlertCircle, Download, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis,
+  Line, LineChart, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
+} from "recharts";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface PBLProject {
   id: string;
@@ -44,6 +48,25 @@ interface FailedStudent {
   tech_score: number;
 }
 
+// Thai months in academic-year order (term starts พฤษภาคม) for sorting a
+// student's projects chronologically.
+const THAI_MONTH_ORDER = [
+  "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม",
+  "พฤศจิกายน", "ธันวาคม", "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน",
+];
+const monthOrder = (m: string) => {
+  const i = THAI_MONTH_ORDER.findIndex((x) => m?.includes(x));
+  return i === -1 ? 99 : i;
+};
+
+const DIMENSIONS = [
+  { key: "com_score", label: "การสื่อสาร", color: "#8884d8" },
+  { key: "think_score", label: "การคิด", color: "#82ca9d" },
+  { key: "problem_score", label: "การแก้ปัญหา", color: "#ffc658" },
+  { key: "life_score", label: "ทักษะชีวิต", color: "#ff8042" },
+  { key: "tech_score", label: "เทคโนโลยี", color: "#a4de6c" },
+] as const;
+
 const PBLDashboard = () => {
   const { toast } = useToast();
   // Default for the empty-table state; once data exists, an effect below
@@ -52,6 +75,7 @@ const PBLDashboard = () => {
   const [gradeLevel, setGradeLevel] = useState<string>("all");
   const [classroom, setClassroom] = useState<string>("all");
   const [uploading, setUploading] = useState(false);
+  const [selectedStudentId, setSelectedStudentId] = useState<string>("");
 
   // Fetch distinct filter values from real data (no hardcoded options).
   const { data: filterRows } = useQuery({
@@ -301,6 +325,92 @@ const PBLDashboard = () => {
     เทคโนโลยี: parseFloat(p.avg_tech.toFixed(2)),
   })) || [];
 
+  // ── Phase 2: per-student & per-class detail ──────────────────────────────
+  // All assessments in the current filter scope, with their project's name/month.
+  const { data: detail } = useQuery({
+    queryKey: ["pbl-detail", academicTerm, gradeLevel, classroom],
+    queryFn: async () => {
+      let pq = supabase
+        .from("pbl_projects")
+        .select("id, project_name, month")
+        .eq("academic_term", academicTerm);
+      if (gradeLevel !== "all") pq = pq.eq("grade_level", gradeLevel);
+      if (classroom !== "all") pq = pq.eq("classroom", classroom);
+
+      const { data: projs, error: pe } = await pq;
+      if (pe) throw pe;
+
+      const projMap = new Map((projs ?? []).map((p: any) => [p.id, p]));
+      const ids = [...projMap.keys()];
+      if (ids.length === 0) return [];
+
+      const { data, error } = await supabase
+        .from("pbl_assessments")
+        .select(
+          "student_id, student_name, com_score, think_score, problem_score, life_score, tech_score, overall_result, project_id"
+        )
+        .in("project_id", ids);
+      if (error) throw error;
+
+      return (data ?? []).map((a: any) => {
+        const p: any = projMap.get(a.project_id);
+        return { ...a, project_name: p?.project_name ?? "", month: p?.month ?? "" };
+      });
+    },
+  });
+
+  // Distinct students for the dropdown (sorted by Thai name).
+  const studentList = useMemo(() => {
+    const m = new Map<string, string>();
+    (detail ?? []).forEach((a: any) => {
+      if (!m.has(a.student_id)) m.set(a.student_id, a.student_name);
+    });
+    return [...m.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name, "th"));
+  }, [detail]);
+
+  // Keep the selected student valid as the scope changes.
+  useEffect(() => {
+    if (studentList.length > 0 && !studentList.some((s) => s.id === selectedStudentId)) {
+      setSelectedStudentId(studentList[0].id);
+    }
+  }, [studentList, selectedStudentId]);
+
+  // One row per project the student appears in, ordered chronologically.
+  const studentSeries = useMemo(() => {
+    return (detail ?? [])
+      .filter((a: any) => a.student_id === selectedStudentId)
+      .slice()
+      .sort((a: any, b: any) => monthOrder(a.month) - monthOrder(b.month))
+      .map((a: any) => {
+        const row: Record<string, any> = {
+          name: a.month || a.project_name?.slice(0, 14) || "—",
+        };
+        DIMENSIONS.forEach((d) => (row[d.label] = a[d.key]));
+        return row;
+      });
+  }, [detail, selectedStudentId]);
+
+  // Class average per dimension (radar).
+  const classRadar = useMemo(() => {
+    const rows = detail ?? [];
+    if (rows.length === 0) return [] as { dim: string; value: number }[];
+    return DIMENSIONS.map((d) => ({
+      dim: d.label,
+      value: parseFloat(
+        (rows.reduce((s: number, a: any) => s + (a[d.key] || 0), 0) / rows.length).toFixed(2)
+      ),
+    }));
+  }, [detail]);
+
+  const classStrength = classRadar.length
+    ? classRadar.reduce((a, b) => (b.value > a.value ? b : a))
+    : null;
+  const classWeakness = classRadar.length
+    ? classRadar.reduce((a, b) => (b.value < a.value ? b : a))
+    : null;
+
   return (
     <AppLayout>
       <div className="max-w-7xl mx-auto space-y-6">
@@ -449,6 +559,14 @@ const PBLDashboard = () => {
           </CardContent>
         </Card>
 
+        <Tabs defaultValue="overview" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="overview">ภาพรวมโปรเจกต์</TabsTrigger>
+            <TabsTrigger value="student">รายนักเรียน</TabsTrigger>
+            <TabsTrigger value="classroom">รายห้อง</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview" className="space-y-6">
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
@@ -595,6 +713,140 @@ const PBLDashboard = () => {
             </CardContent>
           </Card>
         )}
+          </TabsContent>
+
+          {/* ── Per-student view ── */}
+          <TabsContent value="student" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>พัฒนาการรายนักเรียน</CardTitle>
+                <CardDescription>
+                  เลือกนักเรียนเพื่อดูคะแนน 5 ด้านข้ามโปรเจกต์ในภาคเรียนที่เลือก
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {studentList.length === 0 ? (
+                  <div className="h-[320px] flex items-center justify-center text-muted-foreground">
+                    ไม่มีข้อมูลนักเรียนในตัวกรองนี้
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <label className="text-sm font-medium">นักเรียน</label>
+                      <Select value={selectedStudentId} onValueChange={setSelectedStudentId}>
+                        <SelectTrigger className="w-[300px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {studentList.map((s) => (
+                            <SelectItem key={s.id} value={s.id}>
+                              {s.name} ({s.id})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <ResponsiveContainer width="100%" height={360}>
+                      <LineChart data={studentSeries}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" />
+                        <YAxis domain={[0, 3]} ticks={[0, 1, 2, 3]} />
+                        <Tooltip />
+                        <Legend />
+                        {DIMENSIONS.map((d) => (
+                          <Line
+                            key={d.key}
+                            type="monotone"
+                            dataKey={d.label}
+                            stroke={d.color}
+                            strokeWidth={2}
+                          />
+                        ))}
+                      </LineChart>
+                    </ResponsiveContainer>
+                    {studentSeries.length === 1 && (
+                      <p className="text-xs text-muted-foreground">
+                        * มีข้อมูลเพียง 1 โปรเจกต์ — กราฟเส้นจะเห็นพัฒนาการชัดเมื่อมีหลายโปรเจกต์ในภาคเรียน
+                      </p>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ── Per-classroom view ── */}
+          <TabsContent value="classroom" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>ภาพรวมรายห้อง</CardTitle>
+                <CardDescription>
+                  คะแนนเฉลี่ย 5 ด้านของห้องที่เลือก (ตามตัวกรองด้านบน) — ไว้ดูจุดแข็ง/จุดที่ควรพัฒนา
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {classRadar.length === 0 ? (
+                  <div className="h-[320px] flex items-center justify-center text-muted-foreground">
+                    ไม่มีข้อมูลในตัวกรองนี้
+                  </div>
+                ) : (
+                  <div className="grid gap-6 md:grid-cols-3">
+                    <div className="md:col-span-2">
+                      <ResponsiveContainer width="100%" height={360}>
+                        <RadarChart data={classRadar}>
+                          <PolarGrid />
+                          <PolarAngleAxis dataKey="dim" />
+                          <PolarRadiusAxis domain={[0, 3]} tickCount={4} />
+                          <Radar
+                            name="คะแนนเฉลี่ย"
+                            dataKey="value"
+                            stroke="#6366f1"
+                            fill="#6366f1"
+                            fillOpacity={0.4}
+                            strokeWidth={2}
+                          />
+                          <Tooltip />
+                        </RadarChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="space-y-3">
+                      {classStrength && (
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm">จุดแข็ง</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-lg font-bold text-green-600">
+                              {classStrength.dim}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              เฉลี่ย {classStrength.value.toFixed(2)} / 3
+                            </p>
+                          </CardContent>
+                        </Card>
+                      )}
+                      {classWeakness && (
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm">จุดที่ควรพัฒนา</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-lg font-bold text-orange-600">
+                              {classWeakness.dim}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              เฉลี่ย {classWeakness.value.toFixed(2)} / 3
+                            </p>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </AppLayout>
   );
