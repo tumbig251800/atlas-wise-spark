@@ -162,18 +162,36 @@ serve(async (req) => {
 
     const academic_term = normalizeTerm(year, semester);
 
-    // Warn (don't block) if the term still looks wrong — otherwise the data
-    // imports but silently won't match the dashboard's term filter.
+    // ─── Validate the header block, naming exactly which cell is blank ────────
+    // Required fields block the import (they're upsert keys / drive the dashboard
+    // filter); optional fields only warn so a small omission doesn't stop import.
+    const missing: string[] = [];
+    if (!project_name) missing.push(`ชื่อโปรเจกต์ (ช่อง C${META_ROW})`);
+    if (!gradeClass) {
+      missing.push(`ชั้น/ห้อง (ช่อง F${META_ROW})`);
+    } else if (!grade_level || !classroom) {
+      missing.push(`ชั้น/ห้อง ต้องอยู่ในรูป "ป.4/KBW" (ช่อง F${META_ROW})`);
+    }
+    if (!year) missing.push(`ปีการศึกษา (ช่อง J${META_ROW})`);
+    if (!semester) missing.push(`ภาคเรียน (ช่อง L${META_ROW})`);
+
+    if (missing.length > 0) {
+      throw new Error(
+        `ยังกรอกข้อมูลส่วนหัวไม่ครบ — กรุณาเติม: ${missing.join(" / ")}`,
+      );
+    }
+
+    // Year + semester are present but the combined term still looks wrong — warn,
+    // don't block (otherwise the data imports but won't match the term filter).
     if (!/^25\d\d-[1-3]$/.test(academic_term)) {
       warnings.push(
         `รูปแบบภาคเรียนผิดปกติ (อ่านได้ "${academic_term}") — ตรวจช่องปีการศึกษา (J${META_ROW}) และภาคเรียน (L${META_ROW}) ให้เป็นเลขปี เช่น 2569 และเทอม 1–2`,
       );
     }
 
-    if (!project_name || !grade_level || !classroom) {
-      throw new Error(
-        `ข้อมูลโปรเจกต์ไม่ครบ — ต้องมีชื่อโปรเจกต์ (C${META_ROW}), ชั้น/ห้อง (F${META_ROW}) ให้ครบ`,
-      );
+    // Optional field: warn but still import.
+    if (!teacher_name) {
+      warnings.push(`ยังไม่ได้กรอกชื่อครูผู้รับผิดชอบ (ช่อง I${META_ROW})`);
     }
 
     // ─── Student rows (from the row after the header) ────────────────────────
