@@ -166,6 +166,59 @@ const TOOLS = [
       },
       required: []
     }
+  },
+  {
+    name: "atlas_pbl_summary",
+    description: "สรุปสมรรถนะ PBL ในภาคเรียน: รายโปรเจกต์ (จำนวนดีเยี่ยม/ผ่าน/ไม่ผ่าน + คะแนนเฉลี่ย 5 ด้าน) และภาพรวม กรองตามชั้น/ห้อง/ครูได้",
+    inputSchema: {
+      type: "object",
+      properties: {
+        term: { type: "string", description: "รหัสภาคเรียน เช่น 2569-1" },
+        grade_level: { type: "string", description: "ระดับชั้น เช่น ป.4 (optional)" },
+        classroom: { type: "string", description: "ห้องเรียน เช่น KBW หรือ 2 (optional)" },
+        teacher_name: { type: "string", description: "ชื่อครูผู้รับผิดชอบ (optional)" }
+      },
+      required: ["term"]
+    }
+  },
+  {
+    name: "atlas_pbl_class_profile",
+    description: "โปรไฟล์สมรรถนะ PBL ของห้องเรียน: คะแนนเฉลี่ย 5 ด้าน จุดแข็ง/จุดที่ควรพัฒนา และการกระจายผล (ดีเยี่ยม/ผ่าน/ไม่ผ่าน)",
+    inputSchema: {
+      type: "object",
+      properties: {
+        term: { type: "string", description: "รหัสภาคเรียน" },
+        grade_level: { type: "string", description: "ระดับชั้น เช่น ป.4" },
+        classroom: { type: "string", description: "ห้องเรียน เช่น KBW หรือ 2" }
+      },
+      required: ["term", "grade_level", "classroom"]
+    }
+  },
+  {
+    name: "atlas_pbl_failing",
+    description: "รายชื่อนักเรียนที่ไม่ผ่านเกณฑ์ PBL (มีด้านใดได้ 1) พร้อมด้านที่อ่อนและหมายเหตุ — สำหรับติดตาม/แจ้งเตือน/ช่วยเหลือ",
+    inputSchema: {
+      type: "object",
+      properties: {
+        term: { type: "string", description: "รหัสภาคเรียน" },
+        grade_level: { type: "string", description: "ระดับชั้น (optional)" },
+        classroom: { type: "string", description: "ห้องเรียน (optional)" },
+        teacher_name: { type: "string", description: "ชื่อครู (optional)" }
+      },
+      required: ["term"]
+    }
+  },
+  {
+    name: "atlas_pbl_student",
+    description: "พัฒนาการสมรรถนะ PBL ของนักเรียนรายคน: คะแนน 5 ด้านในแต่ละโปรเจกต์/หน่วยของภาคเรียน",
+    inputSchema: {
+      type: "object",
+      properties: {
+        term: { type: "string", description: "รหัสภาคเรียน" },
+        student_id: { type: "string", description: "รหัสนักเรียน" }
+      },
+      required: ["term", "student_id"]
+    }
   }
 ];
 
@@ -750,6 +803,139 @@ async function callTool(supabase: any, name: string, args: any): Promise<any> {
         return { content: [{ type: "text", text: JSON.stringify({ plans: finalPlans, total_plans: finalPlans.length }, null, 2) }] };
       }
 
+      case "atlas_pbl_summary": {
+        const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+        let pq = admin.from("pbl_projects")
+          .select("id, project_name, grade_level, classroom, teacher_name, month")
+          .eq("academic_term", args.term);
+        if (args.grade_level) pq = pq.eq("grade_level", args.grade_level);
+        if (args.classroom) pq = pq.eq("classroom", args.classroom);
+        if (args.teacher_name) pq = pq.eq("teacher_name", args.teacher_name);
+        const { data: projects, error: pe } = await pq;
+        if (pe) throw pe;
+        if (!projects || projects.length === 0) {
+          return { content: [{ type: "text", text: JSON.stringify({ term: args.term, message: "ไม่พบโปรเจกต์ PBL ตามเงื่อนไข" }, null, 2) }] };
+        }
+        const ids = projects.map((p: any) => p.id);
+        const { data: assess, error: ae } = await admin.from("pbl_assessments")
+          .select("project_id, com_score, think_score, problem_score, life_score, tech_score, overall_result")
+          .in("project_id", ids);
+        if (ae) throw ae;
+        const rowsAll = assess || [];
+        const projectsOut = projects.map((p: any) => {
+          const rows = rowsAll.filter((a: any) => a.project_id === p.id);
+          const n = rows.length || 1;
+          const avg = (k: string) => Math.round((rows.reduce((s: number, a: any) => s + (a[k] || 0), 0) / n) * 100) / 100;
+          return {
+            project_name: p.project_name, grade_level: p.grade_level, classroom: p.classroom,
+            teacher_name: p.teacher_name, month: p.month, students: rows.length,
+            excellent: rows.filter((a: any) => a.overall_result === "excellent").length,
+            pass: rows.filter((a: any) => a.overall_result === "pass").length,
+            fail: rows.filter((a: any) => a.overall_result === "fail").length,
+            avg_competency: { communication: avg("com_score"), thinking: avg("think_score"), problem_solving: avg("problem_score"), life_skill: avg("life_score"), technology: avg("tech_score") }
+          };
+        });
+        const overall = {
+          total_projects: projects.length, total_assessments: rowsAll.length,
+          excellent: rowsAll.filter((a: any) => a.overall_result === "excellent").length,
+          pass: rowsAll.filter((a: any) => a.overall_result === "pass").length,
+          fail: rowsAll.filter((a: any) => a.overall_result === "fail").length
+        };
+        return { content: [{ type: "text", text: JSON.stringify({ term: args.term, overall, projects: projectsOut }, null, 2) }] };
+      }
+
+      case "atlas_pbl_class_profile": {
+        const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+        const { data: projects, error: pe } = await admin.from("pbl_projects")
+          .select("id")
+          .eq("academic_term", args.term).eq("grade_level", args.grade_level).eq("classroom", args.classroom);
+        if (pe) throw pe;
+        const ids = (projects || []).map((p: any) => p.id);
+        if (ids.length === 0) {
+          return { content: [{ type: "text", text: JSON.stringify({ message: "ไม่พบข้อมูล PBL ของห้องนี้", term: args.term, grade_level: args.grade_level, classroom: args.classroom }, null, 2) }] };
+        }
+        const { data: assess, error: ae } = await admin.from("pbl_assessments")
+          .select("student_id, com_score, think_score, problem_score, life_score, tech_score, overall_result").in("project_id", ids);
+        if (ae) throw ae;
+        const rows = assess || [];
+        const n = rows.length || 1;
+        const dims = [
+          { key: "com_score", label: "การสื่อสาร" }, { key: "think_score", label: "การคิด" },
+          { key: "problem_score", label: "การแก้ปัญหา" }, { key: "life_score", label: "ทักษะชีวิต" },
+          { key: "tech_score", label: "เทคโนโลยี" }
+        ];
+        const avgs = dims.map((d) => ({ dimension: d.label, avg: Math.round((rows.reduce((s: number, a: any) => s + (a[d.key] || 0), 0) / n) * 100) / 100 }));
+        const sorted = [...avgs].sort((a, b) => b.avg - a.avg);
+        const result = {
+          term: args.term, grade_level: args.grade_level, classroom: args.classroom,
+          assessments: rows.length, distinct_students: new Set(rows.map((a: any) => a.student_id)).size,
+          result_distribution: {
+            excellent: rows.filter((a: any) => a.overall_result === "excellent").length,
+            pass: rows.filter((a: any) => a.overall_result === "pass").length,
+            fail: rows.filter((a: any) => a.overall_result === "fail").length
+          },
+          competency_avg: avgs,
+          strength: sorted[0] || null, weakness: sorted[sorted.length - 1] || null
+        };
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      }
+
+      case "atlas_pbl_failing": {
+        const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+        let pq = admin.from("pbl_projects").select("id, project_name, grade_level, classroom, teacher_name").eq("academic_term", args.term);
+        if (args.grade_level) pq = pq.eq("grade_level", args.grade_level);
+        if (args.classroom) pq = pq.eq("classroom", args.classroom);
+        if (args.teacher_name) pq = pq.eq("teacher_name", args.teacher_name);
+        const { data: projects, error: pe } = await pq;
+        if (pe) throw pe;
+        const pmap: Record<string, any> = {};
+        (projects || []).forEach((p: any) => { pmap[p.id] = p; });
+        const ids = Object.keys(pmap);
+        if (ids.length === 0) return { content: [{ type: "text", text: JSON.stringify({ term: args.term, failing: [], message: "ไม่พบโปรเจกต์ตามเงื่อนไข" }, null, 2) }] };
+        const { data: assess, error: ae } = await admin.from("pbl_assessments")
+          .select("student_id, student_name, project_id, com_score, think_score, problem_score, life_score, tech_score, notes")
+          .in("project_id", ids).eq("overall_result", "fail");
+        if (ae) throw ae;
+        const dimMap: Record<string, string> = { com_score: "การสื่อสาร", think_score: "การคิด", problem_score: "การแก้ปัญหา", life_score: "ทักษะชีวิต", tech_score: "เทคโนโลยี" };
+        const failing = (assess || []).map((a: any) => {
+          const p = pmap[a.project_id] || {};
+          const weak = Object.keys(dimMap).filter((k) => a[k] === 1).map((k) => dimMap[k]);
+          return {
+            student_id: a.student_id, student_name: a.student_name,
+            project_name: p.project_name, grade_level: p.grade_level, classroom: p.classroom, teacher_name: p.teacher_name,
+            scores: { communication: a.com_score, thinking: a.think_score, problem_solving: a.problem_score, life_skill: a.life_score, technology: a.tech_score },
+            weak_dimensions: weak, notes: a.notes || null
+          };
+        });
+        return { content: [{ type: "text", text: JSON.stringify({ term: args.term, total_failing: failing.length, failing }, null, 2) }] };
+      }
+
+      case "atlas_pbl_student": {
+        const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+        const { data: projects, error: pe } = await admin.from("pbl_projects")
+          .select("id, project_name, grade_level, classroom, month").eq("academic_term", args.term);
+        if (pe) throw pe;
+        const pmap: Record<string, any> = {};
+        (projects || []).forEach((p: any) => { pmap[p.id] = p; });
+        const ids = Object.keys(pmap);
+        if (ids.length === 0) return { content: [{ type: "text", text: JSON.stringify({ message: "ไม่พบโปรเจกต์ในภาคเรียนนี้", term: args.term }, null, 2) }] };
+        const { data: assess, error: ae } = await admin.from("pbl_assessments")
+          .select("student_name, project_id, com_score, think_score, problem_score, life_score, tech_score, overall_result, notes")
+          .in("project_id", ids).eq("student_id", args.student_id);
+        if (ae) throw ae;
+        const rows = assess || [];
+        if (rows.length === 0) return { content: [{ type: "text", text: JSON.stringify({ message: "ไม่พบข้อมูล PBL ของนักเรียนรหัสนี้ในภาคเรียนนี้", term: args.term, student_id: args.student_id }, null, 2) }] };
+        const projectsOut = rows.map((a: any) => {
+          const p = pmap[a.project_id] || {};
+          return {
+            project_name: p.project_name, grade_level: p.grade_level, classroom: p.classroom, month: p.month,
+            scores: { communication: a.com_score, thinking: a.think_score, problem_solving: a.problem_score, life_skill: a.life_score, technology: a.tech_score },
+            overall_result: a.overall_result, notes: a.notes || null
+          };
+        });
+        return { content: [{ type: "text", text: JSON.stringify({ term: args.term, student_id: args.student_id, student_name: rows[0].student_name, projects: projectsOut }, null, 2) }] };
+      }
+
       default:
         return { content: [{ type: "text", text: `Unknown tool: ${name}` }], isError: true };
     }
@@ -764,7 +950,7 @@ Deno.serve(async (req: Request) => {
   }
 
   if (req.method === "HEAD" || req.method === "GET") {
-    return new Response(JSON.stringify({ status: "ok", server: "Woranat_School_Atlas_MCP", version: "2.2.0" }), {
+    return new Response(JSON.stringify({ status: "ok", server: "Woranat_School_Atlas_MCP", version: "2.3.0" }), {
       status: 200,
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
     });
@@ -802,7 +988,7 @@ Deno.serve(async (req: Request) => {
   try {
     switch (method) {
       case "initialize":
-        result = { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "Woranat_School_Atlas_MCP", version: "2.2.0" } };
+        result = { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "Woranat_School_Atlas_MCP", version: "2.3.0" } };
         break;
       case "ping":
         result = {};
