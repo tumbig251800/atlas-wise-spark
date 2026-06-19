@@ -69,6 +69,49 @@ function normalizeTerm(yearRaw: string, semRaw: string): string {
   return `${year}-${semester}`;
 }
 
+// Normalise the "ป.4/KBW" cell into grade + classroom.
+// School structure: every grade has exactly TWO rooms — "KBW" (the only
+// alphabetic room) and "2". So:
+//   • any alphabetic value → KBW (auto-fixes typos: bkw / kwb / klb / kbw …)
+//   • "2" → "2"
+//   • any other digit (e.g. "1") or junk → ambiguous, we refuse rather than guess
+// Grade is taken from the first 1–6 digit ("ป4", "4", "ป.4 " → ป.4).
+function normalizeGradeClass(raw: string): {
+  grade: string;
+  classroom: string;
+  gradeOk: boolean;
+  classOk: boolean;
+  classCorrected: boolean;
+  rawClass: string;
+} {
+  const [gPart = "", cPart = ""] = raw.split("/").map((s) => s.trim());
+
+  const gm = gPart.match(/[1-6]/);
+  const grade = gm ? `ป.${gm[0]}` : gPart;
+
+  const c = cPart.toUpperCase().replace(/[\s.]/g, "");
+  let classroom = cPart;
+  let classOk = false;
+  let classCorrected = false;
+  if (c === "2") {
+    classroom = "2";
+    classOk = true;
+  } else if (/[A-Z]/.test(c)) {
+    classroom = "KBW";
+    classOk = true;
+    classCorrected = c !== "KBW";
+  }
+
+  return {
+    grade,
+    classroom,
+    gradeOk: !!gm,
+    classOk,
+    classCorrected,
+    rawClass: cPart,
+  };
+}
+
 // excellent: no score of 1 AND at least three scores of 3
 // fail:      any score of 1
 // pass:      everything else
@@ -144,10 +187,10 @@ serve(async (req) => {
     const monthRaw = cellStr(ws, `K${META_ROW}`);
     const semester = cellStr(ws, `L${META_ROW}`);
 
-    // Split "ป.4/KBW" → grade_level + classroom
-    const [grade_level = "", classroom = ""] = gradeClass
-      .split("/")
-      .map((s) => s.trim());
+    // Split + normalise "ป.4/KBW" → grade_level + classroom (fixes room typos)
+    const gc = normalizeGradeClass(gradeClass);
+    const grade_level = gc.gradeOk ? gc.grade : "";
+    const classroom = gc.classOk ? gc.classroom : "";
 
     // GUARD: the template ships with the word "เดือน" sitting in the month cell
     // as a placeholder/label. Teachers fill it either as "มิถุนายน" or by
@@ -169,8 +212,15 @@ serve(async (req) => {
     if (!project_name) missing.push(`ชื่อโปรเจกต์ (ช่อง C${META_ROW})`);
     if (!gradeClass) {
       missing.push(`ชั้น/ห้อง (ช่อง F${META_ROW})`);
-    } else if (!grade_level || !classroom) {
-      missing.push(`ชั้น/ห้อง ต้องอยู่ในรูป "ป.4/KBW" (ช่อง F${META_ROW})`);
+    } else {
+      if (!gc.gradeOk) {
+        missing.push(`ระดับชั้น ต้องเป็น ป.1–ป.6 (ช่อง F${META_ROW})`);
+      }
+      if (!gc.classOk) {
+        missing.push(
+          `ห้องเรียน ต้องเป็น KBW หรือ 2 เท่านั้น (พบ "${gc.rawClass}", ช่อง F${META_ROW})`,
+        );
+      }
     }
     if (!year) missing.push(`ปีการศึกษา (ช่อง J${META_ROW})`);
     if (!semester) missing.push(`ภาคเรียน (ช่อง L${META_ROW})`);
@@ -178,6 +228,13 @@ serve(async (req) => {
     if (missing.length > 0) {
       throw new Error(
         `ยังกรอกข้อมูลส่วนหัวไม่ครบ — กรุณาเติม: ${missing.join(" / ")}`,
+      );
+    }
+
+    // Auto-fixed a room typo (e.g. "bkw" → "KBW") — tell the teacher.
+    if (gc.classCorrected) {
+      warnings.push(
+        `แก้ชื่อห้อง "${gc.rawClass}" เป็น "${classroom}" อัตโนมัติ`,
       );
     }
 
