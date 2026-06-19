@@ -59,18 +59,19 @@ const monthOrder = (m: string) => {
   return i === -1 ? 99 : i;
 };
 
-// Bright, modern palette — rendered translucent (see-through / glassy) so the
-// grid shows through; works on both light and dark backgrounds.
+// Juicy pastel palette (Tailwind -300 fill, -400 stroke) — soft but lively.
+// Pastel fill pops on dark mode; the deeper same-hue stroke keeps bars readable
+// on light backgrounds too. Rendered translucent for a see-through/glassy look.
 const DIMENSIONS = [
-  { key: "com_score", label: "การสื่อสาร", color: "#a855f7" },   // violet
-  { key: "think_score", label: "การคิด", color: "#22c55e" },     // green
-  { key: "problem_score", label: "การแก้ปัญหา", color: "#f59e0b" }, // amber
-  { key: "life_score", label: "ทักษะชีวิต", color: "#ec4899" },  // pink
-  { key: "tech_score", label: "เทคโนโลยี", color: "#06b6d4" },   // cyan
+  { key: "com_score", label: "การสื่อสาร", color: "#c4b5fd", stroke: "#a78bfa" },   // violet
+  { key: "think_score", label: "การคิด", color: "#86efac", stroke: "#4ade80" },     // green
+  { key: "problem_score", label: "การแก้ปัญหา", color: "#fcd34d", stroke: "#fbbf24" }, // amber
+  { key: "life_score", label: "ทักษะชีวิต", color: "#f9a8d4", stroke: "#f472b6" },  // pink
+  { key: "tech_score", label: "เทคโนโลยี", color: "#7dd3fc", stroke: "#38bdf8" },   // sky
 ] as const;
 
 // Shared "see-through" bar styling.
-const BAR_FILL_OPACITY = 0.7;
+const BAR_FILL_OPACITY = 0.85;
 const BAR_RADIUS: [number, number, number, number] = [6, 6, 0, 0];
 
 const PBLDashboard = () => {
@@ -705,8 +706,8 @@ const PBLDashboard = () => {
                       dataKey={d.label}
                       fill={d.color}
                       fillOpacity={BAR_FILL_OPACITY}
-                      stroke={d.color}
-                      strokeWidth={1}
+                      stroke={d.stroke}
+                      strokeWidth={1.5}
                       radius={BAR_RADIUS}
                     />
                   ))}
@@ -843,18 +844,18 @@ const PBLDashboard = () => {
                         <Legend />
                         <Bar
                           dataKey="นักเรียน"
-                          fill="#a855f7"
+                          fill="#c4b5fd"
                           fillOpacity={BAR_FILL_OPACITY}
-                          stroke="#a855f7"
-                          strokeWidth={1}
+                          stroke="#a78bfa"
+                          strokeWidth={1.5}
                           radius={BAR_RADIUS}
                         />
                         <Bar
                           dataKey="เฉลี่ยห้อง"
-                          fill="#06b6d4"
-                          fillOpacity={0.5}
-                          stroke="#06b6d4"
-                          strokeWidth={1}
+                          fill="#7dd3fc"
+                          fillOpacity={BAR_FILL_OPACITY}
+                          stroke="#38bdf8"
+                          strokeWidth={1.5}
                           radius={BAR_RADIUS}
                         />
                       </BarChart>
@@ -895,9 +896,9 @@ const PBLDashboard = () => {
                           <Radar
                             name="คะแนนเฉลี่ย"
                             dataKey="value"
-                            stroke="#a855f7"
-                            fill="#a855f7"
-                            fillOpacity={0.45}
+                            stroke="#a78bfa"
+                            fill="#c4b5fd"
+                            fillOpacity={0.55}
                             strokeWidth={2}
                           />
                           <Tooltip />
