@@ -366,6 +366,26 @@ const PBLDashboard = () => {
     }
   }, [studentList, selectedStudentId]);
 
+  // Class average per dimension (radar). Declared BEFORE studentCompare since
+  // that memo reads classRadar (useMemo runs its factory during render).
+  const classRadar = useMemo(() => {
+    const rows = detail ?? [];
+    if (rows.length === 0) return [] as { dim: string; value: number }[];
+    return DIMENSIONS.map((d) => ({
+      dim: d.label,
+      value: parseFloat(
+        (rows.reduce((s: number, a: any) => s + (a[d.key] || 0), 0) / rows.length).toFixed(2)
+      ),
+    }));
+  }, [detail]);
+
+  const classStrength = classRadar.length
+    ? classRadar.reduce((a, b) => (b.value > a.value ? b : a))
+    : null;
+  const classWeakness = classRadar.length
+    ? classRadar.reduce((a, b) => (b.value < a.value ? b : a))
+    : null;
+
   // Selected student's score per dimension (averaged over their projects)
   // alongside the class average — for a side-by-side comparison bar chart.
   const studentCompare = useMemo(() => {
@@ -384,25 +404,6 @@ const PBLDashboard = () => {
     () => (detail ?? []).filter((a: any) => a.student_id === selectedStudentId).length,
     [detail, selectedStudentId]
   );
-
-  // Class average per dimension (radar).
-  const classRadar = useMemo(() => {
-    const rows = detail ?? [];
-    if (rows.length === 0) return [] as { dim: string; value: number }[];
-    return DIMENSIONS.map((d) => ({
-      dim: d.label,
-      value: parseFloat(
-        (rows.reduce((s: number, a: any) => s + (a[d.key] || 0), 0) / rows.length).toFixed(2)
-      ),
-    }));
-  }, [detail]);
-
-  const classStrength = classRadar.length
-    ? classRadar.reduce((a, b) => (b.value > a.value ? b : a))
-    : null;
-  const classWeakness = classRadar.length
-    ? classRadar.reduce((a, b) => (b.value < a.value ? b : a))
-    : null;
 
   return (
     <AppLayout>
