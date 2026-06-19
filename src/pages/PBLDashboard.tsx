@@ -48,6 +48,17 @@ interface FailedStudent {
   tech_score: number;
 }
 
+// Thai months in academic-year order (term starts พฤษภาคม) for numbering a
+// class's projects by the order they were done.
+const THAI_MONTH_ORDER = [
+  "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม",
+  "พฤศจิกายน", "ธันวาคม", "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน",
+];
+const monthOrder = (m: string) => {
+  const i = THAI_MONTH_ORDER.findIndex((x) => m?.includes(x));
+  return i === -1 ? 99 : i;
+};
+
 const DIMENSIONS = [
   { key: "com_score", label: "การสื่อสาร", color: "#8884d8" },
   { key: "think_score", label: "การคิด", color: "#82ca9d" },
@@ -321,7 +332,7 @@ const PBLDashboard = () => {
     queryFn: async () => {
       let pq = supabase
         .from("pbl_projects")
-        .select("id, project_name, month")
+        .select("id, project_name, month, grade_level, classroom")
         .eq("academic_term", academicTerm);
       if (gradeLevel !== "all") pq = pq.eq("grade_level", gradeLevel);
       if (classroom !== "all") pq = pq.eq("classroom", classroom);
@@ -343,7 +354,13 @@ const PBLDashboard = () => {
 
       return (data ?? []).map((a: any) => {
         const p: any = projMap.get(a.project_id);
-        return { ...a, project_name: p?.project_name ?? "", month: p?.month ?? "" };
+        return {
+          ...a,
+          project_name: p?.project_name ?? "",
+          month: p?.month ?? "",
+          grade_level: p?.grade_level ?? "",
+          classroom: p?.classroom ?? "",
+        };
       });
     },
   });
@@ -405,16 +422,56 @@ const PBLDashboard = () => {
     [detail, selectedStudentId]
   );
 
+  // Number each class's projects by the order they were done (month order),
+  // independently per grade+classroom. project_id → "Project N".
+  const projectNumber = useMemo(() => {
+    const projs = new Map<string, any>();
+    (detail ?? []).forEach((a: any) => {
+      if (!projs.has(a.project_id)) {
+        projs.set(a.project_id, {
+          id: a.project_id,
+          name: a.project_name,
+          month: a.month,
+          cls: `${a.grade_level}|${a.classroom}`,
+        });
+      }
+    });
+    const byClass = new Map<string, any[]>();
+    [...projs.values()].forEach((p) => {
+      if (!byClass.has(p.cls)) byClass.set(p.cls, []);
+      byClass.get(p.cls)!.push(p);
+    });
+    const num = new Map<string, number>();
+    byClass.forEach((list) => {
+      list
+        .sort(
+          (a, b) =>
+            monthOrder(a.month) - monthOrder(b.month) ||
+            a.name.localeCompare(b.name, "th")
+        )
+        .forEach((p, i) => num.set(p.id, i + 1));
+    });
+    return num;
+  }, [detail]);
+
   // Which unit(s)/project(s) these scores come from, for the selected student.
   const studentProjects = useMemo(() => {
-    const seen = new Map<string, string>();
+    const seen = new Map<string, any>();
     (detail ?? [])
       .filter((a: any) => a.student_id === selectedStudentId)
       .forEach((a: any) => {
-        if (!seen.has(a.project_name)) seen.set(a.project_name, a.month);
+        if (!seen.has(a.project_id)) {
+          seen.set(a.project_id, {
+            id: a.project_id,
+            name: a.project_name,
+            month: a.month,
+          });
+        }
       });
-    return [...seen.entries()].map(([name, month]) => ({ name, month }));
-  }, [detail, selectedStudentId]);
+    return [...seen.values()]
+      .map((p) => ({ ...p, no: projectNumber.get(p.id) ?? 0 }))
+      .sort((a, b) => a.no - b.no);
+  }, [detail, selectedStudentId, projectNumber]);
 
   return (
     <AppLayout>
@@ -756,8 +813,9 @@ const PBLDashboard = () => {
                         <span className="text-muted-foreground">
                           คะแนนจากหน่วย/โปรเจกต์:
                         </span>
-                        {studentProjects.map((p, i) => (
-                          <Badge key={i} variant="secondary">
+                        {studentProjects.map((p) => (
+                          <Badge key={p.id} variant="secondary">
+                            {p.no > 0 ? `Project ${p.no} · ` : ""}
                             {p.name}
                             {p.month ? ` · ${p.month}` : ""}
                           </Badge>
