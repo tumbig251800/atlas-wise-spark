@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { AppLayout } from "@/components/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Upload, FileSpreadsheet, TrendingUp, Award, AlertCircle } from "lucide-react";
+import { Upload, FileSpreadsheet, TrendingUp, Award, AlertCircle, Download, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -50,6 +50,72 @@ const PBLDashboard = () => {
   const [gradeLevel, setGradeLevel] = useState<string>("all");
   const [classroom, setClassroom] = useState<string>("all");
   const [uploading, setUploading] = useState(false);
+
+  // Fetch distinct filter values from real data (no hardcoded options).
+  const { data: filterRows } = useQuery({
+    queryKey: ["pbl-filter-options"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("pbl_projects")
+        .select("academic_term, grade_level, classroom");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  // Term options: always include the currently selected term so the Select is
+  // never blank, even when the table is empty. Newest term first.
+  const termOptions = useMemo(() => {
+    const set = new Set<string>(
+      (filterRows ?? []).map((r) => r.academic_term).filter(Boolean)
+    );
+    set.add(academicTerm);
+    return [...set].sort().reverse();
+  }, [filterRows, academicTerm]);
+
+  // Grades available within the selected term.
+  const gradeOptions = useMemo(() => {
+    const rows = (filterRows ?? []).filter((r) => r.academic_term === academicTerm);
+    return [...new Set(rows.map((r) => r.grade_level).filter(Boolean))].sort();
+  }, [filterRows, academicTerm]);
+
+  // Classrooms available within the selected term + grade.
+  const classroomOptions = useMemo(() => {
+    const rows = (filterRows ?? []).filter(
+      (r) =>
+        r.academic_term === academicTerm &&
+        (gradeLevel === "all" || r.grade_level === gradeLevel)
+    );
+    return [...new Set(rows.map((r) => r.classroom).filter(Boolean))].sort();
+  }, [filterRows, academicTerm, gradeLevel]);
+
+  // On first load (or when data arrives), default to the newest term that
+  // actually has data if the current selection has none.
+  useEffect(() => {
+    const terms = [
+      ...new Set((filterRows ?? []).map((r) => r.academic_term).filter(Boolean)),
+    ]
+      .sort()
+      .reverse();
+    if (terms.length > 0 && !terms.includes(academicTerm)) {
+      setAcademicTerm(terms[0]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterRows]);
+
+  // Reset grade/classroom to "all" when the current pick no longer exists
+  // (e.g. after switching term/grade) to avoid filtering on a phantom value.
+  useEffect(() => {
+    if (gradeLevel !== "all" && !gradeOptions.includes(gradeLevel)) {
+      setGradeLevel("all");
+    }
+  }, [gradeOptions, gradeLevel]);
+
+  useEffect(() => {
+    if (classroom !== "all" && !classroomOptions.includes(classroom)) {
+      setClassroom("all");
+    }
+  }, [classroomOptions, classroom]);
 
   // Fetch project summary
   const { data: projects, isLoading, refetch } = useQuery({
@@ -174,9 +240,29 @@ const PBLDashboard = () => {
         throw new Error(result.error || "Import failed");
       }
 
+      // Build a readable summary from the function response, surfacing the
+      // skip/warning/error details so the teacher isn't left guessing.
+      const lines: string[] = [
+        `นำเข้าคะแนน ${result.inserted} คน → "${result.project_name}"`,
+      ];
+      if (result.skipped_incomplete > 0) {
+        lines.push(`⏭️ ข้าม ${result.skipped_incomplete} แถวที่กรอกไม่ครบ 5 ด้าน`);
+      }
+      if (Array.isArray(result.warnings) && result.warnings.length > 0) {
+        lines.push(...result.warnings.map((w: string) => `⚠️ ${w}`));
+      }
+      if (Array.isArray(result.errors) && result.errors.length > 0) {
+        lines.push(...result.errors.map((e: string) => `❌ ${e}`));
+      }
+
+      const hasIssues =
+        (Array.isArray(result.errors) && result.errors.length > 0) ||
+        (Array.isArray(result.warnings) && result.warnings.length > 0);
+
       toast({
-        title: "นำเข้าสำเร็จ",
-        description: `นำเข้าคะแนน ${result.inserted} คน สำหรับโปรเจกต์ "${result.project_name}"`,
+        title: hasIssues ? "นำเข้าสำเร็จ (มีข้อควรตรวจสอบ)" : "นำเข้าสำเร็จ",
+        description: lines.join("\n"),
+        variant: hasIssues ? "default" : "default",
       });
 
       refetch();
@@ -217,35 +303,93 @@ const PBLDashboard = () => {
     <AppLayout>
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold">PBL Assessment Dashboard</h1>
-            <p className="text-muted-foreground">การประเมินสมรรถนะ Project-Based Learning</p>
-          </div>
-          <div>
-            <input
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={handleFileUpload}
-              style={{ display: "none" }}
-              id="file-upload"
-            />
-            <label htmlFor="file-upload">
-              <Button asChild disabled={uploading}>
-                <span>
-                  {uploading ? (
-                    "กำลังนำเข้า..."
-                  ) : (
-                    <>
-                      <Upload className="mr-2 h-4 w-4" />
-                      นำเข้าคะแนน PBL
-                    </>
-                  )}
-                </span>
-              </Button>
-            </label>
-          </div>
+        <div>
+          <h1 className="text-3xl font-bold">PBL Assessment Dashboard</h1>
+          <p className="text-muted-foreground">การประเมินสมรรถนะ Project-Based Learning</p>
         </div>
+
+        {/* Import workflow — 3 clear steps */}
+        <Card className="border-primary/30 bg-primary/[0.03]">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="h-5 w-5 text-primary" />
+              นำเข้าคะแนน PBL
+            </CardTitle>
+            <CardDescription>ทำตาม 3 ขั้นตอน — ดาวน์โหลดเทมเพลต กรอกคะแนน แล้วอัปโหลดกลับ</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-3">
+              {/* Step 1: Download */}
+              <div className="flex flex-col gap-3 rounded-lg border bg-background p-4">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">1</span>
+                  <span className="font-medium">ดาวน์โหลดเทมเพลต</span>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  ไฟล์ Excel สำหรับกรอกคะแนน — กรอกเฉพาะชีต <span className="font-medium">"📝 กรอกคะแนน"</span>
+                </p>
+                <Button
+                  variant="outline"
+                  className="mt-auto"
+                  onClick={() => {
+                    const link = document.createElement("a");
+                    link.href = "/templates/PBL_Template_วรนาถ.xlsx";
+                    link.download = "PBL_Template_วรนาถ.xlsx";
+                    link.click();
+                  }}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  ดาวน์โหลดเทมเพลต
+                </Button>
+              </div>
+
+              {/* Step 2: Fill in */}
+              <div className="flex flex-col gap-3 rounded-lg border bg-background p-4">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">2</span>
+                  <span className="font-medium">กรอกคะแนนในไฟล์</span>
+                </div>
+                <ul className="space-y-1.5 text-sm text-muted-foreground">
+                  <li className="flex gap-2"><CheckCircle2 className="h-4 w-4 shrink-0 text-green-600" /> กรอกข้อมูลโปรเจกต์ที่แถวบนสุด (ชื่อ/ชั้น-ห้อง/เดือน)</li>
+                  <li className="flex gap-2"><CheckCircle2 className="h-4 w-4 shrink-0 text-green-600" /> ให้คะแนน 5 ด้าน ด้านละ 1–3</li>
+                  <li className="flex gap-2"><CheckCircle2 className="h-4 w-4 shrink-0 text-green-600" /> ระบบสรุปผล (ผ่าน/ดีเยี่ยม/ไม่ผ่าน) ให้อัตโนมัติ</li>
+                </ul>
+              </div>
+
+              {/* Step 3: Upload */}
+              <div className="flex flex-col gap-3 rounded-lg border bg-background p-4">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">3</span>
+                  <span className="font-medium">อัปโหลดกลับเข้าระบบ</span>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  เลือกไฟล์ที่กรอกเสร็จแล้ว ระบบจะนำเข้าและสรุปผลให้ทันที
+                </p>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={handleFileUpload}
+                  style={{ display: "none" }}
+                  id="file-upload"
+                />
+                <label htmlFor="file-upload" className="mt-auto">
+                  <Button asChild disabled={uploading} className="w-full">
+                    <span>
+                      {uploading ? (
+                        "กำลังนำเข้า..."
+                      ) : (
+                        <>
+                          <Upload className="mr-2 h-4 w-4" />
+                          เลือกไฟล์เพื่ออัปโหลด
+                        </>
+                      )}
+                    </span>
+                  </Button>
+                </label>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Filters */}
         <Card>
@@ -260,9 +404,11 @@ const PBLDashboard = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="2568-2">2568-2</SelectItem>
-                  <SelectItem value="2568-1">2568-1</SelectItem>
-                  <SelectItem value="2567-2">2567-2</SelectItem>
+                  {termOptions.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {t}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -274,12 +420,11 @@ const PBLDashboard = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">ทั้งหมด</SelectItem>
-                  <SelectItem value="ป.1">ป.1</SelectItem>
-                  <SelectItem value="ป.2">ป.2</SelectItem>
-                  <SelectItem value="ป.3">ป.3</SelectItem>
-                  <SelectItem value="ป.4">ป.4</SelectItem>
-                  <SelectItem value="ป.5">ป.5</SelectItem>
-                  <SelectItem value="ป.6">ป.6</SelectItem>
+                  {gradeOptions.map((g) => (
+                    <SelectItem key={g} value={g}>
+                      {g}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -291,10 +436,11 @@ const PBLDashboard = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">ทั้งหมด</SelectItem>
-                  <SelectItem value="KBW">KBW</SelectItem>
-                  <SelectItem value="VKW">VKW</SelectItem>
-                  <SelectItem value="KW1">KW1</SelectItem>
-                  <SelectItem value="KW2">KW2</SelectItem>
+                  {classroomOptions.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {c}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
