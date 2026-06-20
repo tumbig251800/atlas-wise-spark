@@ -35,7 +35,6 @@ const directorMenuItems = [
   { title: "หน้าแรก", url: "/", icon: Home },
   { title: "แดชบอร์ด", url: "/dashboard", icon: BarChart3 },
   { title: "ภาพรวมผู้บริหาร", url: "/executive", icon: Building2 },
-  { title: "วันนี้ใครกรอกคะแนน", url: "/todays-submissions", icon: CheckCircle2 },
   { title: "Action Board", url: "/action-board", icon: ListChecks },
   { title: "วิจัยชั้นเรียน", url: "/classroom-research", icon: FileSearch },
   { title: "บันทึกหลังสอน", url: "/log", icon: ClipboardList },
