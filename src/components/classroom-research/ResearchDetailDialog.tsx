@@ -101,6 +101,18 @@ export function ResearchDetailDialog({
   };
 
   const handleGenerateDocument = async () => {
+    // เปิด window ทันที (ต้องอยู่ใน user gesture context ก่อน await)
+    const win = window.open("", "_blank");
+    if (!win) {
+      toast({
+        title: "ป๊อปอัปถูกบล็อก",
+        description: "กรุณาอนุญาตป๊อปอัปสำหรับเว็บไซต์นี้แล้วลองใหม่",
+        variant: "destructive",
+      });
+      return;
+    }
+    win.document.write("<html><body style='font-family:sans-serif;padding:40px;'>⏳ กำลังสร้างเอกสาร กรุณารอสักครู่...</body></html>");
+
     setIsGenerating(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -123,19 +135,12 @@ export function ResearchDetailDialog({
 
       if (!res.ok) {
         const errText = await res.text();
+        win.close();
         throw new Error(errText || `HTTP ${res.status}`);
       }
 
       const html = await res.text();
-      const win = window.open("", "_blank");
-      if (!win) {
-        toast({
-          title: "ป๊อปอัปถูกบล็อก",
-          description: "กรุณาอนุญาตป๊อปอัปสำหรับเว็บไซต์นี้แล้วลองใหม่",
-          variant: "destructive",
-        });
-        return;
-      }
+      win.document.open();
       win.document.write(html);
       win.document.close();
     } catch (err) {
