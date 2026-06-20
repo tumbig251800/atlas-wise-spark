@@ -238,7 +238,6 @@ function atlasStructureSection(mode: LessonPlanGenerationMode): string {
 - Gap หลัก: [gap types]
 - นักเรียน Special Care: [จำนวน คน — ไม่ระบุชื่อ]
 - ข้อสังเกต: [สรุปสั้น]
-${profileLine}
 
 6. สาระสำคัญ
 [เนื้อหาหลัก 2-3 ย่อหน้า]

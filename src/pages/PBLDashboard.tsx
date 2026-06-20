@@ -1,15 +1,19 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { AppLayout } from "@/components/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Upload, FileSpreadsheet, TrendingUp, Award, AlertCircle } from "lucide-react";
+import { Upload, FileSpreadsheet, TrendingUp, Award, AlertCircle, Download, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis,
+  RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
+} from "recharts";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface PBLProject {
   id: string;
@@ -44,16 +48,131 @@ interface FailedStudent {
   tech_score: number;
 }
 
+// Thai months in academic-year order (term starts พฤษภาคม) for numbering a
+// class's projects by the order they were done.
+const THAI_MONTH_ORDER = [
+  "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม",
+  "พฤศจิกายน", "ธันวาคม", "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน",
+];
+const monthOrder = (m: string) => {
+  const i = THAI_MONTH_ORDER.findIndex((x) => m?.includes(x));
+  return i === -1 ? 99 : i;
+};
+
+// Juicy pastel palette (Tailwind -300 fill, -400 stroke) — soft but lively.
+// Pastel fill pops on dark mode; the deeper same-hue stroke keeps bars readable
+// on light backgrounds too. Rendered translucent for a see-through/glassy look.
+const DIMENSIONS = [
+  { key: "com_score", label: "การสื่อสาร", color: "#c4b5fd", stroke: "#a78bfa" },   // violet
+  { key: "think_score", label: "การคิด", color: "#86efac", stroke: "#4ade80" },     // green
+  { key: "problem_score", label: "การแก้ปัญหา", color: "#fcd34d", stroke: "#fbbf24" }, // amber
+  { key: "life_score", label: "ทักษะชีวิต", color: "#f9a8d4", stroke: "#f472b6" },  // pink
+  { key: "tech_score", label: "เทคโนโลยี", color: "#7dd3fc", stroke: "#38bdf8" },   // sky
+] as const;
+
+// Shared "see-through" bar styling.
+const BAR_FILL_OPACITY = 0.85;
+const BAR_RADIUS: [number, number, number, number] = [6, 6, 0, 0];
+
 const PBLDashboard = () => {
   const { toast } = useToast();
-  const [academicTerm, setAcademicTerm] = useState("2568-2");
+  // Default for the empty-table state; once data exists, an effect below
+  // switches this to the newest term that actually has data.
+  const [academicTerm, setAcademicTerm] = useState("2569-1");
   const [gradeLevel, setGradeLevel] = useState<string>("all");
   const [classroom, setClassroom] = useState<string>("all");
+  const [teacherName, setTeacherName] = useState<string>("all");
   const [uploading, setUploading] = useState(false);
+  const [selectedStudentId, setSelectedStudentId] = useState<string>("");
+
+  // Fetch distinct filter values from real data (no hardcoded options).
+  const { data: filterRows } = useQuery({
+    queryKey: ["pbl-filter-options"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("pbl_projects")
+        .select("academic_term, grade_level, classroom, teacher_name");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  // Term options: always include the currently selected term so the Select is
+  // never blank, even when the table is empty. Newest term first.
+  const termOptions = useMemo(() => {
+    const set = new Set<string>(
+      (filterRows ?? []).map((r) => r.academic_term).filter(Boolean)
+    );
+    set.add(academicTerm);
+    return [...set].sort().reverse();
+  }, [filterRows, academicTerm]);
+
+  // Grades available within the selected term.
+  const gradeOptions = useMemo(() => {
+    const rows = (filterRows ?? []).filter((r) => r.academic_term === academicTerm);
+    return [...new Set(rows.map((r) => r.grade_level).filter(Boolean))].sort();
+  }, [filterRows, academicTerm]);
+
+  // Classrooms available within the selected term + grade.
+  const classroomOptions = useMemo(() => {
+    const rows = (filterRows ?? []).filter(
+      (r) =>
+        r.academic_term === academicTerm &&
+        (gradeLevel === "all" || r.grade_level === gradeLevel)
+    );
+    return [...new Set(rows.map((r) => r.classroom).filter(Boolean))].sort();
+  }, [filterRows, academicTerm, gradeLevel]);
+
+  // Teachers available within the selected term + grade + classroom.
+  const teacherOptions = useMemo(() => {
+    const rows = (filterRows ?? []).filter(
+      (r) =>
+        r.academic_term === academicTerm &&
+        (gradeLevel === "all" || r.grade_level === gradeLevel) &&
+        (classroom === "all" || r.classroom === classroom)
+    );
+    return [...new Set(rows.map((r) => r.teacher_name).filter(Boolean))].sort((a, b) =>
+      a.localeCompare(b, "th")
+    );
+  }, [filterRows, academicTerm, gradeLevel, classroom]);
+
+  // On first load (or when data arrives), default to the newest term that
+  // actually has data if the current selection has none.
+  useEffect(() => {
+    const terms = [
+      ...new Set((filterRows ?? []).map((r) => r.academic_term).filter(Boolean)),
+    ]
+      .sort()
+      .reverse();
+    if (terms.length > 0 && !terms.includes(academicTerm)) {
+      setAcademicTerm(terms[0]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterRows]);
+
+  // Reset grade/classroom to "all" when the current pick no longer exists
+  // (e.g. after switching term/grade) to avoid filtering on a phantom value.
+  useEffect(() => {
+    if (gradeLevel !== "all" && !gradeOptions.includes(gradeLevel)) {
+      setGradeLevel("all");
+    }
+  }, [gradeOptions, gradeLevel]);
+
+  useEffect(() => {
+    if (classroom !== "all" && !classroomOptions.includes(classroom)) {
+      setClassroom("all");
+    }
+  }, [classroomOptions, classroom]);
+
+  useEffect(() => {
+    if (teacherName !== "all" && !teacherOptions.includes(teacherName)) {
+      setTeacherName("all");
+    }
+  }, [teacherOptions, teacherName]);
 
   // Fetch project summary
   const { data: projects, isLoading, refetch } = useQuery({
-    queryKey: ["pbl-projects", academicTerm, gradeLevel, classroom],
+    queryKey: ["pbl-projects", academicTerm, gradeLevel, classroom, teacherName],
     queryFn: async () => {
       let query = supabase
         .from("pbl_projects")
@@ -73,6 +192,7 @@ const PBLDashboard = () => {
 
       if (gradeLevel !== "all") query = query.eq("grade_level", gradeLevel);
       if (classroom !== "all") query = query.eq("classroom", classroom);
+      if (teacherName !== "all") query = query.eq("teacher_name", teacherName);
 
       const { data, error } = await query;
       if (error) throw error;
@@ -100,7 +220,7 @@ const PBLDashboard = () => {
 
   // Fetch failed students
   const { data: failedStudents } = useQuery({
-    queryKey: ["pbl-failed-students", academicTerm, gradeLevel, classroom],
+    queryKey: ["pbl-failed-students", academicTerm, gradeLevel, classroom, teacherName],
     queryFn: async () => {
       let projectQuery = supabase
         .from("pbl_projects")
@@ -109,6 +229,7 @@ const PBLDashboard = () => {
 
       if (gradeLevel !== "all") projectQuery = projectQuery.eq("grade_level", gradeLevel);
       if (classroom !== "all") projectQuery = projectQuery.eq("classroom", classroom);
+      if (teacherName !== "all") projectQuery = projectQuery.eq("teacher_name", teacherName);
 
       const { data: projectIds, error: projectError } = await projectQuery;
       if (projectError) throw projectError;
@@ -174,9 +295,29 @@ const PBLDashboard = () => {
         throw new Error(result.error || "Import failed");
       }
 
+      // Build a readable summary from the function response, surfacing the
+      // skip/warning/error details so the teacher isn't left guessing.
+      const lines: string[] = [
+        `นำเข้าคะแนน ${result.inserted} คน → "${result.project_name}"`,
+      ];
+      if (result.skipped_incomplete > 0) {
+        lines.push(`⏭️ ข้าม ${result.skipped_incomplete} แถวที่กรอกไม่ครบ 5 ด้าน`);
+      }
+      if (Array.isArray(result.warnings) && result.warnings.length > 0) {
+        lines.push(...result.warnings.map((w: string) => `⚠️ ${w}`));
+      }
+      if (Array.isArray(result.errors) && result.errors.length > 0) {
+        lines.push(...result.errors.map((e: string) => `❌ ${e}`));
+      }
+
+      const hasIssues =
+        (Array.isArray(result.errors) && result.errors.length > 0) ||
+        (Array.isArray(result.warnings) && result.warnings.length > 0);
+
       toast({
-        title: "นำเข้าสำเร็จ",
-        description: `นำเข้าคะแนน ${result.inserted} คน สำหรับโปรเจกต์ "${result.project_name}"`,
+        title: hasIssues ? "นำเข้าสำเร็จ (มีข้อควรตรวจสอบ)" : "นำเข้าสำเร็จ",
+        description: lines.join("\n"),
+        variant: hasIssues ? "default" : "default",
       });
 
       refetch();
@@ -213,39 +354,246 @@ const PBLDashboard = () => {
     เทคโนโลยี: parseFloat(p.avg_tech.toFixed(2)),
   })) || [];
 
+  // ── Phase 2: per-student & per-class detail ──────────────────────────────
+  // All assessments in the current filter scope, with their project's name/month.
+  const { data: detail } = useQuery({
+    queryKey: ["pbl-detail", academicTerm, gradeLevel, classroom, teacherName],
+    queryFn: async () => {
+      let pq = supabase
+        .from("pbl_projects")
+        .select("id, project_name, month, grade_level, classroom")
+        .eq("academic_term", academicTerm);
+      if (gradeLevel !== "all") pq = pq.eq("grade_level", gradeLevel);
+      if (classroom !== "all") pq = pq.eq("classroom", classroom);
+      if (teacherName !== "all") pq = pq.eq("teacher_name", teacherName);
+
+      const { data: projs, error: pe } = await pq;
+      if (pe) throw pe;
+
+      const projMap = new Map((projs ?? []).map((p: any) => [p.id, p]));
+      const ids = [...projMap.keys()];
+      if (ids.length === 0) return [];
+
+      const { data, error } = await supabase
+        .from("pbl_assessments")
+        .select(
+          "student_id, student_name, com_score, think_score, problem_score, life_score, tech_score, overall_result, project_id"
+        )
+        .in("project_id", ids);
+      if (error) throw error;
+
+      return (data ?? []).map((a: any) => {
+        const p: any = projMap.get(a.project_id);
+        return {
+          ...a,
+          project_name: p?.project_name ?? "",
+          month: p?.month ?? "",
+          grade_level: p?.grade_level ?? "",
+          classroom: p?.classroom ?? "",
+        };
+      });
+    },
+  });
+
+  // Distinct students for the dropdown (sorted by Thai name).
+  const studentList = useMemo(() => {
+    const m = new Map<string, string>();
+    (detail ?? []).forEach((a: any) => {
+      if (!m.has(a.student_id)) m.set(a.student_id, a.student_name);
+    });
+    return [...m.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name, "th"));
+  }, [detail]);
+
+  // Keep the selected student valid as the scope changes.
+  useEffect(() => {
+    if (studentList.length > 0 && !studentList.some((s) => s.id === selectedStudentId)) {
+      setSelectedStudentId(studentList[0].id);
+    }
+  }, [studentList, selectedStudentId]);
+
+  // Class average per dimension (radar). Declared BEFORE studentCompare since
+  // that memo reads classRadar (useMemo runs its factory during render).
+  const classRadar = useMemo(() => {
+    const rows = detail ?? [];
+    if (rows.length === 0) return [] as { dim: string; value: number }[];
+    return DIMENSIONS.map((d) => ({
+      dim: d.label,
+      value: parseFloat(
+        (rows.reduce((s: number, a: any) => s + (a[d.key] || 0), 0) / rows.length).toFixed(2)
+      ),
+    }));
+  }, [detail]);
+
+  const classStrength = classRadar.length
+    ? classRadar.reduce((a, b) => (b.value > a.value ? b : a))
+    : null;
+  const classWeakness = classRadar.length
+    ? classRadar.reduce((a, b) => (b.value < a.value ? b : a))
+    : null;
+
+  // Selected student's score per dimension (averaged over their projects)
+  // alongside the class average — for a side-by-side comparison bar chart.
+  const studentCompare = useMemo(() => {
+    const rows = (detail ?? []).filter((a: any) => a.student_id === selectedStudentId);
+    if (rows.length === 0) return [] as { dim: string; นักเรียน: number; เฉลี่ยห้อง: number }[];
+    return DIMENSIONS.map((d) => ({
+      dim: d.label,
+      นักเรียน: parseFloat(
+        (rows.reduce((s: number, a: any) => s + (a[d.key] || 0), 0) / rows.length).toFixed(2)
+      ),
+      เฉลี่ยห้อง: classRadar.find((c) => c.dim === d.label)?.value ?? 0,
+    }));
+  }, [detail, selectedStudentId, classRadar]);
+
+  const studentProjectCount = useMemo(
+    () => (detail ?? []).filter((a: any) => a.student_id === selectedStudentId).length,
+    [detail, selectedStudentId]
+  );
+
+  // Number each class's projects by the order they were done (month order),
+  // independently per grade+classroom. project_id → "Project N".
+  const projectNumber = useMemo(() => {
+    const projs = new Map<string, any>();
+    (detail ?? []).forEach((a: any) => {
+      if (!projs.has(a.project_id)) {
+        projs.set(a.project_id, {
+          id: a.project_id,
+          name: a.project_name,
+          month: a.month,
+          cls: `${a.grade_level}|${a.classroom}`,
+        });
+      }
+    });
+    const byClass = new Map<string, any[]>();
+    [...projs.values()].forEach((p) => {
+      if (!byClass.has(p.cls)) byClass.set(p.cls, []);
+      byClass.get(p.cls)!.push(p);
+    });
+    const num = new Map<string, number>();
+    byClass.forEach((list) => {
+      list
+        .sort(
+          (a, b) =>
+            monthOrder(a.month) - monthOrder(b.month) ||
+            a.name.localeCompare(b.name, "th")
+        )
+        .forEach((p, i) => num.set(p.id, i + 1));
+    });
+    return num;
+  }, [detail]);
+
+  // Which unit(s)/project(s) these scores come from, for the selected student.
+  const studentProjects = useMemo(() => {
+    const seen = new Map<string, any>();
+    (detail ?? [])
+      .filter((a: any) => a.student_id === selectedStudentId)
+      .forEach((a: any) => {
+        if (!seen.has(a.project_id)) {
+          seen.set(a.project_id, {
+            id: a.project_id,
+            name: a.project_name,
+            month: a.month,
+          });
+        }
+      });
+    return [...seen.values()]
+      .map((p) => ({ ...p, no: projectNumber.get(p.id) ?? 0 }))
+      .sort((a, b) => a.no - b.no);
+  }, [detail, selectedStudentId, projectNumber]);
+
   return (
     <AppLayout>
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold">PBL Assessment Dashboard</h1>
-            <p className="text-muted-foreground">การประเมินสมรรถนะ Project-Based Learning</p>
-          </div>
-          <div>
-            <input
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={handleFileUpload}
-              style={{ display: "none" }}
-              id="file-upload"
-            />
-            <label htmlFor="file-upload">
-              <Button asChild disabled={uploading}>
-                <span>
-                  {uploading ? (
-                    "กำลังนำเข้า..."
-                  ) : (
-                    <>
-                      <Upload className="mr-2 h-4 w-4" />
-                      นำเข้าคะแนน PBL
-                    </>
-                  )}
-                </span>
-              </Button>
-            </label>
-          </div>
+        <div>
+          <h1 className="text-3xl font-bold">PBL Assessment Dashboard</h1>
+          <p className="text-muted-foreground">การประเมินสมรรถนะ Project-Based Learning</p>
         </div>
+
+        {/* Import workflow — 3 clear steps */}
+        <Card className="border-primary/30 bg-primary/[0.03]">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="h-5 w-5 text-primary" />
+              นำเข้าคะแนน PBL
+            </CardTitle>
+            <CardDescription>ทำตาม 3 ขั้นตอน — ดาวน์โหลดเทมเพลต กรอกคะแนน แล้วอัปโหลดกลับ</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-3">
+              {/* Step 1: Download */}
+              <div className="flex flex-col gap-3 rounded-lg border bg-background p-4">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">1</span>
+                  <span className="font-medium">ดาวน์โหลดเทมเพลต</span>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  ไฟล์ Excel สำหรับกรอกคะแนน — กรอกเฉพาะชีต <span className="font-medium">"📝 กรอกคะแนน"</span>
+                </p>
+                <Button
+                  variant="outline"
+                  className="mt-auto"
+                  onClick={() => {
+                    const link = document.createElement("a");
+                    link.href = "/templates/PBL_Template_วรนาถ.xlsx";
+                    link.download = "PBL_Template_วรนาถ.xlsx";
+                    link.click();
+                  }}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  ดาวน์โหลดเทมเพลต
+                </Button>
+              </div>
+
+              {/* Step 2: Fill in */}
+              <div className="flex flex-col gap-3 rounded-lg border bg-background p-4">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">2</span>
+                  <span className="font-medium">กรอกคะแนนในไฟล์</span>
+                </div>
+                <ul className="space-y-1.5 text-sm text-muted-foreground">
+                  <li className="flex gap-2"><CheckCircle2 className="h-4 w-4 shrink-0 text-green-600" /> กรอกข้อมูลโปรเจกต์ที่แถวบนสุด (ชื่อ/ชั้น-ห้อง/เดือน)</li>
+                  <li className="flex gap-2"><CheckCircle2 className="h-4 w-4 shrink-0 text-green-600" /> ให้คะแนน 5 ด้าน ด้านละ 1–3</li>
+                  <li className="flex gap-2"><CheckCircle2 className="h-4 w-4 shrink-0 text-green-600" /> ระบบสรุปผล (ผ่าน/ดีเยี่ยม/ไม่ผ่าน) ให้อัตโนมัติ</li>
+                </ul>
+              </div>
+
+              {/* Step 3: Upload */}
+              <div className="flex flex-col gap-3 rounded-lg border bg-background p-4">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">3</span>
+                  <span className="font-medium">อัปโหลดกลับเข้าระบบ</span>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  เลือกไฟล์ที่กรอกเสร็จแล้ว ระบบจะนำเข้าและสรุปผลให้ทันที
+                </p>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={handleFileUpload}
+                  style={{ display: "none" }}
+                  id="file-upload"
+                />
+                <label htmlFor="file-upload" className="mt-auto">
+                  <Button asChild disabled={uploading} className="w-full">
+                    <span>
+                      {uploading ? (
+                        "กำลังนำเข้า..."
+                      ) : (
+                        <>
+                          <Upload className="mr-2 h-4 w-4" />
+                          เลือกไฟล์เพื่ออัปโหลด
+                        </>
+                      )}
+                    </span>
+                  </Button>
+                </label>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Filters */}
         <Card>
@@ -260,9 +608,11 @@ const PBLDashboard = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="2568-2">2568-2</SelectItem>
-                  <SelectItem value="2568-1">2568-1</SelectItem>
-                  <SelectItem value="2567-2">2567-2</SelectItem>
+                  {termOptions.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {t}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -274,12 +624,11 @@ const PBLDashboard = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">ทั้งหมด</SelectItem>
-                  <SelectItem value="ป.1">ป.1</SelectItem>
-                  <SelectItem value="ป.2">ป.2</SelectItem>
-                  <SelectItem value="ป.3">ป.3</SelectItem>
-                  <SelectItem value="ป.4">ป.4</SelectItem>
-                  <SelectItem value="ป.5">ป.5</SelectItem>
-                  <SelectItem value="ป.6">ป.6</SelectItem>
+                  {gradeOptions.map((g) => (
+                    <SelectItem key={g} value={g}>
+                      {g}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -291,16 +640,41 @@ const PBLDashboard = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">ทั้งหมด</SelectItem>
-                  <SelectItem value="KBW">KBW</SelectItem>
-                  <SelectItem value="VKW">VKW</SelectItem>
-                  <SelectItem value="KW1">KW1</SelectItem>
-                  <SelectItem value="KW2">KW2</SelectItem>
+                  {classroomOptions.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium">ครูผู้รับผิดชอบ</label>
+              <Select value={teacherName} onValueChange={setTeacherName}>
+                <SelectTrigger className="w-[220px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">ทั้งหมด</SelectItem>
+                  {teacherOptions.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {t}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
           </CardContent>
         </Card>
 
+        <Tabs defaultValue="overview" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="overview">ภาพรวมโปรเจกต์</TabsTrigger>
+            <TabsTrigger value="student">รายนักเรียน</TabsTrigger>
+            <TabsTrigger value="classroom">รายห้อง</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview" className="space-y-6">
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
@@ -365,11 +739,17 @@ const PBLDashboard = () => {
                   <YAxis domain={[0, 3]} />
                   <Tooltip />
                   <Legend />
-                  <Bar dataKey="การสื่อสาร" fill="#8884d8" />
-                  <Bar dataKey="การคิด" fill="#82ca9d" />
-                  <Bar dataKey="การแก้ปัญหา" fill="#ffc658" />
-                  <Bar dataKey="ทักษะชีวิต" fill="#ff8042" />
-                  <Bar dataKey="เทคโนโลยี" fill="#a4de6c" />
+                  {DIMENSIONS.map((d) => (
+                    <Bar
+                      key={d.key}
+                      dataKey={d.label}
+                      fill={d.color}
+                      fillOpacity={BAR_FILL_OPACITY}
+                      stroke={d.stroke}
+                      strokeWidth={1.5}
+                      radius={BAR_RADIUS}
+                    />
+                  ))}
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -447,6 +827,161 @@ const PBLDashboard = () => {
             </CardContent>
           </Card>
         )}
+          </TabsContent>
+
+          {/* ── Per-student view ── */}
+          <TabsContent value="student" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>สมรรถนะผู้เรียนรายบุคคล</CardTitle>
+                <CardDescription>
+                  เลือกผู้เรียนเพื่อดูคะแนนสมรรถนะ 5 ด้าน เทียบกับค่าเฉลี่ยทั้งห้อง
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {studentList.length === 0 ? (
+                  <div className="h-[320px] flex items-center justify-center text-muted-foreground">
+                    ไม่มีข้อมูลนักเรียนในตัวกรองนี้
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <label className="text-sm font-medium">นักเรียน</label>
+                      <Select value={selectedStudentId} onValueChange={setSelectedStudentId}>
+                        <SelectTrigger className="w-[300px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {studentList.map((s) => (
+                            <SelectItem key={s.id} value={s.id}>
+                              {s.name} ({s.id})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {studentProjects.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-2 text-sm">
+                        <span className="text-muted-foreground">
+                          คะแนนจากหน่วย/โปรเจกต์:
+                        </span>
+                        {studentProjects.map((p) => (
+                          <Badge key={p.id} variant="secondary">
+                            {p.no > 0 ? `Project ${p.no} · ` : ""}
+                            {p.name}
+                            {p.month ? ` · ${p.month}` : ""}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                    <ResponsiveContainer width="100%" height={360}>
+                      <BarChart data={studentCompare}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="dim" />
+                        <YAxis domain={[0, 3]} ticks={[0, 1, 2, 3]} />
+                        <Tooltip />
+                        <Legend />
+                        <Bar
+                          dataKey="นักเรียน"
+                          fill="#c4b5fd"
+                          fillOpacity={BAR_FILL_OPACITY}
+                          stroke="#a78bfa"
+                          strokeWidth={1.5}
+                          radius={BAR_RADIUS}
+                        />
+                        <Bar
+                          dataKey="เฉลี่ยห้อง"
+                          fill="#7dd3fc"
+                          fillOpacity={BAR_FILL_OPACITY}
+                          stroke="#38bdf8"
+                          strokeWidth={1.5}
+                          radius={BAR_RADIUS}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                    <p className="text-xs text-muted-foreground">
+                      เทียบคะแนน 5 ด้านของนักเรียนกับค่าเฉลี่ยทั้งห้อง
+                      {studentProjectCount > 1 &&
+                        ` — นักเรียนมี ${studentProjectCount} โปรเจกต์ในภาคเรียนนี้ แสดงค่าเฉลี่ยของทุกโปรเจกต์`}
+                    </p>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ── Per-classroom view ── */}
+          <TabsContent value="classroom" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>ภาพรวมรายห้อง</CardTitle>
+                <CardDescription>
+                  คะแนนเฉลี่ย 5 ด้านของห้องที่เลือก (ตามตัวกรองด้านบน) — ไว้ดูจุดแข็ง/จุดที่ควรพัฒนา
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {classRadar.length === 0 ? (
+                  <div className="h-[320px] flex items-center justify-center text-muted-foreground">
+                    ไม่มีข้อมูลในตัวกรองนี้
+                  </div>
+                ) : (
+                  <div className="grid gap-6 md:grid-cols-3">
+                    <div className="md:col-span-2">
+                      <ResponsiveContainer width="100%" height={360}>
+                        <RadarChart data={classRadar}>
+                          <PolarGrid />
+                          <PolarAngleAxis dataKey="dim" />
+                          <PolarRadiusAxis domain={[0, 3]} tickCount={4} />
+                          <Radar
+                            name="คะแนนเฉลี่ย"
+                            dataKey="value"
+                            stroke="#a78bfa"
+                            fill="#c4b5fd"
+                            fillOpacity={0.55}
+                            strokeWidth={2}
+                          />
+                          <Tooltip />
+                        </RadarChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="space-y-3">
+                      {classStrength && (
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm">จุดแข็ง</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-lg font-bold text-green-600">
+                              {classStrength.dim}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              เฉลี่ย {classStrength.value.toFixed(2)} / 3
+                            </p>
+                          </CardContent>
+                        </Card>
+                      )}
+                      {classWeakness && (
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm">จุดที่ควรพัฒนา</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-lg font-bold text-orange-600">
+                              {classWeakness.dim}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              เฉลี่ย {classWeakness.value.toFixed(2)} / 3
+                            </p>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </AppLayout>
   );
