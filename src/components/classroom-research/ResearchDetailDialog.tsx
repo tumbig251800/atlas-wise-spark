@@ -18,17 +18,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Edit, CheckCircle2, XCircle, FileText } from "lucide-react";
+import { Edit, CheckCircle2, XCircle, FileText, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useUpdateResearchStatus } from "@/hooks/useClassroomResearch";
 import { StatusBadge, IssueTypeBadge } from "./StatusBadge";
 import type { ClassroomResearchSuggestion } from "@/types/classroomResearch";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Props {
   research: ClassroomResearchSuggestion | null;
@@ -56,6 +51,7 @@ export function ResearchDetailDialog({
   const { toast } = useToast();
   const updateStatus = useUpdateResearchStatus();
   const [confirmAbandonOpen, setConfirmAbandonOpen] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   if (!research) return null;
 
@@ -104,12 +100,53 @@ export function ResearchDetailDialog({
     );
   };
 
-  // TODO: Edge Function integration for document generation
-  const handleGenerateDocument = () => {
-    toast({
-      title: "ฟีเจอร์กำลังจะเปิดใช้งาน",
-      description: "ระบบสร้างเอกสารจะพร้อมใช้งานในเร็วๆ นี้",
-    });
+  const handleGenerateDocument = async () => {
+    setIsGenerating(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("กรุณาเข้าสู่ระบบก่อน");
+
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-research-docx`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            suggestion_id: research.id,
+            director_name: "ผู้อำนวยการโรงเรียนวรนาถวิทยากำแพงเพชร",
+          }),
+        }
+      );
+
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(errText || `HTTP ${res.status}`);
+      }
+
+      const html = await res.text();
+      const win = window.open("", "_blank");
+      if (!win) {
+        toast({
+          title: "ป๊อปอัปถูกบล็อก",
+          description: "กรุณาอนุญาตป๊อปอัปสำหรับเว็บไซต์นี้แล้วลองใหม่",
+          variant: "destructive",
+        });
+        return;
+      }
+      win.document.write(html);
+      win.document.close();
+    } catch (err) {
+      toast({
+        title: "สร้างเอกสารไม่สำเร็จ",
+        description: String(err),
+        variant: "destructive",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const isReadOnly = research.status === "in_progress" || research.status === "completed";
@@ -206,25 +243,18 @@ export function ResearchDetailDialog({
 
                   {research.status === "selected" && (
                     <>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className="w-full sm:flex-1">
-                              <Button
-                                onClick={handleGenerateDocument}
-                                disabled
-                                className="w-full"
-                              >
-                                <FileText className="h-4 w-4 mr-1" />
-                                สร้างเค้าโครงวิจัย
-                              </Button>
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>ฟีเจอร์สร้างเอกสารกำลังจะเปิดใช้งาน</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                      <Button
+                        onClick={handleGenerateDocument}
+                        disabled={isGenerating}
+                        className="w-full sm:flex-1"
+                      >
+                        {isGenerating ? (
+                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                        ) : (
+                          <FileText className="h-4 w-4 mr-1" />
+                        )}
+                        {isGenerating ? "กำลังสร้างเอกสาร..." : "สร้างเค้าโครงวิจัย"}
+                      </Button>
                       <Button
                         variant="outline"
                         onClick={() => onEdit(research)}

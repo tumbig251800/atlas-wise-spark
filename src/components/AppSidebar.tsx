@@ -14,7 +14,7 @@ import {
   SidebarFooter,
   SidebarHeader,
 } from "@/components/ui/sidebar";
-import { Brain, ClipboardList, BarChart3, Upload, Building2, LogOut, Settings, History, BookOpen, FileBarChart, Home, Bot, BookMarked, ListChecks, FileSpreadsheet, FileSearch, Sparkles } from "lucide-react";
+import { Brain, ClipboardList, BarChart3, Upload, Building2, LogOut, Settings, History, BookOpen, FileBarChart, Home, Bot, BookMarked, ListChecks, FileSpreadsheet, FileSearch, Sparkles, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTrendAlerts } from "@/hooks/useTrendAlerts";
 
@@ -35,6 +35,7 @@ const directorMenuItems = [
   { title: "หน้าแรก", url: "/", icon: Home },
   { title: "แดชบอร์ด", url: "/dashboard", icon: BarChart3 },
   { title: "ภาพรวมผู้บริหาร", url: "/executive", icon: Building2 },
+  { title: "วันนี้ใครกรอกคะแนน", url: "/todays-submissions", icon: CheckCircle2 },
   { title: "Action Board", url: "/action-board", icon: ListChecks },
   { title: "วิจัยชั้นเรียน", url: "/classroom-research", icon: FileSearch },
   { title: "บันทึกหลังสอน", url: "/log", icon: ClipboardList },
