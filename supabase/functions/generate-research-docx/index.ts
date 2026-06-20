@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import Anthropic from "npm:@anthropic-ai/sdk@0.32.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,7 +9,6 @@ const corsHeaders = {
 };
 
 function formatTerm(academic_term: string): { term: string; year: string } {
-  // "2569-1" → term: "1", year: "2569"
   const m = academic_term.match(/(\d{4})-(\d)/);
   if (m) return { year: m[1], term: m[2] };
   return { year: academic_term, term: "" };
@@ -45,13 +45,13 @@ interface DVDimension {
   passing_criteria: string;
 }
 
-interface GeminiResult {
+interface AIResult {
   weekly_plan: WeeklyPlan[];
   iv: IVData;
   dv: DVDimension[];
 }
 
-async function callGemini(
+async function callClaude(
   apiKey: string,
   intervention: string,
   tools: string,
@@ -60,11 +60,11 @@ async function callGemini(
   subject: string,
   grade_level: string,
   classroom: string
-): Promise<GeminiResult> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+): Promise<AIResult> {
+  const anthropic = new Anthropic({ apiKey });
 
   const systemPrompt = `คุณเป็นผู้ช่วยเขียนเค้าโครงวิจัยชั้นเรียนภาษาไทยสำหรับครูประถมศึกษา
-ตอบเป็น JSON เท่านั้น ห้ามมีข้อความนอก JSON
+ตอบเป็น JSON เท่านั้น ห้ามมีข้อความนอก JSON ห้ามมี markdown code block
 ห้ามใช้ภาษา causation เช่น "ทำให้" "ส่งผลให้" — ใช้ "สัมพันธ์กับ" "สะท้อนให้เห็น" แทน`;
 
   const userPrompt = `จากข้อมูลวิจัยชั้นเรียนต่อไปนี้ สร้าง JSON ตามโครงสร้างที่กำหนด
@@ -97,28 +97,20 @@ async function callGemini(
 หมายเหตุ: dv ให้แตกจาก success_indicator โดย parse ข้อความที่คั่นด้วย ";" หรือ "|" หรือเลขข้อ
 ถ้าไม่มีการคั่นชัดเจนให้สรุปเป็น 1-3 มิติตามเนื้อหา`;
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      system_instruction: { parts: [{ text: systemPrompt }] },
-      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-      generationConfig: { temperature: 0, responseMimeType: "application/json" },
-    }),
+  const message = await anthropic.messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 4096,
+    temperature: 0,
+    system: systemPrompt,
+    messages: [{ role: "user", content: userPrompt }],
   });
 
-  if (!res.ok) {
-    const t = await res.text();
-    throw new Error(`Gemini error ${res.status}: ${t}`);
-  }
-
-  const data = await res.json();
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
+  const text = message.content[0].type === "text" ? message.content[0].text : "{}";
   const cleaned = text.replace(/```json|```/g, "").trim();
-  return JSON.parse(cleaned) as GeminiResult;
+  return JSON.parse(cleaned) as AIResult;
 }
 
-function buildHTML(row: Record<string, unknown>, ai: GeminiResult, directorName: string): string {
+function buildHTML(row: Record<string, unknown>, ai: AIResult, directorName: string): string {
   const { term, year } = formatTerm(row.academic_term as string);
 
   const weeklyRows = (ai.weekly_plan ?? [])
@@ -196,7 +188,6 @@ function buildHTML(row: Record<string, unknown>, ai: GeminiResult, directorName:
     }
     .info-grid { display: grid; grid-template-columns: 160px 1fr; gap: 4px 12px; margin-bottom: 8px; }
     .label { font-weight: 600; }
-    .value { }
     p { margin-bottom: 8px; }
     table { width: 100%; border-collapse: collapse; margin-top: 8px; }
     td, th {
@@ -253,48 +244,60 @@ function buildHTML(row: Record<string, unknown>, ai: GeminiResult, directorName:
 <body>
 
 <div class="no-print">
-  <button class="print-btn" onclick="window.print()">🖨️ พิมพ์เอกสาร / บันทึก PDF</button>
+  <button class="print-btn" onclick="window.print()">🖨️ พิมพ์ / บันทึก PDF</button>
+  <button class="print-btn" style="background:#16a34a;margin-left:12px;" onclick="downloadDoc()">💾 บันทึกเป็น .doc</button>
 </div>
+<script>
+function downloadDoc() {
+  var clone = document.documentElement.cloneNode(true);
+  var noPrint = clone.querySelector('.no-print');
+  if (noPrint) noPrint.remove();
+  var blob = new Blob(['﻿', clone.outerHTML], { type: 'application/msword' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'เค้าโครงวิจัย.doc';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+</script>
 
 <h1>โรงเรียนวรนาถวิทยากำแพงเพชร</h1>
 <p class="subtitle">เค้าโครงการวิจัยในชั้นเรียน</p>
 <p class="term-info">ภาคเรียนที่ ${escapeHtml(term)} &nbsp;·&nbsp; ปีการศึกษา ${escapeHtml(year)}</p>
 
-<!-- ส่วนที่ 1 -->
 <h2>ส่วนที่ 1 ข้อมูลทั่วไป</h2>
 <div class="info-grid">
   <span class="label">ชื่อเรื่องวิจัย:</span>
-  <span class="value">${escapeHtml(row.research_title as string)}</span>
+  <span>${escapeHtml(row.research_title as string)}</span>
   <span class="label">ชั้น/ห้อง:</span>
-  <span class="value">ป.${escapeHtml(row.grade_level as string)}/${escapeHtml(row.classroom as string)}</span>
+  <span>ป.${escapeHtml(row.grade_level as string)}/${escapeHtml(row.classroom as string)}</span>
   <span class="label">วิชา:</span>
-  <span class="value">${escapeHtml(row.subject as string)}</span>
+  <span>${escapeHtml(row.subject as string)}</span>
   <span class="label">ครูผู้วิจัย:</span>
-  <span class="value">${escapeHtml(row.teacher_name as string)}</span>
+  <span>${escapeHtml(row.teacher_name as string)}</span>
   <span class="label">ปีการศึกษา/ภาคเรียน:</span>
-  <span class="value">${escapeHtml(year)} / ${escapeHtml(term)}</span>
+  <span>${escapeHtml(year)} / ${escapeHtml(term)}</span>
 </div>
 
-<!-- ส่วนที่ 2 -->
 <h2>ส่วนที่ 2 ความเป็นมาและความสำคัญของปัญหา</h2>
 <p>${escapeHtml(row.detected_problem as string)}</p>
 <p>${escapeHtml(row.evidence_summary as string)}</p>
 ${beforeDataHtml}
 
-<!-- ส่วนที่ 3 -->
 <h2>ส่วนที่ 3 คำถามวิจัยและวัตถุประสงค์</h2>
 <div class="info-grid">
   <span class="label">คำถามวิจัย:</span>
-  <span class="value">${escapeHtml(row.research_question as string)}</span>
+  <span>${escapeHtml(row.research_question as string)}</span>
   <span class="label">วัตถุประสงค์:</span>
-  <span class="value">${escapeHtml(row.objective as string)}</span>
+  <span>${escapeHtml(row.objective as string)}</span>
 </div>
 
-<!-- ส่วนที่ 4 -->
 <h2>ส่วนที่ 4 กลุ่มเป้าหมาย</h2>
 <p>${escapeHtml(row.target_group as string)}</p>
 
-<!-- ส่วนที่ 5 ตัวแปรการวิจัย -->
 <h2>ส่วนที่ 5 ตัวแปรการวิจัย</h2>
 <p style="font-weight:600;margin-bottom:6px;">ตัวแปรต้น (Independent Variable)</p>
 <table>
@@ -316,11 +319,9 @@ ${beforeDataHtml}
   ${dvRows || '<tr><td colspan="3" style="text-align:center;">-</td></tr>'}
 </table>
 
-<!-- ส่วนที่ 6 -->
 <h2>ส่วนที่ 6 วิธีดำเนินการวิจัย</h2>
 <p>${escapeHtml(row.intervention as string)}</p>
 
-<!-- ส่วนที่ 7 แผนรายสัปดาห์ -->
 <h2>ส่วนที่ 7 แผนปฏิบัติการรายสัปดาห์</h2>
 <table>
   <tr>
@@ -332,24 +333,20 @@ ${beforeDataHtml}
   ${weeklyRows || '<tr><td colspan="4" style="text-align:center;">-</td></tr>'}
 </table>
 
-<!-- ส่วนที่ 8 -->
 <h2>ส่วนที่ 8 เครื่องมือและวิธีเก็บข้อมูล</h2>
 <div class="info-grid">
   <span class="label">เครื่องมือ:</span>
-  <span class="value">${escapeHtml(row.tools as string)}</span>
+  <span>${escapeHtml(row.tools as string)}</span>
   <span class="label">วิธีเก็บข้อมูล:</span>
-  <span class="value">${escapeHtml(row.data_collection_method as string)}</span>
+  <span>${escapeHtml(row.data_collection_method as string)}</span>
 </div>
 
-<!-- ส่วนที่ 9 -->
 <h2>ส่วนที่ 9 วิธีวิเคราะห์ข้อมูล</h2>
 <p>${escapeHtml(row.analysis_method as string)}</p>
 
-<!-- ส่วนที่ 10 -->
 <h2>ส่วนที่ 10 ตัวชี้วัดความสำเร็จ</h2>
 <p>${escapeHtml(row.success_indicator as string)}</p>
 
-<!-- ลงนาม -->
 <div class="sign-section">
   <table class="sign-table">
     <tr>
@@ -399,16 +396,13 @@ serve(async (req) => {
       );
     }
 
-    // Verify auth
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
+    if (!req.headers.get("Authorization")) {
       return new Response(
         JSON.stringify({ error: "Unauthorized" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Service-role client to query suggestion
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
@@ -427,13 +421,12 @@ serve(async (req) => {
       );
     }
 
-    // Gemini API
-    const rawKey = Deno.env.get("LOVABLE_API_KEY") ?? "";
-    const geminiKey = rawKey.replace(/[^\x20-\x7E]/g, "").trim();
-    if (!geminiKey) throw new Error("LOVABLE_API_KEY is not configured");
+    const rawKey = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
+    const anthropicKey = rawKey.replace(/[^\x20-\x7E]/g, "").trim();
+    if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY is not configured in Supabase Secrets");
 
-    const aiResult = await callGemini(
-      geminiKey,
+    const aiResult = await callClaude(
+      anthropicKey,
       row.intervention ?? "",
       row.tools ?? "",
       row.data_collection_method ?? "",
@@ -448,10 +441,7 @@ serve(async (req) => {
 
     return new Response(html, {
       status: 200,
-      headers: {
-        ...corsHeaders,
-        "Content-Type": "text/html; charset=utf-8",
-      },
+      headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" },
     });
   } catch (err) {
     console.error("generate-research-docx error:", err);
