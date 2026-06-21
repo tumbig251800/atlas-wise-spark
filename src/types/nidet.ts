@@ -1,9 +1,21 @@
 // Supervision Visit Record (บันทึกการนิเทศ)
 // NOTE: action_item_id is `number` (not string) because action_plan_items.id
 // is a bigint identity column, not a uuid.
+export type NidetType = 'observation' | 'conversation'
+export type NidetOutcome = 'resolved' | 'need_observation' | 'follow_up'
+
+export const NIDET_TYPE_LABELS: Record<NidetType, string> = {
+  observation: 'สังเกตการจัดการเรียนรู้ในชั้นเรียน',
+  conversation: 'นิเทศแบบพูดคุย (สนทนาเชิงพัฒนา)',
+}
+
 export interface NidetVisit {
   id: string
   action_item_id: number
+  /** การนิเทศครั้งนี้ครอบคลุม action item ใดบ้าง (กลุ่ม ครู×วิชา×ชั้น) */
+  linked_action_item_ids: number[]
+  nidet_type: NidetType
+  outcome_type: NidetOutcome | null
   visit_date: string
   supervisor_id: string | null
   supervisor_name: string
@@ -24,7 +36,11 @@ export interface NidetVisit {
   updated_at: string
 }
 
-export type NidetVisitInsert = Omit<NidetVisit, 'id' | 'created_at' | 'updated_at'>
+// New grouping/type fields are optional on insert — the DB supplies defaults
+// (nidet_type='observation', linked_action_item_ids='{}', outcome_type=null).
+export type NidetVisitInsert =
+  Omit<NidetVisit, 'id' | 'created_at' | 'updated_at' | 'nidet_type' | 'linked_action_item_ids' | 'outcome_type'> &
+  Partial<Pick<NidetVisit, 'nidet_type' | 'linked_action_item_ids' | 'outcome_type'>>
 
 export const RUBRIC_DIMENSIONS = [
   { key: 'rubric_activity_design', label: 'การออกแบบกิจกรรม (K/P/A)' },

@@ -4,6 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { RUBRIC_DIMENSIONS, type RubricKey } from "@/types/nidet";
 import type { ActionItem } from "@/hooks/useActionItems";
+import { PLC_OUTCOME_LABELS, type PlcSession } from "@/types/plc";
 
 interface Props {
   teacherId: string;
@@ -71,6 +72,88 @@ function useTeacherActionItems(teacherId: string) {
       return data ?? [];
     },
   });
+}
+
+const TEACHER_PLC_KEY = (teacherId: string) =>
+  ["teacher-plc-sessions", teacherId] as const;
+
+// PLC sessions this teacher is a member of. plc_sessions is readable by any
+// authenticated user, but we only ever surface sessions the teacher belongs to
+// (members @> [{ teacher_id }]) — never a colleague's group.
+function useTeacherPlcSessions(teacherId: string) {
+  return useQuery({
+    queryKey: TEACHER_PLC_KEY(teacherId),
+    enabled: !!teacherId,
+    queryFn: async (): Promise<PlcSession[]> => {
+      const { data, error } = await supabase
+        .from("plc_sessions")
+        .select("*")
+        .contains("members", [{ teacher_id: teacherId }])
+        .order("session_date", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as PlcSession[];
+    },
+  });
+}
+
+function outcomeBadgeClass(outcome: PlcSession["outcome_type"]): string {
+  switch (outcome) {
+    case "resolved":
+      return "bg-emerald-100 text-emerald-800 border-emerald-300";
+    case "need_supervision":
+      return "bg-amber-100 text-amber-800 border-amber-300";
+    case "continue_plc":
+    default:
+      return "bg-violet-100 text-violet-800 border-violet-300";
+  }
+}
+
+function PlcSessionTeacherCard({
+  session,
+  teacherId,
+}: {
+  session: PlcSession;
+  teacherId: string;
+}) {
+  const others = (session.members ?? []).filter((m) => m.teacher_id !== teacherId);
+  const scope = session.subject || session.grade_band || "PLC";
+  return (
+    <div className="rounded-lg border border-violet-300 bg-violet-50 p-4 space-y-2">
+      <div className="flex items-start justify-between gap-2">
+        <div className="font-medium text-violet-900">{session.topic}</div>
+        <span
+          className={cn(
+            "text-[11px] border rounded px-1.5 py-0.5 whitespace-nowrap shrink-0",
+            outcomeBadgeClass(session.outcome_type)
+          )}
+        >
+          {PLC_OUTCOME_LABELS[session.outcome_type]}
+        </span>
+      </div>
+
+      <div className="text-sm text-violet-900 space-y-0.5">
+        <div>
+          <span className="text-violet-700">วันที่:</span> {formatThaiDate(session.session_date)}
+          <span className="text-violet-400"> · </span>
+          <span className="text-violet-700">ขอบเขต:</span> {scope}
+        </div>
+        <div>
+          <span className="text-violet-700">ครูแกนนำ (ผู้นำ):</span> {session.facilitator_name || "—"}
+        </div>
+        {others.length > 0 && (
+          <div>
+            <span className="text-violet-700">เพื่อนร่วมกลุ่ม:</span>{" "}
+            {others.map((m) => m.teacher_name).join(", ")}
+          </div>
+        )}
+        {session.outcome_type === "continue_plc" && session.next_plc_date && (
+          <div className="text-violet-800 font-medium">
+            📅 นัด PLC ครั้งถัดไป: {formatThaiDate(session.next_plc_date)}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 // ── Per-status cards ────────────────────────────────────────────────────────
@@ -195,8 +278,9 @@ function TeacherCard({ item }: { item: ActionItem }) {
 
 export function TeacherActionView({ teacherId }: Props) {
   const { data: items, isLoading, error } = useTeacherActionItems(teacherId);
+  const { data: plcSessions, isLoading: plcLoading } = useTeacherPlcSessions(teacherId);
 
-  if (isLoading) {
+  if (isLoading || plcLoading) {
     return (
       <div className="space-y-3">
         <Skeleton className="h-24 w-full" />
@@ -215,8 +299,9 @@ export function TeacherActionView({ teacherId }: Props) {
   }
 
   const list = items ?? [];
+  const sessions = plcSessions ?? [];
 
-  if (list.length === 0) {
+  if (list.length === 0 && sessions.length === 0) {
     return (
       <div className="glass-card p-8 text-center text-muted-foreground">
         ขณะนี้ไม่มีรายการติดตามสำหรับคุณ 🎉
@@ -225,11 +310,36 @@ export function TeacherActionView({ teacherId }: Props) {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="text-sm text-muted-foreground">{list.length} รายการ</div>
-      {list.map((item) => (
-        <TeacherCard key={item.id} item={item} />
-      ))}
+    <div className="space-y-6">
+      {/* กลุ่ม PLC ที่ครูคนนี้เป็นสมาชิก */}
+      {sessions.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold">กลุ่ม PLC ของคุณ</h2>
+            <span className="text-sm text-muted-foreground">({sessions.length} กลุ่ม)</span>
+          </div>
+          {sessions.map((session) => (
+            <PlcSessionTeacherCard
+              key={session.id}
+              session={session}
+              teacherId={teacherId}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* ปัญหา/รายการติดตามของครูคนนี้ */}
+      {list.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold">ปัญหาที่ต้องติดตาม</h2>
+            <span className="text-sm text-muted-foreground">({list.length} รายการ)</span>
+          </div>
+          {list.map((item) => (
+            <TeacherCard key={item.id} item={item} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

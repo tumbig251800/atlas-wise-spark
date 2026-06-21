@@ -388,7 +388,7 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss, onPass
                         )}
 
                         {visit && (
-                          <NidetVisitCard visit={visit} onEdit={() => openNidetModal(item)} />
+                          <NidetVisitCard visit={visit} item={item} onEdit={() => openNidetModal(item)} />
                         )}
 
                         {/* PLC sessions + download hint */}
