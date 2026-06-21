@@ -72,6 +72,19 @@ export function normalizeGradeLevel(input: string): ValidationResult {
     "ป๔": "ป.4",
     "ป๕": "ป.5",
     "ป๖": "ป.6",
+    // เลขล้วน ไม่มี "ป." นำหน้า (เช่น "2" → "ป.2")
+    "1": "ป.1",
+    "2": "ป.2",
+    "3": "ป.3",
+    "4": "ป.4",
+    "5": "ป.5",
+    "6": "ป.6",
+    "๑": "ป.1",
+    "๒": "ป.2",
+    "๓": "ป.3",
+    "๔": "ป.4",
+    "๕": "ป.5",
+    "๖": "ป.6",
   };
 
   if (corrections[upper]) {
@@ -141,10 +154,11 @@ export function normalizeClassroom(input: string): ValidationResult {
     warnings.push(`แปลงห้องเป็นตัวพิมพ์ใหญ่: "${normalized}"`);
   }
 
-  // เช็คว่าถูกต้องหรือไม่
+  // ป้องกันการกรอกผิด: ห้องที่ไม่รู้จัก (ไม่ใช่ "2") → นับเป็น KBW เสมอ
+  // โรงเรียนมีแค่ห้อง "2" (ปกติ) และ "KBW" (สองภาษา)
   if (!VALID_CLASSROOMS.includes(normalized)) {
-    errors.push(`ห้อง "${normalized}" ไม่ถูกต้อง (ต้องเป็น 2 หรือ KBW)`);
-    return { isValid: false, normalized, warnings, errors };
+    warnings.push(`ห้อง "${normalized}" ไม่รู้จัก → ปรับเป็น "KBW"`);
+    normalized = "KBW";
   }
 
   return { isValid: true, normalized, warnings, errors };
@@ -167,15 +181,25 @@ export function normalizeGradeClassroom(input: string): ValidationResult {
     };
   }
 
-  // แยก ชั้น/ห้อง
-  let [grade, classroom] = normalized.includes("/")
-    ? normalized.split("/").map(s => s.trim())
-    : [normalized, ""];
+  // แยก ชั้น/ห้อง — รองรับหลายรูปแบบ
+  let grade = normalized;
+  let classroom = "";
+  if (normalized.includes("/")) {
+    [grade, classroom] = normalized.split("/").map((s) => s.trim());
+  } else {
+    // รูปแบบใช้ "." หรือช่องว่างแทน "/" เช่น "ป.3.KBW" หรือ "ป.3 KBW"
+    const m = normalized.match(/^(ป\.?\s*[๑-๖1-6])[.\s]+(.+)$/);
+    if (m) {
+      grade = m[1].trim();
+      classroom = m[2].trim();
+      warnings.push(`ปรับรูปแบบชั้น/ห้องจาก "${input}" เป็น "${grade}/${classroom}"`);
+    }
+  }
 
-  // ถ้าไม่มี / ให้ใส่เตือน
-  if (!normalized.includes("/")) {
-    errors.push(`ชั้น/ห้องต้องมี "/" คั่น (เช่น "ป.3/2")`);
-    return { isValid: false, normalized, warnings, errors };
+  // ป้องกันการกรอกผิด: ไม่ระบุห้อง → ใช้ห้องปกติ "2"
+  if (!classroom) {
+    classroom = "2";
+    warnings.push(`ไม่ระบุห้อง → ใช้ห้องปกติ "2"`);
   }
 
   // Normalize แต่ละส่วน
