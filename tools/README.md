@@ -134,8 +134,8 @@ GET /api/teaching-logs/export
 
 #### 2. เพิ่ม MCP Tool ใหม่
 ```python
-# เครื่องมือที่ควรเพิ่ม
-atlas_teaching_logs_by_teacher(teacher_id, term, date_from, date_to)
+# ✅ implemented แล้วใน MCP v2.4.0
+atlas_teaching_logs_by_teacher(term, teacher_name?, teacher_id?, date_from?, date_to?, limit?)
 ```
 
 #### 3. แก้ไข UI Export

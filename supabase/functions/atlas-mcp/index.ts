@@ -219,6 +219,22 @@ const TOOLS = [
       },
       required: ["term", "student_id"]
     }
+  },
+  {
+    name: "atlas_teaching_logs_by_teacher",
+    description: "บันทึกหลังสอนรายครู (drill-down) — กรองตามครู (ชื่อหรือ teacher_id) + ภาคเรียน + ช่วงวันที่ เรียงวันที่ล่าสุดก่อน สำหรับดูบันทึกดิบรายคน",
+    inputSchema: {
+      type: "object",
+      properties: {
+        term: { type: "string", description: "รหัสภาคเรียน เช่น 2569-1" },
+        teacher_name: { type: "string", description: "ชื่อครู (ค้นแบบ ILIKE บางส่วนได้) (optional)" },
+        teacher_id: { type: "string", description: "teacher_id (uuid) (optional)" },
+        date_from: { type: "string", description: "วันที่เริ่ม YYYY-MM-DD (optional)" },
+        date_to: { type: "string", description: "วันที่สิ้นสุด YYYY-MM-DD (optional)" },
+        limit: { type: "number", description: "จำนวนบันทึกสูงสุด (default 100)" }
+      },
+      required: ["term"]
+    }
   }
 ];
 
@@ -936,6 +952,22 @@ async function callTool(supabase: any, name: string, args: any): Promise<any> {
         return { content: [{ type: "text", text: JSON.stringify({ term: args.term, student_id: args.student_id, student_name: rows[0].student_name, projects: projectsOut }, null, 2) }] };
       }
 
+      case "atlas_teaching_logs_by_teacher": {
+        let query = supabase
+          .from("teaching_logs")
+          .select("teaching_date, teacher_name, grade_level, classroom, subject, mastery_score, major_gap, key_issue, health_care_status")
+          .eq("academic_term", args.term);
+        if (args.teacher_id) query = query.eq("teacher_id", args.teacher_id);
+        if (args.teacher_name) query = query.ilike("teacher_name", `%${args.teacher_name}%`);
+        if (args.date_from) query = query.gte("teaching_date", args.date_from);
+        if (args.date_to) query = query.lte("teaching_date", args.date_to);
+        const { data, error } = await query
+          .order("teaching_date", { ascending: false })
+          .limit(args.limit || 100);
+        if (error) throw error;
+        return { content: [{ type: "text", text: JSON.stringify({ term: args.term, count: data?.length || 0, logs: data || [] }, null, 2) }] };
+      }
+
       default:
         return { content: [{ type: "text", text: `Unknown tool: ${name}` }], isError: true };
     }
@@ -950,7 +982,7 @@ Deno.serve(async (req: Request) => {
   }
 
   if (req.method === "HEAD" || req.method === "GET") {
-    return new Response(JSON.stringify({ status: "ok", server: "Woranat_School_Atlas_MCP", version: "2.3.0" }), {
+    return new Response(JSON.stringify({ status: "ok", server: "Woranat_School_Atlas_MCP", version: "2.4.0" }), {
       status: 200,
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
     });
@@ -988,7 +1020,7 @@ Deno.serve(async (req: Request) => {
   try {
     switch (method) {
       case "initialize":
-        result = { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "Woranat_School_Atlas_MCP", version: "2.3.0" } };
+        result = { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "Woranat_School_Atlas_MCP", version: "2.4.0" } };
         break;
       case "ping":
         result = {};
