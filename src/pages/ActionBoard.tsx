@@ -139,6 +139,18 @@ export default function ActionBoard() {
     return Object.values(byTeacher).sort((a, b) => a.teacher.localeCompare(b.teacher, "th"));
   }, [blindSpotQueue]);
 
+  // คิวนิเทศนับเป็น "ครู" และ "รายการนิเทศ (ครู×วิชา×ชั้น)" ไม่ใช่จำนวนนักเรียน
+  const queueSummary = useMemo(() => {
+    const teachers = new Set<string>();
+    const units = new Set<string>();
+    for (const i of queueItems) {
+      const t = i.teacher_id ?? i.teacher_name ?? "?";
+      teachers.add(t);
+      units.add(`${t}|${i.subject ?? ""}|${i.grade_level ?? ""}`);
+    }
+    return { teachers: teachers.size, units: units.size };
+  }, [queueItems]);
+
   const historyItems = useMemo(() => {
     return filtered.filter((i) => i.status === "verified" || i.status === "dismissed" || i.status === "resolved");
   }, [filtered]);
@@ -304,7 +316,9 @@ export default function ActionBoard() {
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-semibold">คิวนิเทศ</h2>
-                <span className="text-sm text-muted-foreground">({queueItems.length} รายการ)</span>
+                <span className="text-sm text-muted-foreground">
+                  ({queueSummary.teachers} ครู · {queueSummary.units} รายการนิเทศ)
+                </span>
               </div>
 
               {/* รายการอื่น (RedZone, MasteryDrop, IntegrityFlag) */}
@@ -328,7 +342,7 @@ export default function ActionBoard() {
                       <div className="bg-indigo-50 px-4 py-2 flex items-center gap-2">
                         <span className="text-indigo-700 font-semibold text-sm">👤 {tg.teacher}</span>
                         <span className="text-indigo-400 text-xs">
-                          {Object.values(tg.classes).reduce((s, arr) => s + arr.length, 0)} รายการ · {Object.keys(tg.classes).length} กลุ่ม
+                          {new Set(Object.values(tg.classes).flat().map((it) => `${it.subject ?? ""}|${it.grade_level ?? ""}`)).size} รายการนิเทศ · {Object.values(tg.classes).reduce((s, arr) => s + arr.length, 0)} คน
                         </span>
                       </div>
                       {/* Per class/subject sub-groups */}
