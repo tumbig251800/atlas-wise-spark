@@ -149,7 +149,7 @@ export default function ActionBoard() {
 
   const passItem = usePassActionItem();
   const { role } = useAuth();
-  const { isTeacher, teacherId, teacherName, loading: roleLoading } = useUserRole();
+  const { isTeacher, isLead, teacherId, teacherName, loading: roleLoading } = useUserRole();
   const { toast } = useToast();
   const qc = useQueryClient();
   const [running, setRunning] = useState(false);
@@ -279,7 +279,7 @@ export default function ActionBoard() {
             )}
 
             {/* PLC Queue — admin/director only */}
-            {(role === "director" || role === "admin") && queueGroups.length > 0 && (
+            {(role === "director" || role === "admin" || isLead) && queueGroups.length > 0 && (
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <h2 className="text-lg font-semibold">คิว PLC ที่แนะนำ</h2>

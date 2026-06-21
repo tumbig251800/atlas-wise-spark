@@ -20,6 +20,7 @@ import { useTrendAlerts } from "@/hooks/useTrendAlerts";
 
 const teacherMenuItems = [
   { title: "หน้าแรก", url: "/", icon: Home },
+  { title: "รายการติดตามของฉัน", url: "/action-board", icon: ListChecks },
   { title: "บันทึกหลังสอน", url: "/log", icon: ClipboardList },
   { title: "ประวัติการสอน", url: "/history", icon: History },
   { title: "วิจัยชั้นเรียน", url: "/classroom-research", icon: FileSearch },

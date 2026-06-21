@@ -1,9 +1,12 @@
 import { Button } from "@/components/ui/button";
-import { Pencil, ClipboardCheck } from "lucide-react";
+import { Pencil, ClipboardCheck, FileText } from "lucide-react";
 import { RUBRIC_DIMENSIONS, type NidetVisit } from "@/types/nidet";
+import type { ActionItem } from "@/hooks/useActionItems";
+import { downloadNidetDocx } from "@/lib/downloadNidetDocx";
 
 interface Props {
   visit: NidetVisit;
+  item: ActionItem;
   onEdit: () => void;
 }
 
@@ -16,7 +19,7 @@ function formatThaiDate(d: string | null): string {
   });
 }
 
-export function NidetVisitCard({ visit, onEdit }: Props) {
+export function NidetVisitCard({ visit, item, onEdit }: Props) {
   const scored = RUBRIC_DIMENSIONS.filter((d) => visit[d.key] != null);
 
   const rows: Array<{ label: string; value: string }> = [
@@ -66,17 +69,30 @@ export function NidetVisitCard({ visit, onEdit }: Props) {
           นัดติดตาม: {formatThaiDate(visit.follow_up_date)}
           {visit.follow_up_method ? ` · ${visit.follow_up_method}` : ""}
         </span>
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-7 border-sky-300 text-sky-800 hover:bg-sky-100"
-          onClick={(e) => {
-            e.stopPropagation();
-            onEdit();
-          }}
-        >
-          <Pencil className="h-3 w-3 mr-1" /> แก้ไข
-        </Button>
+        <div className="flex items-center gap-1.5">
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 border-sky-300 text-sky-800 hover:bg-sky-100"
+            onClick={(e) => {
+              e.stopPropagation();
+              void downloadNidetDocx(visit, item);
+            }}
+          >
+            <FileText className="h-3 w-3 mr-1" /> ออกเอกสาร .doc
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 border-sky-300 text-sky-800 hover:bg-sky-100"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit();
+            }}
+          >
+            <Pencil className="h-3 w-3 mr-1" /> แก้ไข
+          </Button>
+        </div>
       </div>
     </div>
   );

@@ -7,6 +7,9 @@ import type { NidetVisit, NidetVisitInsert } from "@/types/nidet";
 type NidetRow = {
   id: string;
   action_item_id: number;
+  linked_action_item_ids: number[] | null;
+  nidet_type: "observation" | "conversation";
+  outcome_type: "resolved" | "need_observation" | "follow_up" | null;
   visit_date: string;
   supervisor_id: string | null;
   supervisor_name: string;
@@ -30,6 +33,7 @@ type NidetRow = {
 function mapRow(row: NidetRow): NidetVisit {
   return {
     ...row,
+    linked_action_item_ids: row.linked_action_item_ids ?? [],
     strengths: row.strengths ?? "",
     improvements: row.improvements ?? "",
     recommendations: row.recommendations ?? "",
