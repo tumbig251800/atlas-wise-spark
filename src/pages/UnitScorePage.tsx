@@ -5,6 +5,8 @@ import { Unit1Uploader } from "@/components/unit-score/Unit1Uploader";
 import { UnitScoreEntry } from "@/components/unit-score/UnitScoreEntry";
 import { UnitScoreImporter } from "@/components/unit-score/UnitScoreImporter";
 import { Button } from "@/components/ui/button";
+import { downloadUnitScoreTemplate } from "@/lib/unitScoreTemplate";
+import { Download } from "lucide-react";
 
 export default function UnitScorePage() {
   const [importerOpen, setImporterOpen] = useState(false);
@@ -33,9 +35,18 @@ export default function UnitScorePage() {
                 <p className="text-sm text-muted-foreground mb-4">
                   นำเข้าคะแนน K (ความรู้), P (ทักษะ), A (เจตคติ) รายข้อจาก Excel ที่ครูกรอก
                 </p>
-                <Button onClick={() => setImporterOpen(true)}>
-                  📤 เลือกไฟล์และนำเข้า
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" onClick={() => downloadUnitScoreTemplate()}>
+                    <Download className="h-4 w-4 mr-2" />
+                    ดาวน์โหลดเทมเพลต (.xlsx)
+                  </Button>
+                  <Button onClick={() => setImporterOpen(true)}>
+                    📤 เลือกไฟล์และนำเข้า
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  ครูดาวน์โหลดเทมเพลต → กรอกคะแนน → บันทึกเป็น .xlsx → นำเข้ากลับ
+                </p>
               </div>
             </div>
             <UnitScoreImporter
