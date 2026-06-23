@@ -361,7 +361,19 @@ export function UnitScoreEntry() {
         .order("student_id");
       if (rowsErr) throw rowsErr;
 
-      // 3. Insert blank assessment rows
+      // 3. Auto-link to latest teaching_log
+      const { data: latestLog } = await supabase
+        .from("teaching_logs")
+        .select("id")
+        .eq("teacher_id", teacherId)
+        .eq("subject", newUnitSubject.trim())
+        .eq("grade_level", source.grade_level)
+        .eq("classroom", source.classroom)
+        .order("teaching_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      // 4. Insert blank assessment rows
       if (sourceRows && sourceRows.length > 0) {
         const inserts = sourceRows.map((r) => ({
           teacher_id: teacherId,
@@ -382,6 +394,7 @@ export function UnitScoreEntry() {
           k_total: newUnitK,
           p_total: newUnitP,
           a_total: newUnitA,
+          teaching_log_ref: latestLog?.id || null,
         }));
         const { error: insErr } = await supabase.from("unit_assessments").insert(inserts);
         if (insErr) throw insErr;

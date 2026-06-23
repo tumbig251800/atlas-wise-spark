@@ -274,6 +274,18 @@ export function Unit1Uploader() {
       ) {
         setSaveProgress((prev) => [...prev, "กำลังบันทึกคะแนน..."]);
 
+        // Auto-link to latest teaching_log
+        const { data: latestLog } = await supabase
+          .from("teaching_logs")
+          .select("id")
+          .eq("teacher_id", teacherId!)
+          .eq("subject", normalizedSubject)
+          .eq("grade_level", normalizedGradeLevel)
+          .eq("classroom", normalizedClassroom)
+          .order("teaching_date", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
         let scoresCreated = 0;
         let scoresUpdated = 0;
         let scoresSkipped = 0;
@@ -355,6 +367,7 @@ export function Unit1Uploader() {
                 art_culture_score: null,
                 competency_assessed_date: null,
                 competency_note: null,
+                teaching_log_ref: latestLog?.id || null,
               });
 
             if (assessInsertErr) throw assessInsertErr;

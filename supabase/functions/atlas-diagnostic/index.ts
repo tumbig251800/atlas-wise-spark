@@ -430,7 +430,10 @@ serve(async (req) => {
 
       const { error: remError } = await supabase
         .from("remedial_tracking")
-        .insert(remedialInserts);
+        .upsert(remedialInserts, {
+          onConflict: "student_id,subject,grade_level,academic_term",
+          ignoreDuplicates: false,
+        });
 
       if (remError) console.error("Remedial tracking insert error:", remError);
 

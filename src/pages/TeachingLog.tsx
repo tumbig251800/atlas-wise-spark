@@ -279,7 +279,6 @@ export default function TeachingLog() {
       const academicTerm = getAcademicTerm(form.teachingDate);
       const { data: logData, error } = await supabase.from("teaching_logs").insert({
         teacher_id: user.id,
-        teacher_name: teacherName || null,
         teaching_date: form.teachingDate,
         grade_level: form.gradeLevel,
         classroom: cleanedClassroom,
@@ -327,7 +326,10 @@ export default function TeachingLog() {
 
         const { error: trackingError } = await supabase
           .from("remedial_tracking")
-          .insert(trackingRecords);
+          .upsert(trackingRecords, {
+            onConflict: "student_id,subject,grade_level,academic_term",
+            ignoreDuplicates: false,
+          });
 
         if (trackingError) {
           console.error("Failed to save remedial tracking:", trackingError);

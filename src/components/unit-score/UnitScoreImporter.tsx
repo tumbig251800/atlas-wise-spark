@@ -205,6 +205,18 @@ export function UnitScoreImporter({ open, onOpenChange, onImportSuccess }: Props
       // === STEP 2: Upsert unit_assessments ===
       setSaveProgress((prev) => [...prev, "กำลังบันทึกคะแนนนักเรียน..."]);
 
+      // Auto-link to latest teaching_log
+      const { data: latestLog } = await supabase
+        .from("teaching_logs")
+        .select("id")
+        .eq("teacher_id", teacherId)
+        .eq("subject", metadata.subject)
+        .eq("grade_level", metadata.grade_level)
+        .eq("classroom", metadata.classroom)
+        .order("teaching_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
       const totalScore = metadata.k_total + metadata.p_total + metadata.a_total;
       let created = 0;
       let updated = 0;
@@ -274,6 +286,7 @@ export function UnitScoreImporter({ open, onOpenChange, onImportSuccess }: Props
               p_total: metadata.p_total,
               a_total: metadata.a_total,
               assessed_date: metadata.assessed_date,
+              teaching_log_ref: latestLog?.id || null,
             });
 
           if (insertErr) throw insertErr;
