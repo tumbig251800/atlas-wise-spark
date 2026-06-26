@@ -1,13 +1,15 @@
 import { format } from "date-fns";
 import { useState, useEffect } from "react";
-import { CalendarIcon, User } from "lucide-react";
+import { CalendarIcon, User, FlaskConical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { ActiveResearchMatch } from "@/hooks/useClassroomResearch";
 
 interface Step1Props {
   data: {
@@ -22,6 +24,10 @@ interface Step1Props {
   onChange: (field: string, value: unknown) => void;
   errors: Record<string, string>;
   teacherName?: string;
+  /** Active classroom research matching this lesson (auto-detected), or null. */
+  matchedResearch?: ActiveResearchMatch | null;
+  researchLinked?: boolean;
+  onToggleResearch?: (v: boolean) => void;
 }
 
 const GRADES = ["ป.1", "ป.2", "ป.3", "ป.4", "ป.5", "ป.6"];
@@ -51,7 +57,7 @@ const SUBJECTS = [
   "การอ่านและการเขียนเพื่อการสื่อสารภาษาอังกฤษ",
 ];
 
-export function Step1General({ data, onChange, errors, teacherName }: Step1Props) {
+export function Step1General({ data, onChange, errors, teacherName, matchedResearch, researchLinked, onToggleResearch }: Step1Props) {
   const dateValue = data.teachingDate ? new Date(`${data.teachingDate}T00:00:00`) : new Date();
 
   // Local state prevents parent re-renders from interrupting typing
@@ -72,6 +78,27 @@ export function Step1General({ data, onChange, errors, teacherName }: Step1Props
           <User className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm text-muted-foreground">ผู้สอน:</span>
           <span className="text-sm font-medium">{teacherName}</span>
+        </div>
+      )}
+
+      {/* Auto-detected: this lesson matches the teacher's active research */}
+      {matchedResearch && (
+        <div className="rounded-lg border border-violet-300 bg-violet-50 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-1.5 text-sm font-medium text-violet-900">
+                <FlaskConical className="h-4 w-4" />
+                คาบนี้อยู่ในงานวิจัยของคุณ
+              </div>
+              <div className="text-sm text-violet-800">{matchedResearch.research_title}</div>
+              <div className="text-xs text-violet-600">
+                {researchLinked
+                  ? "✓ จะบันทึกคาบนี้เป็นข้อมูลงานวิจัย"
+                  : "ปิดอยู่ — คาบนี้จะไม่ถูกนับเป็นข้อมูลวิจัย"}
+              </div>
+            </div>
+            <Switch checked={!!researchLinked} onCheckedChange={(v) => onToggleResearch?.(v)} />
+          </div>
         </div>
       )}
 

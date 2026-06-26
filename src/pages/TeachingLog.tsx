@@ -41,6 +41,7 @@ import {
   type FlagResult,
 } from "@/hooks/useTeachingLogValidation";
 import { usePreviousMastery } from "@/hooks/usePreviousMastery";
+import { useActiveResearchForLesson } from "@/hooks/useClassroomResearch";
 
 export interface TeachingLogForm {
   teachingDate: string;
@@ -112,6 +113,26 @@ export default function TeachingLog() {
     classroom: form.classroom,
     gradeLevel: form.gradeLevel,
   });
+
+  // Auto-detect the teacher's active classroom research matching this lesson
+  // (subject + grade + classroom) so we can prompt linking without them having
+  // to remember. null = follow default (ON when matched); true/false = explicit.
+  const { research: matchedResearch } = useActiveResearchForLesson({
+    subject: form.subject,
+    gradeLevel: form.gradeLevel,
+    classroom: form.classroom,
+  });
+  const [linkResearch, setLinkResearch] = useState<boolean | null>(null);
+  const prevMatchIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const id = matchedResearch?.id ?? null;
+    if (id !== prevMatchIdRef.current) {
+      prevMatchIdRef.current = id;
+      setLinkResearch(null); // new/changed match → reset to default (ON)
+    }
+  }, [matchedResearch?.id]);
+  const researchLinked = !!matchedResearch && (linkResearch ?? true);
+  const researchIdToSave = researchLinked ? matchedResearch!.id : null;
 
   const validation = useTeachingLogValidation({
     masteryScore: form.masteryScore,
@@ -300,6 +321,7 @@ export default function TeachingLog() {
         next_strategy: form.nextStrategy || null,
         reflection: form.reflection.trim() || null,
         academic_term: academicTerm,
+        research_id: researchIdToSave,
       }).select("id").single();
 
       if (error) throw error;
@@ -412,6 +434,7 @@ export default function TeachingLog() {
       }
       setForm(resetForm);
       setCurrentStep(1);
+      setLinkResearch(null); // next log starts at default (auto-ON when matched)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "ไม่สามารถบันทึกข้อมูลได้";
       toast({ title: "❌ เกิดข้อผิดพลาด", description: message, variant: "destructive" });
@@ -428,7 +451,7 @@ export default function TeachingLog() {
         <StepProgress currentStep={currentStep} />
 
         <div className="glass-card p-6">
-          {currentStep === 1 && <Step1General data={form} onChange={handleChange} errors={errors} teacherName={teacherName} />}
+          {currentStep === 1 && <Step1General data={form} onChange={handleChange} errors={errors} teacherName={teacherName} matchedResearch={matchedResearch} researchLinked={researchLinked} onToggleResearch={setLinkResearch} />}
           {currentStep === 2 && <Step2Quality data={form} majorGap={form.majorGap} onChange={handleChange} errors={errors} />}
           {currentStep === 3 && <Step3Gap data={form} onChange={handleChange} errors={errors} masteryScore={form.masteryScore} />}
           {currentStep === 4 && <Step4Action data={form} onChange={handleChange} errors={errors} masteryScore={form.masteryScore} totalStudents={form.totalStudents} majorGap={form.majorGap} previousMastery={previousMasteryScore} />}
@@ -468,6 +491,7 @@ export default function TeachingLog() {
         onConfirm={handleSubmit}
         form={form}
         submitting={submitting}
+        researchTitle={researchLinked ? matchedResearch?.research_title ?? null : null}
       />
 
       <SpecialCarePlanModal

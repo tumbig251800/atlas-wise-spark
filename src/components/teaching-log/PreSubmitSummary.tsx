@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Loader2, Users, AlertTriangle } from "lucide-react";
+import { CheckCircle2, Loader2, Users, AlertTriangle, FlaskConical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { TeachingLogForm } from "@/pages/TeachingLog";
 
@@ -12,6 +12,8 @@ interface PreSubmitSummaryProps {
   onConfirm: () => void;
   form: TeachingLogForm;
   submitting: boolean;
+  /** Set when this lesson is linked to the teacher's active research. */
+  researchTitle?: string | null;
 }
 
 const GAP_LABELS: Record<string, string> = {
@@ -40,7 +42,7 @@ function useGapPercent(remedialIds: string, totalStudents: number | null) {
   }, [remedialIds, totalStudents]);
 }
 
-export function PreSubmitSummary({ open, onClose, onConfirm, form, submitting }: PreSubmitSummaryProps) {
+export function PreSubmitSummary({ open, onClose, onConfirm, form, submitting, researchTitle }: PreSubmitSummaryProps) {
   const gap = useGapPercent(form.remedialIds, form.totalStudents);
 
   const items = [
@@ -73,6 +75,16 @@ export function PreSubmitSummary({ open, onClose, onConfirm, form, submitting }:
             สรุปข้อมูลก่อนบันทึก
           </DialogTitle>
         </DialogHeader>
+
+        {researchTitle && (
+          <div className="flex items-start gap-2 rounded-lg border border-violet-300 bg-violet-50 p-3 mb-1">
+            <FlaskConical className="h-4 w-4 text-violet-700 mt-0.5 shrink-0" />
+            <div className="text-sm text-violet-900">
+              <span className="font-medium">บันทึกนี้จะถูกนับเป็นข้อมูลงานวิจัย</span>
+              <div className="text-xs text-violet-700">{researchTitle}</div>
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-wrap items-center gap-2 mb-3">
           <Badge className="bg-[hsl(var(--atlas-success))] hover:bg-[hsl(var(--atlas-success))]">ครบทุกข้อ</Badge>

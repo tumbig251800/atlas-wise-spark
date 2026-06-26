@@ -726,6 +726,7 @@ export type Database = {
           notes: string | null
           reflection: string | null
           remedial_ids: string | null
+          research_id: string | null
           subject: string
           teacher_id: string
           teacher_name: string | null
@@ -757,6 +758,7 @@ export type Database = {
           notes?: string | null
           reflection?: string | null
           remedial_ids?: string | null
+          research_id?: string | null
           subject: string
           teacher_id: string
           teacher_name?: string | null
@@ -788,6 +790,7 @@ export type Database = {
           notes?: string | null
           reflection?: string | null
           remedial_ids?: string | null
+          research_id?: string | null
           subject?: string
           teacher_id?: string
           teacher_name?: string | null
