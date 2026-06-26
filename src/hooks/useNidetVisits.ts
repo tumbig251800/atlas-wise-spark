@@ -4,7 +4,7 @@ import type { NidetVisit, NidetVisitInsert } from "@/types/nidet";
 
 // DB text columns are nullable (default ''); normalize to non-null strings so
 // the rest of the app can rely on the NidetVisit interface.
-type NidetRow = {
+export type NidetRow = {
   id: string;
   action_item_id: number;
   linked_action_item_ids: number[] | null;
@@ -30,7 +30,7 @@ type NidetRow = {
   updated_at: string;
 };
 
-function mapRow(row: NidetRow): NidetVisit {
+export function mapRow(row: NidetRow): NidetVisit {
   return {
     ...row,
     linked_action_item_ids: row.linked_action_item_ids ?? [],

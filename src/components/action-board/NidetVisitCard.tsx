@@ -7,7 +7,8 @@ import { downloadNidetDocx } from "@/lib/downloadNidetDocx";
 interface Props {
   visit: NidetVisit;
   item: ActionItem;
-  onEdit: () => void;
+  /** Omit to render download-only (e.g. teacher view — teachers cannot edit นิเทศ). */
+  onEdit?: () => void;
 }
 
 function formatThaiDate(d: string | null): string {
@@ -81,17 +82,19 @@ export function NidetVisitCard({ visit, item, onEdit }: Props) {
           >
             <FileText className="h-3 w-3 mr-1" /> ออกเอกสาร .doc
           </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 border-sky-300 text-sky-800 hover:bg-sky-100"
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit();
-            }}
-          >
-            <Pencil className="h-3 w-3 mr-1" /> แก้ไข
-          </Button>
+          {onEdit && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 border-sky-300 text-sky-800 hover:bg-sky-100"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit();
+              }}
+            >
+              <Pencil className="h-3 w-3 mr-1" /> แก้ไข
+            </Button>
+          )}
         </div>
       </div>
     </div>

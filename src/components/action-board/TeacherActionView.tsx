@@ -1,10 +1,17 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/atlasSupabase";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { FileDown, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { RUBRIC_DIMENSIONS, type RubricKey } from "@/types/nidet";
+import { RUBRIC_DIMENSIONS, type RubricKey, type NidetVisit } from "@/types/nidet";
 import type { ActionItem } from "@/hooks/useActionItems";
 import { PLC_OUTCOME_LABELS, type PlcSession } from "@/types/plc";
+import { mapRow, type NidetRow } from "@/hooks/useNidetVisits";
+import { NidetVisitCard } from "@/components/action-board/NidetVisitCard";
+import { downloadPlcDocx } from "@/lib/downloadPlcDocx";
+import { useToast } from "@/hooks/use-toast";
 
 interface Props {
   teacherId: string;
@@ -96,6 +103,37 @@ function useTeacherPlcSessions(teacherId: string) {
   });
 }
 
+const TEACHER_NIDET_KEY = (teacherId: string) =>
+  ["teacher-nidet-evidence", teacherId] as const;
+
+// บันทึกนิเทศของครูคนนี้ — จับคู่ visit กับ action item ของตัวเอง (RLS จำกัด item
+// เฉพาะของครูอยู่แล้ว) สำหรับให้ครูดาวน์โหลดเก็บเป็นหลักฐานรอรับการประเมิน.
+function useTeacherNidetVisits(teacherId: string) {
+  return useQuery({
+    queryKey: TEACHER_NIDET_KEY(teacherId),
+    enabled: !!teacherId,
+    queryFn: async (): Promise<{ visit: NidetVisit; item: ActionItem }[]> => {
+      const { data: itemRows, error: itemErr } = await supabase
+        .from("action_plan_items")
+        .select("*")
+        .eq("teacher_id", teacherId);
+      if (itemErr) throw itemErr;
+      const items = (itemRows ?? []) as ActionItem[];
+      if (items.length === 0) return [];
+      const itemById = new Map<number, ActionItem>(items.map((i) => [i.id, i]));
+      const { data: visitRows, error: visitErr } = await supabase
+        .from("nidet_visits")
+        .select("*")
+        .in("action_item_id", items.map((i) => i.id))
+        .order("visit_date", { ascending: false });
+      if (visitErr) throw visitErr;
+      return (visitRows ?? [])
+        .map((v) => ({ visit: mapRow(v as NidetRow), item: itemById.get((v as NidetRow).action_item_id) }))
+        .filter((p): p is { visit: NidetVisit; item: ActionItem } => !!p.item);
+    },
+  });
+}
+
 function outcomeBadgeClass(outcome: PlcSession["outcome_type"]): string {
   switch (outcome) {
     case "resolved":
@@ -115,8 +153,31 @@ function PlcSessionTeacherCard({
   session: PlcSession;
   teacherId: string;
 }) {
+  const { toast } = useToast();
+  const [downloading, setDownloading] = useState(false);
   const others = (session.members ?? []).filter((m) => m.teacher_id !== teacherId);
   const scope = session.subject || session.grade_band || "PLC";
+
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      const { data, error } = await supabase
+        .from("action_plan_items")
+        .select("*")
+        .in("id", session.linked_action_item_ids ?? []);
+      if (error) throw error;
+      await downloadPlcDocx(session, (data ?? []) as ActionItem[]);
+    } catch (err) {
+      toast({
+        title: "ดาวน์โหลดไม่สำเร็จ",
+        description: err instanceof Error ? err.message : "ไม่ทราบสาเหตุ",
+        variant: "destructive",
+      });
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   return (
     <div className="rounded-lg border border-violet-300 bg-violet-50 p-4 space-y-2">
       <div className="flex items-start justify-between gap-2">
@@ -152,6 +213,20 @@ function PlcSessionTeacherCard({
           </div>
         )}
       </div>
+
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-7 border-violet-300 text-violet-800 hover:bg-violet-100"
+        onClick={handleDownload}
+        disabled={downloading}
+        title="ดาวน์โหลดหลักฐาน PLC (.docx)"
+      >
+        {downloading
+          ? <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+          : <FileDown className="h-3 w-3 mr-1" />}
+        ดาวน์โหลดหลักฐาน .docx
+      </Button>
     </div>
   );
 }
@@ -279,8 +354,9 @@ function TeacherCard({ item }: { item: ActionItem }) {
 export function TeacherActionView({ teacherId }: Props) {
   const { data: items, isLoading, error } = useTeacherActionItems(teacherId);
   const { data: plcSessions, isLoading: plcLoading } = useTeacherPlcSessions(teacherId);
+  const { data: nidetPairs, isLoading: nidetLoading } = useTeacherNidetVisits(teacherId);
 
-  if (isLoading || plcLoading) {
+  if (isLoading || plcLoading || nidetLoading) {
     return (
       <div className="space-y-3">
         <Skeleton className="h-24 w-full" />
@@ -300,8 +376,9 @@ export function TeacherActionView({ teacherId }: Props) {
 
   const list = items ?? [];
   const sessions = plcSessions ?? [];
+  const nidetVisits = nidetPairs ?? [];
 
-  if (list.length === 0 && sessions.length === 0) {
+  if (list.length === 0 && sessions.length === 0 && nidetVisits.length === 0) {
     return (
       <div className="glass-card p-8 text-center text-muted-foreground">
         ขณะนี้ไม่มีรายการติดตามสำหรับคุณ 🎉
@@ -324,6 +401,21 @@ export function TeacherActionView({ teacherId }: Props) {
               session={session}
               teacherId={teacherId}
             />
+          ))}
+        </div>
+      )}
+
+      {/* บันทึกนิเทศของครูคนนี้ — ดาวน์โหลดเก็บเป็นหลักฐาน (read-only ไม่มีปุ่มแก้ไข) */}
+      {nidetVisits.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold">บันทึกนิเทศของคุณ</h2>
+            <span className="text-sm text-muted-foreground">
+              ({nidetVisits.length} ครั้ง · ดาวน์โหลดเก็บเป็นหลักฐาน)
+            </span>
+          </div>
+          {nidetVisits.map((p) => (
+            <NidetVisitCard key={p.visit.id} visit={p.visit} item={p.item} />
           ))}
         </div>
       )}
