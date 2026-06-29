@@ -69,6 +69,56 @@ function normalizeTerm(yearRaw: string, semRaw: string): string {
   return `${year}-${semester}`;
 }
 
+// ─── Current-term guard ──────────────────────────────────────────────────────
+// A term is sortable as year*10+semester ("2569-1" → 25691). Lets us tell a
+// FUTURE term (impossible — the bug we're guarding) from a stale-but-plausible
+// past one (a teacher entering scores late).
+function termIndex(term: string): number | null {
+  const m = term.match(/^(25\d\d)-([1-3])$/);
+  return m ? Number(m[1]) * 10 + Number(m[2]) : null;
+}
+
+// The semester immediately before the given one (term 1 follows term 2 of the
+// previous Buddhist year; term 2 follows term 1 of the same year).
+function previousTerm(term: string): string {
+  const m = term.match(/^(25\d\d)-([1-3])$/);
+  if (!m) return term;
+  const year = Number(m[1]);
+  const sem = Number(m[2]);
+  return sem === 1 ? `${year - 1}-2` : `${year}-1`;
+}
+
+// The current Thai academic term, derived from today's date (Buddhist year =
+// Gregorian + 543). Term 1 ≈ พ.ค.–ก.ย., term 2 ≈ พ.ย.–มี.ค.; the break months
+// (เม.ย./ต.ค.) fold into the nearer term. Matches getAcademicTerm() in the
+// frontend (src/pages/TeachingLog.tsx) so the app and importer agree.
+function currentTermFromDate(now: Date): string {
+  const month = now.getMonth() + 1;
+  const ceYear = now.getFullYear();
+  if (month >= 5 && month <= 9) return `${ceYear + 543}-1`;
+  if (month >= 11) return `${ceYear + 543}-2`;
+  if (month <= 3) return `${ceYear - 1 + 543}-2`;
+  // เม.ย. → start of the new academic year's term 1; ต.ค. → term 1 winding down.
+  return `${ceYear + 543}-1`;
+}
+
+// Which terms an import may target. Admin can override (e.g. during a roll-over
+// window) without redeploying:
+//   ATLAS_ALLOWED_TERMS="2569-1,2569-2"  → exact allow-list, used verbatim
+//   ATLAS_CURRENT_TERM="2569-1"          → pin "current"; allows it + the one before
+// With neither set we compute "current" from the date and also accept the
+// previous term so late data entry isn't blocked. Future terms are never allowed.
+function allowedTerms(now: Date): { current: string; allowed: string[] } {
+  const explicit = (Deno.env.get("ATLAS_ALLOWED_TERMS") ?? "")
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+  const current =
+    (Deno.env.get("ATLAS_CURRENT_TERM") ?? "").trim() || currentTermFromDate(now);
+  if (explicit.length > 0) return { current, allowed: explicit };
+  return { current, allowed: [previousTerm(current), current] };
+}
+
 // Normalise the "ป.4/KBW" cell into grade + classroom.
 // School structure: every grade has exactly TWO rooms — "KBW" (the only
 // alphabetic room) and "2". So:
@@ -198,7 +248,7 @@ serve(async (req) => {
     // as a placeholder/label. Teachers fill it either as "มิถุนายน" or by
     // appending after the label ("เดือน มิถุนายน") — strip the leading label so
     // we store just the month name. If nothing remains, it wasn't filled.
-    let month = monthRaw.replace(/^เดือน\s*/, "").trim();
+    const month = monthRaw.replace(/^เดือน\s*/, "").trim();
     if (!month) {
       warnings.push(
         'ยังไม่ได้กรอกเดือนในช่องเดือน (พบค่าว่างหรือ placeholder "เดือน") — บันทึกโดยไม่มีเดือน',
@@ -241,11 +291,30 @@ serve(async (req) => {
       );
     }
 
-    // Year + semester are present but the combined term still looks wrong — warn,
-    // don't block (otherwise the data imports but won't match the term filter).
+    // The term drives the dashboard filter and the upsert key, so a wrong term
+    // silently mislabels the whole import. Block (don't just warn) on anything
+    // that isn't the current term — a malformed string, or a real-looking term
+    // that's in the future (the "เทอมเพี้ยน" bug: a teacher edits the year on the
+    // template but forgets the semester, e.g. ships "2569-2" while we're in
+    // "2569-1"). Past terms are allowed so late data entry still works.
     if (!/^25\d\d-[1-3]$/.test(academic_term)) {
-      warnings.push(
+      throw new Error(
         `รูปแบบภาคเรียนผิดปกติ (อ่านได้ "${academic_term}") — ตรวจช่องปีการศึกษา (J${META_ROW}) และภาคเรียน (L${META_ROW}) ให้เป็นเลขปี เช่น 2569 และเทอม 1–2`,
+      );
+    }
+
+    const { current: currentTerm, allowed: allowedTermList } = allowedTerms(new Date());
+    if (!allowedTermList.includes(academic_term)) {
+      const entered = termIndex(academic_term);
+      const curIdx = termIndex(currentTerm);
+      const isFuture = entered !== null && curIdx !== null && entered > curIdx;
+      const reason = isFuture
+        ? `ภาคเรียน "${academic_term}" เป็นเทอมอนาคต ยังมาไม่ถึง`
+        : `ภาคเรียน "${academic_term}" ไม่ใช่เทอมปัจจุบัน`;
+      throw new Error(
+        `${reason} (เทอมปัจจุบันคือ "${currentTerm}") — ` +
+          `กรุณาตรวจช่องปีการศึกษา (J${META_ROW}) และภาคเรียน (L${META_ROW}) ในแท็บ ` +
+          `'📝 กรอกคะแนน' ให้ตรงกับเทอมที่กำลังกรอกจริง แล้วอัปโหลดใหม่`,
       );
     }
 

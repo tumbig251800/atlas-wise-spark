@@ -344,9 +344,12 @@ const PBLDashboard = () => {
   const passPercent = totalStudents > 0 ? ((totalPass / totalStudents) * 100).toFixed(1) : "0";
   const failPercent = totalStudents > 0 ? ((totalFail / totalStudents) * 100).toFixed(1) : "0";
 
-  // Prepare chart data
+  // Prepare chart data — label each bar by class + (shortened) project name so
+  // projects from different grades are distinguishable. Only ellipsize names
+  // that are actually long; full names live in the per-project table below.
+  const shortLabel = (s: string) => (s.length > 16 ? `${s.slice(0, 16)}…` : s);
   const chartData = projects?.map((p) => ({
-    name: `${p.project_name.substring(0, 20)}...`,
+    name: `${p.grade_level}/${p.classroom} · ${shortLabel(p.project_name)}`,
     การสื่อสาร: parseFloat(p.avg_com.toFixed(2)),
     การคิด: parseFloat(p.avg_think.toFixed(2)),
     การแก้ปัญหา: parseFloat(p.avg_problem.toFixed(2)),
@@ -377,7 +380,7 @@ const PBLDashboard = () => {
       const { data, error } = await supabase
         .from("pbl_assessments")
         .select(
-          "student_id, student_name, com_score, think_score, problem_score, life_score, tech_score, overall_result, project_id"
+          "student_id, student_name, com_score, think_score, problem_score, life_score, tech_score, overall_result, notes, project_id"
         )
         .in("project_id", ids);
       if (error) throw error;
@@ -503,13 +506,88 @@ const PBLDashboard = () => {
       .sort((a, b) => a.no - b.no);
   }, [detail, selectedStudentId, projectNumber]);
 
+  // Overall pass rate (ดีเยี่ยม + ผ่าน) for the headline KPI.
+  const passRatePercent =
+    totalStudents > 0
+      ? Math.round(((totalExcellent + totalPass) / totalStudents) * 100)
+      : 0;
+
+  // The radar/strength view mixes classes if the filter spans more than one
+  // grade+classroom — warn the user to narrow it so the averages mean something.
+  const classesInScope = useMemo(() => {
+    const s = new Set<string>();
+    (detail ?? []).forEach((a: any) => s.add(`${a.grade_level}/${a.classroom}`));
+    return [...s];
+  }, [detail]);
+  const radarMixesClasses = classesInScope.length > 1;
+
+  // Selected student's per-project result + note (ข้อ6 — the actionable bit).
+  const studentResults = useMemo(() => {
+    return (detail ?? [])
+      .filter((a: any) => a.student_id === selectedStudentId)
+      .map((a: any) => ({
+        project_id: a.project_id,
+        project_name: a.project_name,
+        month: a.month,
+        overall_result: a.overall_result,
+        notes: a.notes,
+        no: projectNumber.get(a.project_id) ?? 0,
+      }))
+      .sort((a: any, b: any) => a.no - b.no);
+  }, [detail, selectedStudentId, projectNumber]);
+
+  const resultLabel = (r: string) =>
+    r === "excellent" ? "ดีเยี่ยม" : r === "fail" ? "ไม่ผ่าน" : "ผ่าน";
+  const resultBadgeVariant = (r: string) =>
+    r === "fail" ? "destructive" : r === "excellent" ? "default" : "secondary";
+
+  // Export the current filter scope (per-student rows) as a UTF-8 CSV (BOM so
+  // Excel reads Thai correctly). No backend needed — uses the already-loaded
+  // detail rows.
+  const handleExportCsv = () => {
+    const rows = detail ?? [];
+    if (rows.length === 0) {
+      toast({ title: "ไม่มีข้อมูลให้ส่งออก", description: "ปรับตัวกรองให้มีข้อมูลก่อน" });
+      return;
+    }
+    const header = [
+      "ชั้น", "ห้อง", "โปรเจกต์", "เดือน", "รหัสนักเรียน", "ชื่อ-สกุล",
+      "การสื่อสาร", "การคิด", "การแก้ปัญหา", "ทักษะชีวิต", "เทคโนโลยี", "ผลรวม", "หมายเหตุ",
+    ];
+    const esc = (v: any) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const body = rows.map((a: any) =>
+      [
+        a.grade_level, a.classroom, a.project_name, a.month, a.student_id, a.student_name,
+        a.com_score, a.think_score, a.problem_score, a.life_score, a.tech_score,
+        resultLabel(a.overall_result), a.notes,
+      ].map(esc).join(",")
+    );
+    const csv = "﻿" + [header.map(esc).join(","), ...body].join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    const scope = [academicTerm, gradeLevel !== "all" ? gradeLevel : null, classroom !== "all" ? classroom : null]
+      .filter(Boolean)
+      .join("-");
+    link.download = `pbl-${scope}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <AppLayout>
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold">PBL Assessment Dashboard</h1>
-          <p className="text-muted-foreground">การประเมินสมรรถนะ Project-Based Learning</p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-bold">PBL Assessment Dashboard</h1>
+            <p className="text-muted-foreground">การประเมินสมรรถนะ Project-Based Learning</p>
+          </div>
+          <Button variant="outline" onClick={handleExportCsv} disabled={!detail || detail.length === 0}>
+            <Download className="mr-2 h-4 w-4" />
+            ส่งออก CSV
+          </Button>
         </div>
 
         {/* Import workflow — 3 clear steps */}
@@ -600,7 +678,7 @@ const PBLDashboard = () => {
           <CardHeader>
             <CardTitle>ตัวกรอง</CardTitle>
           </CardHeader>
-          <CardContent className="flex gap-4">
+          <CardContent className="flex flex-wrap items-end gap-4">
             <div>
               <label className="text-sm font-medium">ภาคเรียน</label>
               <Select value={academicTerm} onValueChange={setAcademicTerm}>
@@ -664,6 +742,18 @@ const PBLDashboard = () => {
                 </SelectContent>
               </Select>
             </div>
+            {(gradeLevel !== "all" || classroom !== "all" || teacherName !== "all") && (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setGradeLevel("all");
+                  setClassroom("all");
+                  setTeacherName("all");
+                }}
+              >
+                ล้างตัวกรอง
+              </Button>
+            )}
           </CardContent>
         </Card>
 
@@ -722,11 +812,99 @@ const PBLDashboard = () => {
           </Card>
         </div>
 
+        {/* Headline pass-rate KPI + stacked proportion bar (ข้อ5) */}
+        {totalStudents > 0 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-baseline gap-2">
+                อัตราผ่านรวม
+                <span className="text-2xl font-bold text-primary">{passRatePercent}%</span>
+              </CardTitle>
+              <CardDescription>
+                ผ่านเกณฑ์ (ดีเยี่ยม + ผ่าน) {totalExcellent + totalPass} จาก {totalStudents} คน
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex h-4 w-full overflow-hidden rounded-full bg-muted">
+                <div className="bg-green-500" style={{ width: `${(totalExcellent / totalStudents) * 100}%` }} title={`ดีเยี่ยม ${totalExcellent}`} />
+                <div className="bg-yellow-400" style={{ width: `${(totalPass / totalStudents) * 100}%` }} title={`ผ่าน ${totalPass}`} />
+                <div className="bg-red-500" style={{ width: `${(totalFail / totalStudents) * 100}%` }} title={`ไม่ผ่าน ${totalFail}`} />
+              </div>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-green-500" /> ดีเยี่ยม {totalExcellent} ({excellentPercent}%)</span>
+                <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-yellow-400" /> ผ่าน {totalPass} ({passPercent}%)</span>
+                <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-red-500" /> ไม่ผ่าน {totalFail} ({failPercent}%)</span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Per-project summary table — the at-a-glance list of each project's
+            result, which the averaged bar chart alone doesn't convey. */}
+        {projects && projects.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>สรุปรายโปรเจกต์</CardTitle>
+              <CardDescription>ผลแต่ละโปรเจกต์ตามตัวกรองด้านบน</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>โปรเจกต์</TableHead>
+                    <TableHead>ชั้น/ห้อง</TableHead>
+                    <TableHead>ครู</TableHead>
+                    <TableHead className="text-center">นักเรียน</TableHead>
+                    <TableHead className="text-center">ดีเยี่ยม</TableHead>
+                    <TableHead className="text-center">ผ่าน</TableHead>
+                    <TableHead className="text-center">ไม่ผ่าน</TableHead>
+                    <TableHead className="text-center">อัตราผ่าน</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {projects.map((p) => {
+                    const passRate =
+                      p.total_students > 0
+                        ? Math.round(((p.excellent + p.pass) / p.total_students) * 100)
+                        : 0;
+                    return (
+                      <TableRow key={p.id}>
+                        <TableCell className="font-medium max-w-[240px] truncate" title={p.project_name}>
+                          {p.project_name}
+                          {p.month ? (
+                            <span className="text-muted-foreground"> · {p.month}</span>
+                          ) : null}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{p.grade_level}/{p.classroom}</Badge>
+                        </TableCell>
+                        <TableCell className="max-w-[180px] truncate" title={p.teacher_name}>
+                          {p.teacher_name || "—"}
+                        </TableCell>
+                        <TableCell className="text-center">{p.total_students}</TableCell>
+                        <TableCell className="text-center font-medium text-green-600">{p.excellent}</TableCell>
+                        <TableCell className="text-center font-medium text-yellow-600">{p.pass}</TableCell>
+                        <TableCell className="text-center font-medium text-red-600">
+                          {p.fail > 0 ? p.fail : "-"}
+                        </TableCell>
+                        <TableCell className="text-center font-semibold">{passRate}%</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Chart */}
         <Card>
           <CardHeader>
             <CardTitle>คะแนนเฉลี่ย 5 ด้านสมรรถนะ</CardTitle>
             <CardDescription>เปรียบเทียบรายโปรเจกต์</CardDescription>
+            <p className="mt-1 text-xs text-muted-foreground">
+              เกณฑ์: คะแนนรายด้าน 1–3 (3 = ดีที่สุด) · ดีเยี่ยม = ไม่มีด้านใดได้ 1 และมีด้านที่ได้ 3 ตั้งแต่ 3 ด้านขึ้นไป · ไม่ผ่าน = มีด้านใดด้านหนึ่งได้ 1 · ผ่าน = นอกเหนือจากนั้น
+            </p>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -874,6 +1052,28 @@ const PBLDashboard = () => {
                         ))}
                       </div>
                     )}
+                    {/* Per-project result + note for this student (ข้อ6) — the
+                        actionable bit, esp. the พัฒนา note for "ไม่ผ่าน". */}
+                    {studentResults.length > 0 && (
+                      <div className="space-y-2">
+                        {studentResults.map((r: any) => (
+                          <div
+                            key={r.project_id}
+                            className="flex flex-wrap items-center gap-2 rounded-md border p-2 text-sm"
+                          >
+                            <Badge variant={resultBadgeVariant(r.overall_result)}>
+                              {resultLabel(r.overall_result)}
+                            </Badge>
+                            <span className="font-medium">
+                              {r.no > 0 ? `Project ${r.no} · ` : ""}{r.name}
+                            </span>
+                            {r.notes && (
+                              <span className="text-muted-foreground">— {r.notes}</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     <ResponsiveContainer width="100%" height={360}>
                       <BarChart data={studentCompare}>
                         <CartesianGrid strokeDasharray="3 3" />
@@ -919,7 +1119,16 @@ const PBLDashboard = () => {
                   คะแนนเฉลี่ย 5 ด้านของห้องที่เลือก (ตามตัวกรองด้านบน) — ไว้ดูจุดแข็ง/จุดที่ควรพัฒนา
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                {radarMixesClasses && classRadar.length > 0 && (
+                  <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-700/50 dark:bg-amber-950/30 dark:text-amber-300">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>
+                      ค่าเฉลี่ยนี้รวมหลายห้อง ({classesInScope.join(", ")}) — เลือก
+                      "ระดับชั้น" และ "ห้องเรียน" ในตัวกรองด้านบนให้เจาะจง เพื่อดูจุดแข็ง/จุดพัฒนาของห้องเดียว
+                    </span>
+                  </div>
+                )}
                 {classRadar.length === 0 ? (
                   <div className="h-[320px] flex items-center justify-center text-muted-foreground">
                     ไม่มีข้อมูลในตัวกรองนี้
