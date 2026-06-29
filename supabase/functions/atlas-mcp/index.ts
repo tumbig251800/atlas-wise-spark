@@ -221,6 +221,19 @@ const TOOLS = [
     }
   },
   {
+    name: "atlas_pbl_unit_crosscheck",
+    description: "เชื่อมคะแนน PBL (สมรรถนะข้ามวิชา) กับคะแนนหลังหน่วย K/P/A (สมรรถนะรายวิชา) รายคน — แยกวิเคราะห์ทีละห้อง ไม่เทียบข้ามชั้น คืนช่องว่าง (หน่วย%−PBL%) + กลุ่ม pattern (รู้เนื้อหาแต่ประยุกต์อ่อน / ทำ PBL ได้แต่เนื้อหาอ่อน / เร่งด่วนอ่อนทั้งคู่ / สมดุล) + สรุปรายห้อง + sample_note เตือนปริมาณข้อมูล",
+    inputSchema: {
+      type: "object",
+      properties: {
+        term: { type: "string", description: "รหัสภาคเรียน เช่น 2569-1" },
+        grade_level: { type: "string", description: "ระดับชั้น เช่น ป.3 (optional)" },
+        classroom: { type: "string", description: "ห้องเรียน เช่น KBW หรือ 2 (optional)" }
+      },
+      required: ["term"]
+    }
+  },
+  {
     name: "atlas_teaching_logs_by_teacher",
     description: "บันทึกหลังสอนรายครู (drill-down) — กรองตามครู (ชื่อหรือ teacher_id) + ภาคเรียน + ช่วงวันที่ เรียงวันที่ล่าสุดก่อน สำหรับดูบันทึกดิบรายคน",
     inputSchema: {
@@ -952,6 +965,136 @@ async function callTool(supabase: any, name: string, args: any): Promise<any> {
         return { content: [{ type: "text", text: JSON.stringify({ term: args.term, student_id: args.student_id, student_name: rows[0].student_name, projects: projectsOut }, null, 2) }] };
       }
 
+      case "atlas_pbl_unit_crosscheck": {
+        const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+        // 1) PBL projects in scope (optionally narrowed to one grade/classroom).
+        let pq = admin.from("pbl_projects")
+          .select("id, grade_level, classroom")
+          .eq("academic_term", args.term);
+        if (args.grade_level) pq = pq.eq("grade_level", args.grade_level);
+        if (args.classroom) pq = pq.eq("classroom", args.classroom);
+        const { data: projects, error: pe } = await pq;
+        if (pe) throw pe;
+        if (!projects || projects.length === 0) {
+          return { content: [{ type: "text", text: JSON.stringify({ term: args.term, message: "ไม่พบโปรเจกต์ PBL ตามเงื่อนไข" }, null, 2) }] };
+        }
+        const projMap: Record<string, any> = {};
+        projects.forEach((p: any) => { projMap[p.id] = p; });
+        const ids = Object.keys(projMap);
+
+        // 2) PBL assessments → per student per class (keyed by id|grade|classroom).
+        const { data: assess, error: ae } = await admin.from("pbl_assessments")
+          .select("student_id, student_name, project_id, com_score, think_score, problem_score, life_score, tech_score, overall_result")
+          .in("project_id", ids);
+        if (ae) throw ae;
+        const sevRank: Record<string, number> = { fail: 0, pass: 1, excellent: 2 };
+        const sevLabel = ["fail", "pass", "excellent"];
+        const pblByKey: Record<string, any> = {};
+        (assess || []).forEach((a: any) => {
+          const p = projMap[a.project_id] || {};
+          const key = `${a.student_id}|${p.grade_level}|${p.classroom}`;
+          const total = (a.com_score || 0) + (a.think_score || 0) + (a.problem_score || 0) + (a.life_score || 0) + (a.tech_score || 0);
+          if (!pblByKey[key]) pblByKey[key] = { student_id: a.student_id, student_name: a.student_name, grade_level: p.grade_level, classroom: p.classroom, pcts: [], worst: 2 };
+          pblByKey[key].pcts.push((total / 15) * 100);
+          pblByKey[key].worst = Math.min(pblByKey[key].worst, sevRank[a.overall_result] ?? 1);
+        });
+
+        // 3) Unit (หลังหน่วย) K/P/A for the same term + grades/classrooms in scope.
+        const grades = [...new Set(projects.map((p: any) => p.grade_level))];
+        const classes = [...new Set(projects.map((p: any) => p.classroom))];
+        const { data: units, error: ue } = await admin.from("unit_assessments")
+          .select("student_id, grade_level, classroom, k_score, k_total, p_score, p_total, a_score, a_total")
+          .eq("academic_term", args.term)
+          .in("grade_level", grades)
+          .in("classroom", classes);
+        if (ue) throw ue;
+        const unitByKey: Record<string, number[]> = {};
+        (units || []).forEach((u: any) => {
+          const denom = (u.k_total || 0) + (u.p_total || 0) + (u.a_total || 0);
+          if (denom <= 0) return;
+          const pct = (((u.k_score || 0) + (u.p_score || 0) + (u.a_score || 0)) / denom) * 100;
+          const key = `${u.student_id}|${u.grade_level}|${u.classroom}`;
+          (unitByKey[key] ||= []).push(pct);
+        });
+        const avg = (arr: number[]) => (arr.length ? arr.reduce((s, x) => s + x, 0) / arr.length : null);
+
+        // 4) Join per student within class + classify pattern.
+        const classesMap: Record<string, any> = {};
+        Object.values(pblByKey).forEach((s: any) => {
+          const key = `${s.student_id}|${s.grade_level}|${s.classroom}`;
+          const pbl_pct = Math.round(avg(s.pcts) as number);
+          const unitArr = unitByKey[key];
+          const unit_pct = unitArr ? Math.round(avg(unitArr) as number) : null;
+          const pbl_result = sevLabel[s.worst];
+          const gap = unit_pct === null ? null : Math.round(unit_pct - pbl_pct);
+          let pattern: string;
+          const flags: string[] = [];
+          if (unit_pct === null) {
+            pattern = "ไม่มีข้อมูลหลังหน่วย";
+          } else if (pbl_result === "fail" && unit_pct < 50) {
+            pattern = "เร่งด่วน: อ่อนทั้งเนื้อหาและประยุกต์";
+          } else if ((gap as number) >= 10) {
+            pattern = "รู้เนื้อหา แต่ประยุกต์ใน PBL ยังอ่อน";
+          } else if ((gap as number) <= -10) {
+            pattern = "ทำ PBL ได้ แต่ความรู้เนื้อหาตามไม่ทัน";
+          } else {
+            pattern = "สมดุล";
+          }
+          if (unit_pct !== null && unit_pct < 50) flags.push("เนื้อหาต่ำกว่า 50%");
+          if (pbl_result === "fail") flags.push("ไม่ผ่าน PBL");
+          const cls = `${s.grade_level}/${s.classroom}`;
+          if (!classesMap[cls]) classesMap[cls] = { class: cls, grade_level: s.grade_level, classroom: s.classroom, students: [], projectIds: new Set() };
+          classesMap[cls].students.push({ student_id: s.student_id, student_name: s.student_name, pbl_pct, pbl_result, unit_pct, gap, pattern, flags });
+        });
+        projects.forEach((p: any) => {
+          const cls = `${p.grade_level}/${p.classroom}`;
+          if (classesMap[cls]) classesMap[cls].projectIds.add(p.id);
+        });
+
+        // 5) Per-class summary (analysed independently — never pooled across classes).
+        const classesOut = Object.values(classesMap).map((c: any) => {
+          const withUnit = c.students.filter((s: any) => s.unit_pct !== null);
+          const cavg = (arr: any[], k: string) => (arr.length ? Math.round(arr.reduce((s: number, x: any) => s + x[k], 0) / arr.length) : null);
+          const counts = { at_risk: 0, content_strong_app_weak: 0, app_strong_content_weak: 0, balanced: 0, no_unit: 0 };
+          c.students.forEach((s: any) => {
+            if (s.unit_pct === null) counts.no_unit++;
+            else if (s.pattern.startsWith("เร่งด่วน")) counts.at_risk++;
+            else if (s.pattern.startsWith("รู้เนื้อหา")) counts.content_strong_app_weak++;
+            else if (s.pattern.startsWith("ทำ PBL")) counts.app_strong_content_weak++;
+            else counts.balanced++;
+          });
+          c.students.sort((a: any, b: any) => {
+            const ar = a.pattern.startsWith("เร่งด่วน") ? 0 : 1;
+            const br = b.pattern.startsWith("เร่งด่วน") ? 0 : 1;
+            if (ar !== br) return ar - br;
+            return Math.abs(b.gap ?? 0) - Math.abs(a.gap ?? 0);
+          });
+          const uAvg = cavg(withUnit, "unit_pct");
+          const pAvg = cavg(withUnit, "pbl_pct");
+          return {
+            class: c.class, grade_level: c.grade_level, classroom: c.classroom,
+            projects: c.projectIds.size,
+            n_students: c.students.length,
+            n_with_unit: withUnit.length,
+            class_avg: { pbl_pct: cavg(c.students, "pbl_pct"), unit_pct: uAvg, gap: (uAvg !== null && pAvg !== null) ? uAvg - pAvg : null },
+            pattern_counts: counts,
+            students: c.students
+          };
+        }).sort((a: any, b: any) => a.class.localeCompare(b.class, "th"));
+
+        const totalProjects = projects.length;
+        const sample_note = totalProjects < 6
+          ? "ข้อมูล PBL ยังน้อย (โปรเจกต์น้อย/ห้อง) — ใช้ดูรายคนและรายห้องได้ดี แต่ยังไม่ควรสรุปแนวโน้มหรือเทียบข้ามห้อง"
+          : "ข้อมูลเริ่มมากพอสำหรับดูแนวโน้มรายห้อง — ยังควรเทียบภายในห้องเดียวกันเท่านั้น";
+
+        return { content: [{ type: "text", text: JSON.stringify({
+          term: args.term,
+          note: "วิเคราะห์แยกทีละห้อง — ไม่เทียบข้ามชั้น/ห้อง (คนละหลักสูตร/ครู/เกณฑ์) | gap = หน่วย% − PBL%",
+          sample_note,
+          classes: classesOut
+        }, null, 2) }] };
+      }
+
       case "atlas_teaching_logs_by_teacher": {
         let query = supabase
           .from("teaching_logs")
@@ -982,7 +1125,7 @@ Deno.serve(async (req: Request) => {
   }
 
   if (req.method === "HEAD" || req.method === "GET") {
-    return new Response(JSON.stringify({ status: "ok", server: "Woranat_School_Atlas_MCP", version: "2.4.0" }), {
+    return new Response(JSON.stringify({ status: "ok", server: "Woranat_School_Atlas_MCP", version: "2.5.0" }), {
       status: 200,
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
     });
@@ -1020,7 +1163,7 @@ Deno.serve(async (req: Request) => {
   try {
     switch (method) {
       case "initialize":
-        result = { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "Woranat_School_Atlas_MCP", version: "2.4.0" } };
+        result = { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "Woranat_School_Atlas_MCP", version: "2.5.0" } };
         break;
       case "ping":
         result = {};
