@@ -101,7 +101,32 @@ export default function History() {
       }
       const { data, error } = await q;
       if (!error && data) {
-        setLogs(data);
+        // teacher_name snapshot stopped being written to teaching_logs on
+        // 2026-06-23 (commit 7400144) to avoid a stale-name copy drifting from
+        // the profile. Resolve the display name live from teacher_id → profiles
+        // instead, so the "ผู้สอน" field, the list, and the teacher filter all
+        // keep working for newer rows (older rows keep their own snapshot).
+        const teacherIds = [...new Set(data.map((l) => l.teacher_id).filter(Boolean))];
+        let nameById = new Map<string, string>();
+        if (teacherIds.length > 0) {
+          const { data: profs } = await supabase
+            .from("profiles")
+            .select("user_id, full_name")
+            .in("user_id", teacherIds);
+          if (profs) {
+            nameById = new Map(
+              profs
+                .filter((p) => p.user_id && p.full_name)
+                .map((p) => [p.user_id as string, p.full_name as string]),
+            );
+          }
+        }
+        setLogs(
+          data.map((l) => ({
+            ...l,
+            teacher_name: l.teacher_name || nameById.get(l.teacher_id) || null,
+          })),
+        );
       }
       setLoading(false);
     };
