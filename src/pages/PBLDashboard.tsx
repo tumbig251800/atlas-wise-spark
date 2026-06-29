@@ -826,13 +826,13 @@ const PBLDashboard = () => {
             </CardHeader>
             <CardContent className="space-y-2">
               <div className="flex h-4 w-full overflow-hidden rounded-full bg-muted">
-                <div className="bg-yellow-400" style={{ width: `${(totalExcellent / totalStudents) * 100}%` }} title={`ดีเยี่ยม ${totalExcellent}`} />
-                <div className="bg-green-500" style={{ width: `${(totalPass / totalStudents) * 100}%` }} title={`ผ่าน ${totalPass}`} />
+                <div className="bg-green-500" style={{ width: `${(totalExcellent / totalStudents) * 100}%` }} title={`ดีเยี่ยม ${totalExcellent}`} />
+                <div className="bg-yellow-400" style={{ width: `${(totalPass / totalStudents) * 100}%` }} title={`ผ่าน ${totalPass}`} />
                 <div className="bg-red-500" style={{ width: `${(totalFail / totalStudents) * 100}%` }} title={`ไม่ผ่าน ${totalFail}`} />
               </div>
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-yellow-400" /> ดีเยี่ยม {totalExcellent} ({excellentPercent}%)</span>
-                <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-green-500" /> ผ่าน {totalPass} ({passPercent}%)</span>
+                <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-green-500" /> ดีเยี่ยม {totalExcellent} ({excellentPercent}%)</span>
+                <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-yellow-400" /> ผ่าน {totalPass} ({passPercent}%)</span>
                 <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-red-500" /> ไม่ผ่าน {totalFail} ({failPercent}%)</span>
               </div>
             </CardContent>
@@ -882,8 +882,8 @@ const PBLDashboard = () => {
                           {p.teacher_name || "—"}
                         </TableCell>
                         <TableCell className="text-center">{p.total_students}</TableCell>
-                        <TableCell className="text-center font-medium text-yellow-600">{p.excellent}</TableCell>
-                        <TableCell className="text-center font-medium text-green-600">{p.pass}</TableCell>
+                        <TableCell className="text-center font-medium text-green-600">{p.excellent}</TableCell>
+                        <TableCell className="text-center font-medium text-yellow-600">{p.pass}</TableCell>
                         <TableCell className="text-center font-medium text-red-600">
                           {p.fail > 0 ? p.fail : "-"}
                         </TableCell>
