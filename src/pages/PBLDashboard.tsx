@@ -344,9 +344,12 @@ const PBLDashboard = () => {
   const passPercent = totalStudents > 0 ? ((totalPass / totalStudents) * 100).toFixed(1) : "0";
   const failPercent = totalStudents > 0 ? ((totalFail / totalStudents) * 100).toFixed(1) : "0";
 
-  // Prepare chart data
+  // Prepare chart data — label each bar by class + (shortened) project name so
+  // projects from different grades are distinguishable. Only ellipsize names
+  // that are actually long; full names live in the per-project table below.
+  const shortLabel = (s: string) => (s.length > 16 ? `${s.slice(0, 16)}…` : s);
   const chartData = projects?.map((p) => ({
-    name: `${p.project_name.substring(0, 20)}...`,
+    name: `${p.grade_level}/${p.classroom} · ${shortLabel(p.project_name)}`,
     การสื่อสาร: parseFloat(p.avg_com.toFixed(2)),
     การคิด: parseFloat(p.avg_think.toFixed(2)),
     การแก้ปัญหา: parseFloat(p.avg_problem.toFixed(2)),
@@ -600,7 +603,7 @@ const PBLDashboard = () => {
           <CardHeader>
             <CardTitle>ตัวกรอง</CardTitle>
           </CardHeader>
-          <CardContent className="flex gap-4">
+          <CardContent className="flex flex-wrap items-end gap-4">
             <div>
               <label className="text-sm font-medium">ภาคเรียน</label>
               <Select value={academicTerm} onValueChange={setAcademicTerm}>
@@ -664,6 +667,18 @@ const PBLDashboard = () => {
                 </SelectContent>
               </Select>
             </div>
+            {(gradeLevel !== "all" || classroom !== "all" || teacherName !== "all") && (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setGradeLevel("all");
+                  setClassroom("all");
+                  setTeacherName("all");
+                }}
+              >
+                ล้างตัวกรอง
+              </Button>
+            )}
           </CardContent>
         </Card>
 
@@ -721,6 +736,64 @@ const PBLDashboard = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Per-project summary table — the at-a-glance list of each project's
+            result, which the averaged bar chart alone doesn't convey. */}
+        {projects && projects.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>สรุปรายโปรเจกต์</CardTitle>
+              <CardDescription>ผลแต่ละโปรเจกต์ตามตัวกรองด้านบน</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>โปรเจกต์</TableHead>
+                    <TableHead>ชั้น/ห้อง</TableHead>
+                    <TableHead>ครู</TableHead>
+                    <TableHead className="text-center">นักเรียน</TableHead>
+                    <TableHead className="text-center">ดีเยี่ยม</TableHead>
+                    <TableHead className="text-center">ผ่าน</TableHead>
+                    <TableHead className="text-center">ไม่ผ่าน</TableHead>
+                    <TableHead className="text-center">อัตราผ่าน</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {projects.map((p) => {
+                    const passRate =
+                      p.total_students > 0
+                        ? Math.round(((p.excellent + p.pass) / p.total_students) * 100)
+                        : 0;
+                    return (
+                      <TableRow key={p.id}>
+                        <TableCell className="font-medium max-w-[240px] truncate" title={p.project_name}>
+                          {p.project_name}
+                          {p.month ? (
+                            <span className="text-muted-foreground"> · {p.month}</span>
+                          ) : null}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{p.grade_level}/{p.classroom}</Badge>
+                        </TableCell>
+                        <TableCell className="max-w-[180px] truncate" title={p.teacher_name}>
+                          {p.teacher_name || "—"}
+                        </TableCell>
+                        <TableCell className="text-center">{p.total_students}</TableCell>
+                        <TableCell className="text-center font-medium text-yellow-600">{p.excellent}</TableCell>
+                        <TableCell className="text-center font-medium text-green-600">{p.pass}</TableCell>
+                        <TableCell className="text-center font-medium text-red-600">
+                          {p.fail > 0 ? p.fail : "-"}
+                        </TableCell>
+                        <TableCell className="text-center font-semibold">{passRate}%</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Chart */}
         <Card>
