@@ -4,12 +4,16 @@ import { AppLayout } from "@/components/AppLayout";
 import { Unit1Uploader } from "@/components/unit-score/Unit1Uploader";
 import { UnitScoreEntry } from "@/components/unit-score/UnitScoreEntry";
 import { UnitScoreImporter } from "@/components/unit-score/UnitScoreImporter";
+import { UnitScoreAdminOverview } from "@/components/unit-score/UnitScoreAdminOverview";
 import { Button } from "@/components/ui/button";
 import { downloadUnitScoreTemplate } from "@/lib/unitScoreTemplate";
 import { Download } from "lucide-react";
+import { useUserRole } from "@/hooks/useUserRole";
 
 export default function UnitScorePage() {
   const [importerOpen, setImporterOpen] = useState(false);
+  const { isAdmin, isLead } = useUserRole();
+  const isAdminOrLead = isAdmin || isLead;
 
   return (
     <AppLayout>
@@ -22,10 +26,13 @@ export default function UnitScorePage() {
         </div>
 
         <Tabs defaultValue="kpa-import" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className={`grid w-full ${isAdminOrLead ? "grid-cols-4" : "grid-cols-3"}`}>
             <TabsTrigger value="kpa-import">📊 นำเข้าคะแนน K/P/A</TabsTrigger>
             <TabsTrigger value="import">📤 นำเข้ารายชื่อ (Excel)</TabsTrigger>
             <TabsTrigger value="grid">📝 บันทึกคะแนน Grid</TabsTrigger>
+            {isAdminOrLead && (
+              <TabsTrigger value="admin-overview">📈 ภาพรวมผู้บริหาร</TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="kpa-import" className="mt-6">
@@ -62,6 +69,12 @@ export default function UnitScorePage() {
           <TabsContent value="grid" className="mt-6">
             <UnitScoreEntry />
           </TabsContent>
+
+          {isAdminOrLead && (
+            <TabsContent value="admin-overview" className="mt-6">
+              <UnitScoreAdminOverview />
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     </AppLayout>

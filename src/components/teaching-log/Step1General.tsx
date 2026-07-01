@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { CalendarIcon, User, FlaskConical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -33,10 +33,18 @@ interface Step1Props {
 const GRADES = ["ป.1", "ป.2", "ป.3", "ป.4", "ป.5", "ป.6"];
 const CLASSROOMS = ["KBW", "2"];
 
-const SUBJECTS = [
-  "ภาษาไทย",
-  "คณิตศาสตร์",
-  "วิทยาศาสตร์",
+// วิชาที่ชื่อเปลี่ยนไปตามหลักสูตรฐานสมรรถนะ (ป.1-3 พ.ศ. 2568) — ป.4-6 ยังใช้ชื่อเดิม
+// เพราะหลักสูตรฐานสมรรถนะระดับประถมปลายยังไม่ประกาศใช้ อย่ารวมสองชุดนี้ไว้ใน list เดียวกัน
+// ไม่งั้นครูจะเลือกชื่อวิชาผิดชั้นได้ (เคยเกิดขึ้นจริงกับ teaching_logs)
+const SUBJECTS_UPPER_PRIMARY = ["ภาษาไทย", "คณิตศาสตร์", "วิทยาศาสตร์"]; // ป.4-6
+const SUBJECTS_LOWER_PRIMARY = [
+  "การอ่านและการเขียนเพื่อการสื่อสาร",
+  "การคิดคำนวณ",
+  "การเรียนรู้เพื่อเข้าใจธรรมชาติและวิทยาศาสตร์",
+]; // ป.1-3
+
+// วิชาที่ชื่อเหมือนกันทุกชั้น ไม่ได้เปลี่ยนตามหลักสูตรฐานสมรรถนะ
+const SUBJECTS_SHARED = [
   "การงานอาชีพ",
   "ศิลปะ",
   "สังคมศึกษา",
@@ -45,9 +53,6 @@ const SUBJECTS = [
   "ประวัติศาสตร์",
   "หน้าที่พลเมือง",
   "ต้านทุจริต",
-  "การอ่านและการเขียนเพื่อการสื่อสาร",
-  "การคิดคำนวณ",
-  "การเรียนรู้เพื่อเข้าใจธรรมชาติและวิทยาศาสตร์",
   "ความเป็นพลเมืองและชีวิตในสังคม",
   "การเรียนรู้ทักษะศิลปะและวัฒนธรรม",
   "พลศึกษาและสุขภาวะ",
@@ -56,6 +61,17 @@ const SUBJECTS = [
   "ภาษาอังกฤษ KBW",
   "การอ่านและการเขียนเพื่อการสื่อสารภาษาอังกฤษ",
 ];
+
+function getSubjectsForGrade(gradeLevel: string): string[] {
+  if (["ป.1", "ป.2", "ป.3"].includes(gradeLevel)) {
+    return [...SUBJECTS_LOWER_PRIMARY, ...SUBJECTS_SHARED];
+  }
+  if (["ป.4", "ป.5", "ป.6"].includes(gradeLevel)) {
+    return [...SUBJECTS_UPPER_PRIMARY, ...SUBJECTS_SHARED];
+  }
+  // ยังไม่เลือกชั้น — โชว์ทุกวิชาไปก่อน
+  return [...SUBJECTS_LOWER_PRIMARY, ...SUBJECTS_UPPER_PRIMARY, ...SUBJECTS_SHARED];
+}
 
 export function Step1General({ data, onChange, errors, teacherName, matchedResearch, researchLinked, onToggleResearch }: Step1Props) {
   const dateValue = data.teachingDate ? new Date(`${data.teachingDate}T00:00:00`) : new Date();
@@ -69,6 +85,20 @@ export function Step1General({ data, onChange, errors, teacherName, matchedResea
   useEffect(() => { setRawStudents(data.totalStudents?.toString() ?? ""); }, [data.totalStudents]);
   useEffect(() => { setLocalUnit(data.learningUnit); }, [data.learningUnit]);
   useEffect(() => { setLocalTopic(data.topic); }, [data.topic]);
+
+  const availableSubjects = getSubjectsForGrade(data.gradeLevel);
+
+  // ถ้าเปลี่ยนชั้นแล้ววิชาที่เลือกไว้ไม่อยู่ในชุดของชั้นใหม่ (เช่นสลับ ป.1↔ป.4) ให้เคลียร์
+  // เพื่อกันไม่ให้ค้างค่าวิชาผิดชุดชื่อไว้เงียบๆ
+  const prevGradeLevel = useRef(data.gradeLevel);
+  useEffect(() => {
+    if (prevGradeLevel.current !== data.gradeLevel) {
+      prevGradeLevel.current = data.gradeLevel;
+      if (data.subject && !getSubjectsForGrade(data.gradeLevel).includes(data.subject)) {
+        onChange("subject", "");
+      }
+    }
+  }, [data.gradeLevel, data.subject, onChange]);
 
   return (
     <div className="space-y-4">
@@ -197,7 +227,7 @@ export function Step1General({ data, onChange, errors, teacherName, matchedResea
             <SelectValue placeholder="เลือกวิชา" />
           </SelectTrigger>
           <SelectContent className="max-h-60">
-            {SUBJECTS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+            {availableSubjects.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
           </SelectContent>
         </Select>
         {errors.subject && <p className="text-xs text-destructive" data-error>{errors.subject}</p>}
