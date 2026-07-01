@@ -402,7 +402,24 @@ export default function StudentProgressReport() {
                         <PolarGrid />
                         <PolarAngleAxis dataKey="dim" tick={{ fontSize: 10 }} />
                         <PolarRadiusAxis domain={[0, 3]} tickCount={4} tick={{ fontSize: 9 }} />
-                        <Radar name="คะแนน" dataKey="value" stroke="#993c1d" fill="#993c1d" fillOpacity={0.25} strokeWidth={2} />
+                        <Radar
+                          name="คะแนน"
+                          dataKey="value"
+                          stroke="#993c1d"
+                          fill="#993c1d"
+                          fillOpacity={0.25}
+                          strokeWidth={2}
+                          label={(props: { x: number; y: number; cx: number; cy: number; value: number }) => {
+                            const { x, y, cx, cy, value } = props;
+                            const dx = (x - cx) * 0.18;
+                            const dy = (y - cy) * 0.18;
+                            return (
+                              <text x={x + dx} y={y + dy} textAnchor="middle" fontSize={10} fontWeight={500} fill="#993c1d">
+                                {value}/3
+                              </text>
+                            );
+                          }}
+                        />
                       </RadarChart>
                     </ResponsiveContainer>
                   </div>
