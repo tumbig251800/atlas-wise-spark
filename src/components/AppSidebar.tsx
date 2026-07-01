@@ -14,7 +14,7 @@ import {
   SidebarFooter,
   SidebarHeader,
 } from "@/components/ui/sidebar";
-import { Brain, ClipboardList, BarChart3, Upload, Building2, LogOut, Settings, History, BookOpen, FileBarChart, Home, Bot, BookMarked, ListChecks, FileSpreadsheet, FileSearch, Sparkles, CheckCircle2 } from "lucide-react";
+import { Brain, ClipboardList, BarChart3, Upload, Building2, LogOut, Settings, History, BookOpen, FileBarChart, Home, Bot, BookMarked, ListChecks, FileSpreadsheet, FileSearch, Sparkles, CheckCircle2, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTrendAlerts } from "@/hooks/useTrendAlerts";
 
@@ -30,6 +30,7 @@ const teacherMenuItems = [
   { title: "สมรรถนะ PBL", url: "/pbl", icon: Sparkles },
   { title: "อัปโหลด CSV", url: "/upload", icon: Upload },
   { title: "บันทึกคะแนนหน่วย", url: "/unit-scores", icon: FileSpreadsheet },
+  { title: "รายงานพัฒนาการนักเรียน", url: "/student-progress-report", icon: FileText },
 ];
 
 const directorMenuItems = [
@@ -46,6 +47,7 @@ const directorMenuItems = [
   { title: "สมรรถนะ PBL", url: "/pbl", icon: Sparkles },
   { title: "อัปโหลด CSV", url: "/upload", icon: Upload },
   { title: "บันทึกคะแนนหน่วย", url: "/unit-scores", icon: FileSpreadsheet },
+  { title: "รายงานพัฒนาการนักเรียน", url: "/student-progress-report", icon: FileText },
   { title: "ประวัติการสร้างแผนการสอน", url: "/admin/lesson-plans", icon: BookMarked },
   { title: "Admin Settings", url: "/admin", icon: Settings },
 ];
