@@ -35,6 +35,7 @@ import {
 import {
   buildStudentReport,
   levelFromPercent,
+  formatThaiMonthYear,
   UNIT_SCORE_EXPLANATION,
   PBL_EXPLANATION,
   type UnitRow,
@@ -224,6 +225,14 @@ export default function StudentProgressReport() {
   const selectedStudentName =
     readyStudents.find((s) => s.student_id === selectedStudentId)?.student_name ?? "";
 
+  // เดือนของรายงาน = เดือนที่มีคะแนนล่าสุดจริง ไม่ hardcode เพราะรายงานนี้สร้างได้ทุกเมื่อ (on-demand)
+  const latestAssessedDate = (studentUnitRows ?? [])
+    .map((r) => r.assessed_date)
+    .filter((d): d is string => !!d)
+    .sort()
+    .at(-1);
+  const reportMonthLabel = latestAssessedDate ? formatThaiMonthYear(latestAssessedDate) : null;
+
   const BAR_FILL = "#D9D9D3"; // สีเทาอ่อนมาก — ประหยัดหมึกตอนพิมพ์ ระดับสีดูจากคอลัมน์ "ระดับ" ในตารางแทน
   const barData = report?.subjects.map((s) => ({
     name: s.friendlyName ?? s.subject,
@@ -304,7 +313,9 @@ export default function StudentProgressReport() {
           <div id="report-print-area" className="mx-auto bg-white border rounded-lg p-5" style={{ maxWidth: "720px" }}>
             <div className="text-center border-b-2 pb-2 mb-3" style={{ borderColor: "#1a4d3e" }}>
               <div className="text-sm text-gray-500">โรงเรียนวรนาถวิทยากำแพงเพชร</div>
-              <div className="text-xl font-medium mt-1" style={{ color: "#1a4d3e" }}>รายงานภาพรวมพัฒนาการนักเรียน</div>
+              <div className="text-xl font-medium mt-1" style={{ color: "#1a4d3e" }}>
+                รายงานภาพรวมพัฒนาการนักเรียน{reportMonthLabel ? ` ประจำเดือน ${reportMonthLabel}` : ""}
+              </div>
               <div className="text-xs text-gray-500 mt-1">
                 ชั้นประถมศึกษาปีที่ {selectedGrade}/{selectedClassroom} &middot; ภาคเรียน {academicTerm}
               </div>

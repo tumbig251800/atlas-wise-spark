@@ -35,6 +35,23 @@ export function normalizeUnitNumber(unitName: string): string {
   return match ? match[0] : unitName.trim();
 }
 
+const THAI_MONTHS = [
+  "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+  "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
+];
+
+/**
+ * แปลงวันที่ (ISO, ค.ศ.) เป็น "เดือน พ.ศ." สำหรับหัวรายงาน
+ * ใช้วันที่คะแนนล่าสุดจริง ไม่ hardcode เดือน — รายงานนี้เป็น on-demand
+ * (สร้างได้ทันทีที่มีข้อมูล ไม่ผูกรอบเดือนตายตัวแบบรายงานอนุบาล)
+ */
+export function formatThaiMonthYear(dateStr: string): string {
+  const d = new Date(`${dateStr}T00:00:00`);
+  const month = THAI_MONTHS[d.getMonth()];
+  const yearBE = d.getFullYear() + 543;
+  return `${month} ${yearBE}`;
+}
+
 // คำอธิบายสั้นๆ แสดงใต้หัวข้อในรายงาน กันผู้ปกครองไม่คุ้นศัพท์
 export const UNIT_SCORE_EXPLANATION =
   "คะแนนที่ครูวัดหลังจบแต่ละหน่วยการเรียนรู้ แบ่งเป็น K ความรู้ความเข้าใจ P ทักษะ/กระบวนการ และ A เจตคติ";
