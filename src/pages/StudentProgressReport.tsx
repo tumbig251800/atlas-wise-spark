@@ -231,7 +231,7 @@ export default function StudentProgressReport() {
     fill: BAR_FILL,
   })) ?? [];
 
-  const radarData = report?.pbl?.axes.map((a) => ({ dim: a.label, value: a.score })) ?? [];
+  const radarData = report?.pbl?.axes.map((a) => ({ dim: `${a.label} ${a.score}/3`, value: a.score })) ?? [];
 
   return (
     <AppLayout>
@@ -409,16 +409,6 @@ export default function StudentProgressReport() {
                           fill="#993c1d"
                           fillOpacity={0.25}
                           strokeWidth={2}
-                          label={(props: { x: number; y: number; cx: number; cy: number; value: number }) => {
-                            const { x, y, cx, cy, value } = props;
-                            const dx = (x - cx) * 0.18;
-                            const dy = (y - cy) * 0.18;
-                            return (
-                              <text x={x + dx} y={y + dy} textAnchor="middle" fontSize={10} fontWeight={500} fill="#993c1d">
-                                {value}/3
-                              </text>
-                            );
-                          }}
                         />
                       </RadarChart>
                     </ResponsiveContainer>
