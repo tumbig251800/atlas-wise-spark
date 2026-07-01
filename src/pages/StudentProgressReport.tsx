@@ -224,10 +224,11 @@ export default function StudentProgressReport() {
   const selectedStudentName =
     readyStudents.find((s) => s.student_id === selectedStudentId)?.student_name ?? "";
 
+  const BAR_FILL = "#D9D9D3"; // สีเทาอ่อนมาก — ประหยัดหมึกตอนพิมพ์ ระดับสีดูจากคอลัมน์ "ระดับ" ในตารางแทน
   const barData = report?.subjects.map((s) => ({
     name: s.friendlyName ?? s.subject,
     percent: s.percent,
-    fill: LEVEL_COLOR[s.level],
+    fill: BAR_FILL,
   })) ?? [];
 
   const radarData = report?.pbl?.axes.map((a) => ({ dim: a.label, value: a.score })) ?? [];
@@ -300,8 +301,8 @@ export default function StudentProgressReport() {
         )}
 
         {report && (
-          <div id="report-print-area" className="mx-auto bg-white border rounded-lg p-8" style={{ maxWidth: "720px" }}>
-            <div className="text-center border-b-2 pb-3 mb-4" style={{ borderColor: "#1a4d3e" }}>
+          <div id="report-print-area" className="mx-auto bg-white border rounded-lg p-5" style={{ maxWidth: "720px" }}>
+            <div className="text-center border-b-2 pb-2 mb-3" style={{ borderColor: "#1a4d3e" }}>
               <div className="text-sm text-gray-500">โรงเรียนวรนาถวิทยากำแพงเพชร</div>
               <div className="text-xl font-medium mt-1" style={{ color: "#1a4d3e" }}>รายงานภาพรวมพัฒนาการนักเรียน</div>
               <div className="text-xs text-gray-500 mt-1">
@@ -309,13 +310,7 @@ export default function StudentProgressReport() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3 rounded-md p-3 mb-4" style={{ background: "#f4f4f0" }}>
-              <div
-                className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0"
-                style={{ background: "#0f6e56" }}
-              >
-                {selectedStudentName.replace(/^เด็ก(ชาย|หญิง)\s*/, "").slice(0, 2)}
-              </div>
+            <div className="flex items-center gap-3 rounded-md p-2 mb-3" style={{ background: "#f4f4f0" }}>
               <div className="flex-1">
                 <div className="text-sm font-medium">
                   {selectedStudentName}
@@ -333,8 +328,8 @@ export default function StudentProgressReport() {
             <div className="text-sm font-medium" style={{ color: "#1a4d3e" }}>
               คะแนนหลังหน่วยการเรียน ({report.subjects.length} วิชา)
             </div>
-            <div className="text-xs text-gray-500 mb-2">{UNIT_SCORE_EXPLANATION}</div>
-            <div style={{ height: 160 }} className="mb-2">
+            <div className="text-xs text-gray-500 mb-1">{UNIT_SCORE_EXPLANATION}</div>
+            <div style={{ height: 125 }} className="mb-1">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={barData}>
                   <CartesianGrid strokeDasharray="3 3" />
@@ -347,15 +342,15 @@ export default function StudentProgressReport() {
                 </BarChart>
               </ResponsiveContainer>
             </div>
-            <table className="w-full text-xs mb-4" style={{ borderCollapse: "collapse", tableLayout: "fixed" }}>
+            <table className="w-full text-xs mb-3" style={{ borderCollapse: "collapse", tableLayout: "fixed" }}>
               <thead>
                 <tr className="text-gray-500 border-b">
-                  <td className="py-1" style={{ width: "27%" }}>วิชา</td>
-                  <td className="py-1 text-right" style={{ width: "16%" }}>คะแนน</td>
-                  <td className="py-1 text-right" style={{ width: "9%" }}>ระดับ</td>
-                  <td className="py-1 pl-3 border-l" style={{ width: "27%" }}>วิชา</td>
-                  <td className="py-1 text-right" style={{ width: "16%" }}>คะแนน</td>
-                  <td className="py-1 text-right" style={{ width: "9%" }}>ระดับ</td>
+                  <td className="py-1 pl-1 pr-2" style={{ width: "27%" }}>วิชา</td>
+                  <td className="py-1 px-2 text-right" style={{ width: "16%" }}>คะแนน</td>
+                  <td className="py-1 pl-2 pr-3 text-right" style={{ width: "9%" }}>ระดับ</td>
+                  <td className="py-1 pl-4 pr-2 border-l" style={{ width: "27%" }}>วิชา</td>
+                  <td className="py-1 px-2 text-right" style={{ width: "16%" }}>คะแนน</td>
+                  <td className="py-1 pl-2 pr-1 text-right" style={{ width: "9%" }}>ระดับ</td>
                 </tr>
               </thead>
               <tbody>
@@ -365,21 +360,21 @@ export default function StudentProgressReport() {
                   const renderSubjectCells = (s: typeof left | undefined, borderLeft: boolean) =>
                     s ? (
                       <>
-                        <td className={`py-1${borderLeft ? " pl-3 border-l" : ""}`}>
+                        <td className={borderLeft ? "py-1 pl-4 pr-2 border-l" : "py-1 pl-1 pr-2"}>
                           {s.friendlyName ? `${s.friendlyName} ` : ""}
                           <span className="text-gray-400">{s.friendlyName ? `(${s.subject})` : s.subject}</span>
                         </td>
-                        <td className="py-1 text-right">
+                        <td className="py-1 px-2 text-right">
                           {s.score}/{s.maxScore} &middot; {s.percent}%
                           {s.prevPercent !== null && s.percent > s.prevPercent && (
                             <span style={{ color: "#3b6d11" }}> &uarr;{s.prevPercent}%</span>
                           )}
                         </td>
-                        <td className="py-1 text-right" style={{ color: LEVEL_COLOR[s.level] }}>{s.level}</td>
+                        <td className={borderLeft ? "py-1 pl-2 pr-1 text-right" : "py-1 pl-2 pr-3 text-right"} style={{ color: LEVEL_COLOR[s.level] }}>{s.level}</td>
                       </>
                     ) : (
                       <>
-                        <td className={borderLeft ? "pl-3 border-l" : ""}></td>
+                        <td className={borderLeft ? "pl-4 border-l" : ""}></td>
                         <td></td>
                         <td></td>
                       </>
@@ -395,13 +390,13 @@ export default function StudentProgressReport() {
             </table>
 
             {report.pbl && (
-              <div className="flex gap-4 mb-4">
+              <div className="flex gap-4 mb-3">
                 <div className="flex-1">
                   <div className="text-sm font-medium" style={{ color: "#993c1d" }}>
                     ผลงาน PBL &mdash; &ldquo;{report.pbl.projectName}&rdquo;
                   </div>
-                  <div className="text-xs text-gray-500 mb-2">{PBL_EXPLANATION}</div>
-                  <div style={{ height: 155 }}>
+                  <div className="text-xs text-gray-500 mb-1">{PBL_EXPLANATION}</div>
+                  <div style={{ height: 125 }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <RadarChart data={radarData}>
                         <PolarGrid />
@@ -425,24 +420,24 @@ export default function StudentProgressReport() {
               </div>
             )}
 
-            <div className="rounded-md p-3 mb-4" style={{ background: "#f4f4f0" }}>
+            <div className="rounded-md p-2 mb-3" style={{ background: "#f4f4f0" }}>
               <div className="text-xs font-medium mb-1" style={{ color: "#1a4d3e" }}>จุดเด่นของน้อง</div>
-              <div className="text-xs leading-relaxed">{report.highlightText}</div>
-              <div className="text-xs font-medium mt-2 mb-1" style={{ color: "#993c1d" }}>จุดที่โรงเรียนตั้งใจพัฒนาเพิ่มเติม</div>
-              <div className="text-xs leading-relaxed">{report.improvementText}</div>
+              <div className="text-xs leading-snug">{report.highlightText}</div>
+              <div className="text-xs font-medium mt-1.5 mb-1" style={{ color: "#993c1d" }}>จุดที่โรงเรียนตั้งใจพัฒนาเพิ่มเติม</div>
+              <div className="text-xs leading-snug">{report.improvementText}</div>
             </div>
 
-            <div className="rounded-md p-3 mb-4" style={{ background: "#eaf3de" }}>
+            <div className="rounded-md p-2 mb-3" style={{ background: "#eaf3de" }}>
               <div className="text-xs font-medium mb-1" style={{ color: "#27500a" }}>ชวนส่งเสริมที่บ้าน</div>
               {report.homeTips.map((tip, i) => (
-                <div key={i} className="text-xs leading-relaxed">&bull; {tip}</div>
+                <div key={i} className="text-xs leading-snug">&bull; {tip}</div>
               ))}
             </div>
 
-            <div className="border-t pt-3 text-xs text-gray-500">
+            <div className="border-t pt-2 text-xs text-gray-500">
               <div className="font-medium text-gray-700 mb-1">ส่วนตอบกลับจากผู้ปกครอง</div>
               <div>ข้อคิดเห็น / ข้อเสนอแนะ: ......................................................................................</div>
-              <div className="mt-4">ลงชื่อ ................................... (ผู้ปกครอง) &nbsp;&nbsp;&nbsp; วันที่ ......................</div>
+              <div className="mt-3">ลงชื่อ ................................... (ผู้ปกครอง) &nbsp;&nbsp;&nbsp; วันที่ ......................</div>
             </div>
           </div>
         )}
@@ -450,11 +445,14 @@ export default function StudentProgressReport() {
 
       <style>{`
         @media print {
-          @page { size: A4; margin: 12mm; }
+          @page { size: A4; margin: 8mm; }
           .no-print { display: none !important; }
           body * { visibility: hidden; }
           #report-print-area, #report-print-area * { visibility: visible; }
-          #report-print-area { position: absolute; top: 0; left: 0; width: 100%; border: none !important; }
+          #report-print-area {
+            position: absolute; top: 0; left: 0; width: 100% !important; max-width: none !important;
+            padding: 0 !important; margin: 0 !important; border: none !important;
+          }
         }
       `}</style>
     </AppLayout>
