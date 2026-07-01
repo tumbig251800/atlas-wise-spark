@@ -453,6 +453,7 @@ export default function StudentProgressReport() {
             position: absolute; top: 0; left: 0; width: 100% !important; max-width: none !important;
             padding: 0 !important; margin: 0 !important; border: none !important;
           }
+          .recharts-tooltip-wrapper { display: none !important; }
         }
       `}</style>
     </AppLayout>
