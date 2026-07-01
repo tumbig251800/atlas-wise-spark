@@ -59,14 +59,25 @@ export function UnitScoreAdminOverview() {
   const [selectedGrade, setSelectedGrade] = useState<string>("");
 
   // วิชาที่สอนจริงในระบบ (ตัวส่วน — ใช้หา "สอนแล้วแต่ยังไม่โหลด")
+  // teaching_logs มีเป็นพันแถว เกิน default row cap ของ Supabase (1000) ต้อง page ทีละก้อน
+  // ไม่งั้นบางวิชา/บางชั้นจะหายไปจากรายงานเงียบๆ โดยไม่มี error ให้เห็น
   const { data: taughtRows } = useQuery({
     queryKey: ["unit-score-overview-taught"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("teaching_logs")
-        .select("academic_term, grade_level, classroom, subject");
-      if (error) throw error;
-      return (data ?? []) as TeachingLogRow[];
+      const PAGE_SIZE = 1000;
+      const rows: TeachingLogRow[] = [];
+      for (let page = 0; ; page++) {
+        const from = page * PAGE_SIZE;
+        const { data, error } = await supabase
+          .from("teaching_logs")
+          .select("academic_term, grade_level, classroom, subject")
+          .order("id", { ascending: true })
+          .range(from, from + PAGE_SIZE - 1);
+        if (error) throw error;
+        rows.push(...((data ?? []) as TeachingLogRow[]));
+        if (!data || data.length < PAGE_SIZE) break;
+      }
+      return rows;
     },
   });
 
