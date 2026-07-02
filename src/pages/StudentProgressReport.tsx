@@ -316,7 +316,7 @@ export default function StudentProgressReport() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("unit_assessments")
-        .select("student_id, student_name, subject, unit_name, k_score, k_total, p_score, p_total, a_score, a_total, assessed_date")
+        .select("student_id, student_name, subject, unit_name, k_score, k_total, p_score, p_total, a_score, a_total, score, assessed_date")
         .eq("academic_term", academicTerm)
         .eq("grade_level", selectedGrade)
         .eq("classroom", selectedClassroom);

@@ -129,9 +129,12 @@ function subjectTip(subject: string, isJunior: boolean): string {
 export type UnitRow = {
   subject: string;
   unit_name: string;
-  k_score: number; k_total: number;
-  p_score: number; p_total: number;
-  a_score: number; a_total: number;
+  // k/p/a รายด้านเป็น null ได้จริง — บางวิชา (พบใน คณิตศาสตร์ ป.5-6) นำเข้ามาแบบมีแค่คะแนนรวม
+  // ไม่มีแยก K/P/A เก็บไว้ ต้อง fallback ไปใช้ `score` (คอลัมน์คะแนนรวม ไม่เป็น null) แทน
+  k_score: number | null; k_total: number;
+  p_score: number | null; p_total: number;
+  a_score: number | null; a_total: number;
+  score: number;
   assessed_date: string | null;
 };
 
@@ -181,6 +184,16 @@ export type StudentReport = {
   homeTips: string[];
 };
 
+// k/p/a รายด้านเป็น null ได้ (บางวิชานำเข้ามาแบบมีแค่คะแนนรวม ไม่มีแยก K/P/A)
+// ถ้าครบทั้ง 3 ด้านใช้ผลรวมรายด้าน ไม่งั้น fallback ไปใช้ `score` (คอลัมน์รวมที่ไม่เป็น null เสมอ)
+// กันบั๊ก null+null+null=0 ใน JS ที่ทำให้วิชานั้นเงียบๆกลายเป็น 0% ทั้งที่มีคะแนนจริง
+function totalScoreOf(row: UnitRow): number {
+  if (row.k_score !== null && row.p_score !== null && row.a_score !== null) {
+    return row.k_score + row.p_score + row.a_score;
+  }
+  return row.score;
+}
+
 function summarizeSubjects(unitRows: UnitRow[]): SubjectSummary[] {
   const bySubject = new Map<string, UnitRow[]>();
   for (const row of unitRows) {
@@ -197,11 +210,11 @@ function summarizeSubjects(unitRows: UnitRow[]): SubjectSummary[] {
     const prev = sorted.length > 1 ? sorted[sorted.length - 2] : null;
 
     const maxScore = latest.k_total + latest.p_total + latest.a_total;
-    const score = latest.k_score + latest.p_score + latest.a_score;
+    const score = totalScoreOf(latest);
     const percent = maxScore > 0 ? Math.round((score / maxScore) * 100) : 0;
 
     const prevPercent = prev
-      ? Math.round(((prev.k_score + prev.p_score + prev.a_score) / (prev.k_total + prev.p_total + prev.a_total)) * 100)
+      ? Math.round((totalScoreOf(prev) / (prev.k_total + prev.p_total + prev.a_total)) * 100)
       : null;
 
     summaries.push({
