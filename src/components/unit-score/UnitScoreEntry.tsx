@@ -108,8 +108,10 @@ export function UnitScoreEntry() {
   // Hardcoded valid grade options — ป้องกันชื่อห้องผิดจาก DB
   const gradeOptions = useMemo(() => {
     const validGrades = [
+      "ป.1/2",
       "ป.1/KBW",
       "ป.2/2",
+      "ป.2/KBW",
       "ป.3/2",
       "ป.3/KBW",
       "ป.4/2",
