@@ -17,11 +17,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Edit, CheckCircle2, XCircle, FileText, Loader2 } from "lucide-react";
+import { Edit, CheckCircle2, XCircle, FileText, Loader2, ClipboardCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useUpdateResearchStatus } from "@/hooks/useClassroomResearch";
 import { StatusBadge, IssueTypeBadge } from "./StatusBadge";
+import { EndlineDataDialog } from "./EndlineDataDialog";
 import type { ClassroomResearchSuggestion } from "@/types/classroomResearch";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -55,6 +57,7 @@ export function ResearchDetailDialog({
   const updateStatus = useUpdateResearchStatus();
   const [confirmAbandonOpen, setConfirmAbandonOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [endlineDialogOpen, setEndlineDialogOpen] = useState(false);
 
   if (!research) return null;
 
@@ -171,6 +174,11 @@ export function ResearchDetailDialog({
               <div className="flex flex-wrap gap-2">
                 <IssueTypeBadge issueType={research.issue_type} />
                 <StatusBadge status={research.status} />
+                {research.after_data && (
+                  <Badge className="bg-green-100 text-green-700 border-green-200">
+                    ✅ พร้อมเขียนงานวิจัยแล้ว
+                  </Badge>
+                )}
               </div>
               <div className="text-sm">
                 {research.grade_level}/{research.classroom} · {research.subject}
@@ -206,6 +214,28 @@ export function ResearchDetailDialog({
                   </div>
                 </div>
               )}
+
+              {research.after_data ? (
+                <div className="pt-2 text-xs space-y-1">
+                  <div className="font-medium text-foreground">ข้อมูลหลังทำวิจัย (Endline):</div>
+                  <div>
+                    {research.after_data.label}: <strong>{research.after_data.value}</strong>
+                    {research.before_data && (
+                      <span className="text-muted-foreground">
+                        {" "}
+                        (ก่อนทำ: {research.before_data.value})
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-muted-foreground">
+                    วันที่บันทึก: {formatThaiDate(research.after_data.captured_at)}
+                  </div>
+                </div>
+              ) : (
+                <div className="pt-2 text-xs text-muted-foreground">
+                  ยังไม่ได้บันทึกข้อมูลหลังทำ (Endline)
+                </div>
+              )}
             </div>
 
             <Separator />
@@ -227,6 +257,27 @@ export function ResearchDetailDialog({
                 value={research.success_indicator}
               />
             </div>
+
+            {/* Endline capture — independent of isReadOnly: completed research must
+                still be editable/correctable here. */}
+            {canEdit &&
+              (research.status === "selected" ||
+                research.status === "in_progress" ||
+                research.status === "completed") && (
+                <>
+                  <Separator />
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setEndlineDialogOpen(true)}
+                      className="w-full sm:w-auto"
+                    >
+                      <ClipboardCheck className="h-4 w-4 mr-1" />
+                      บันทึกข้อมูลหลังทำ (Endline)
+                    </Button>
+                  </div>
+                </>
+              )}
 
             {/* Action Buttons */}
             {canEdit && !isReadOnly && (
@@ -324,6 +375,13 @@ export function ResearchDetailDialog({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Endline Data Dialog */}
+      <EndlineDataDialog
+        research={research}
+        open={endlineDialogOpen}
+        onClose={() => setEndlineDialogOpen(false)}
+      />
     </>
   );
 }

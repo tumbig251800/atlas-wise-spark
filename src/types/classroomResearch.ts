@@ -48,6 +48,7 @@ export interface ClassroomResearchSuggestion {
   success_indicator: string;
 
   before_data: BeforeData | null;
+  after_data: BeforeData | null;
 
   status: ResearchStatus;
   doc_format: string; // Always 'short' - not editable in UI
@@ -71,4 +72,5 @@ export interface UpdateResearchPayload {
   success_indicator?: string;
   status?: ResearchStatus;
   ethics_confirmed?: boolean;
+  after_data?: BeforeData | null;
 }

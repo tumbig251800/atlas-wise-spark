@@ -29,10 +29,17 @@ export default function ClassroomResearch() {
 
   const [showAbandoned, setShowAbandoned] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState<string>("all");
-  const [detailDialogResearch, setDetailDialogResearch] =
-    useState<ClassroomResearchSuggestion | null>(null);
+  // Store just the id and derive the object from the latest query data — so
+  // the detail dialog reflects an in-place update (e.g. after_data) without
+  // needing to be closed and reopened.
+  const [selectedResearchId, setSelectedResearchId] = useState<string | null>(null);
   const [editDialogResearch, setEditDialogResearch] =
     useState<ClassroomResearchSuggestion | null>(null);
+
+  const detailDialogResearch = useMemo(
+    () => allResearch?.find((r) => r.id === selectedResearchId) ?? null,
+    [allResearch, selectedResearchId]
+  );
 
   const isAdminOrLead = isAdmin || isLead;
 
@@ -246,7 +253,7 @@ export default function ClassroomResearch() {
                     research={research}
                     showTeacherName={isAdminOrLead}
                     logCount={resolveLogCount(research)}
-                    onViewDetail={setDetailDialogResearch}
+                    onViewDetail={(r) => setSelectedResearchId(r.id)}
                   />
                 ))}
               </div>
@@ -258,8 +265,8 @@ export default function ClassroomResearch() {
       {/* Detail Dialog */}
       <ResearchDetailDialog
         research={detailDialogResearch}
-        open={!!detailDialogResearch}
-        onClose={() => setDetailDialogResearch(null)}
+        open={!!selectedResearchId}
+        onClose={() => setSelectedResearchId(null)}
         onEdit={setEditDialogResearch}
         canEdit={detailDialogResearch ? canEditResearch(detailDialogResearch) : false}
         logCount={detailDialogResearch ? resolveLogCount(detailDialogResearch) : undefined}

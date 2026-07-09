@@ -42,6 +42,9 @@ export function ResearchCard({ research, showTeacherName = false, logCount, onVi
           {logCount !== undefined && (
             <div>📝 บันทึกแล้ว {logCount} คาบ</div>
           )}
+          {research.after_data && (
+            <div className="text-green-700 font-medium">✅ พร้อมเขียน</div>
+          )}
         </div>
 
         {/* Detected Problem */}
