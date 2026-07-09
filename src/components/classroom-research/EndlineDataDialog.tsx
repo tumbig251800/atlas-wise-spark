@@ -10,16 +10,24 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Save, Loader2 } from "lucide-react";
+import { Save, Loader2, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useUpdateResearch } from "@/hooks/useClassroomResearch";
-import type { ClassroomResearchSuggestion } from "@/types/classroomResearch";
+import { useUpdateResearch, useComputeCurrentMetric } from "@/hooks/useClassroomResearch";
+import type { ClassroomResearchSuggestion, ResearchIssueType } from "@/types/classroomResearch";
 
 interface Props {
   research: ClassroomResearchSuggestion | null;
   open: boolean;
   onClose: () => void;
 }
+
+// Only PBL types have a source (pbl_assessments scores) verified safe to
+// re-query directly. See useComputeCurrentMetric for why UnitBlindSpot,
+// StayLong, GapRepeat, and RedZone are excluded.
+const RECOMPUTE_SUPPORTED_TYPES: ResearchIssueType[] = [
+  "PBLWeakCompetency",
+  "PBLStudentFailing",
+];
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -28,20 +36,47 @@ function todayIso(): string {
 export function EndlineDataDialog({ research, open, onClose }: Props) {
   const { toast } = useToast();
   const updateResearch = useUpdateResearch();
+  const computeMetric = useComputeCurrentMetric();
 
   const [label, setLabel] = useState("");
   const [value, setValue] = useState("");
   const [capturedAt, setCapturedAt] = useState(todayIso());
+  const [recomputeUnavailable, setRecomputeUnavailable] = useState(false);
 
   useEffect(() => {
     if (research) {
       setLabel(research.after_data?.label ?? "");
       setValue(research.after_data?.value != null ? String(research.after_data.value) : "");
       setCapturedAt(research.after_data?.captured_at ?? todayIso());
+      setRecomputeUnavailable(false);
     }
   }, [research]);
 
   if (!research) return null;
+
+  const canOfferRecompute =
+    RECOMPUTE_SUPPORTED_TYPES.includes(research.issue_type) && !recomputeUnavailable;
+
+  const handleRecompute = () => {
+    computeMetric.mutate(research, {
+      onSuccess: (result) => {
+        if (!result) {
+          setRecomputeUnavailable(true);
+          return;
+        }
+        setLabel(result.label);
+        setValue(String(result.value));
+        setCapturedAt(todayIso());
+      },
+      onError: (error) => {
+        toast({
+          title: "คำนวณอัตโนมัติไม่สำเร็จ",
+          description: error.message,
+          variant: "destructive",
+        });
+      },
+    });
+  };
 
   const metric = research.before_data?.metric ?? research.issue_type;
 
@@ -91,6 +126,27 @@ export function EndlineDataDialog({ research, open, onClose }: Props) {
         </DialogHeader>
 
         <div className="space-y-4">
+          {canOfferRecompute ? (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleRecompute}
+              disabled={computeMetric.isPending}
+              className="w-full"
+            >
+              {computeMetric.isPending ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4 mr-1" />
+              )}
+              คำนวณจากข้อมูล ATLAS อัตโนมัติ
+            </Button>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              หัวข้อประเภทนี้ยังไม่รองรับการคำนวณอัตโนมัติ กรอกข้อมูลเองได้ด้านล่าง
+            </p>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="endline_label">คำอธิบายผลลัพธ์ *</Label>
             <Input
