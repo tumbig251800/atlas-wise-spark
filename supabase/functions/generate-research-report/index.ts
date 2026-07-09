@@ -41,6 +41,13 @@ function thaiDate(dateStr: string | null | undefined): string {
   });
 }
 
+function thaiMonthLabel(yearMonth: string): string {
+  return new Date(`${yearMonth}-01`).toLocaleDateString("th-TH", {
+    month: "short",
+    year: "numeric",
+  });
+}
+
 interface MetricData {
   metric?: string;
   label?: string;
@@ -139,6 +146,141 @@ async function callClaude(
   return JSON.parse(cleaned) as AIReport;
 }
 
+interface AppendixTable {
+  note: string;
+  headers: string[];
+  rows: string[][];
+}
+
+/**
+ * Per-student appendix, identified by student ID code only — never names.
+ * Built entirely by code from real assessment records; student identifiers
+ * are NOT sent to the AI. Codes let school staff trace back who each row is
+ * while keeping the document safe if it travels beyond the school (PDPA).
+ */
+async function buildStudentAppendix(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  row: Record<string, unknown>
+): Promise<AppendixTable | null> {
+  const issueType = row.issue_type as string;
+
+  if (issueType === "UnitBlindSpot") {
+    let query = supabase
+      .from("unit_assessments")
+      .select("student_id, score, total_score, assessed_date")
+      .eq("teacher_id", row.teacher_id)
+      .eq("academic_term", row.academic_term);
+    if (row.grade_level) query = query.eq("grade_level", row.grade_level);
+    if (row.classroom) query = query.eq("classroom", row.classroom);
+    if (row.subject) query = query.eq("subject", row.subject);
+    const { data, error } = await query;
+    if (error) throw error;
+    if (!data || data.length === 0) return null;
+
+    const byMonth: Record<string, Record<string, number>> = {};
+    for (const r of data) {
+      if (!r.assessed_date || !r.total_score) continue;
+      const month = String(r.assessed_date).slice(0, 7);
+      (byMonth[month] ??= {})[String(r.student_id)] =
+        (Number(r.score) / Number(r.total_score)) * 100;
+    }
+    const months = Object.keys(byMonth).sort();
+    if (months.length === 0) return null;
+
+    const baselineGuess = (row.before_data as MetricData | null)?.captured_at?.slice(0, 7);
+    const baseMonth = baselineGuess && byMonth[baselineGuess] ? baselineGuess : months[0];
+    const lastMonth = months[months.length - 1];
+    if (lastMonth === baseMonth) return null; // no post-baseline round yet
+
+    const targets = Object.entries(byMonth[baseMonth])
+      .filter(([, pct]) => pct < 50)
+      .map(([sid]) => sid)
+      .sort();
+    if (targets.length === 0) return null;
+
+    const fmtPct = (p: number | undefined) =>
+      p == null ? "-" : String(Math.round(p * 10) / 10);
+    return {
+      note: `กลุ่มเป้าหมาย: นักเรียนที่ได้คะแนนหลังหน่วยต่ำกว่า 50% ในเดือน ${thaiMonthLabel(baseMonth)} เทียบกับผลเดือน ${thaiMonthLabel(lastMonth)} (เกณฑ์ 50% ตามมาตรฐานที่ใช้ในระบบ ATLAS)`,
+      headers: [
+        "รหัสนักเรียน",
+        `คะแนน % (${thaiMonthLabel(baseMonth)})`,
+        `คะแนน % (${thaiMonthLabel(lastMonth)})`,
+        "ผลเทียบเกณฑ์ล่าสุด",
+      ],
+      rows: targets.map((sid) => {
+        const b = byMonth[baseMonth][sid];
+        const a = byMonth[lastMonth]?.[sid];
+        const verdict = a == null ? "ไม่มีข้อมูล" : a < 50 ? "ยังไม่ผ่านเกณฑ์" : "ผ่านเกณฑ์";
+        return [sid, fmtPct(b), fmtPct(a), verdict];
+      }),
+    };
+  }
+
+  if (issueType === "StayLong") {
+    let query = supabase
+      .from("remedial_tracking")
+      .select("student_id, status")
+      .eq("teacher_id", row.teacher_id)
+      .eq("academic_term", row.academic_term);
+    if (row.grade_level) query = query.eq("grade_level", row.grade_level);
+    if (row.classroom) query = query.eq("classroom", row.classroom);
+    if (row.subject) query = query.eq("subject", row.subject);
+    const { data, error } = await query;
+    if (error) throw error;
+    if (!data || data.length === 0) return null;
+
+    const sorted = [...data].sort((a, b) => {
+      if (a.status !== b.status) return a.status === "stay" ? -1 : 1;
+      return String(a.student_id).localeCompare(String(b.student_id));
+    });
+    return {
+      note: "สถานะซ่อมเสริมล่าสุดของนักเรียนที่อยู่ในการซ่อมเสริมวิชานี้ (บันทึกจากผลการซ่อมเสริมจริง)",
+      headers: ["รหัสนักเรียน", "สถานะซ่อมเสริมล่าสุด"],
+      rows: sorted.map((r) => [
+        String(r.student_id),
+        r.status === "stay" ? "STAY (ยังไม่ผ่าน)" : "PASS (ผ่านแล้ว)",
+      ]),
+    };
+  }
+
+  if (issueType === "PBLStudentFailing" || issueType === "PBLWeakCompetency") {
+    const { data: projects, error: projErr } = await supabase
+      .from("pbl_projects")
+      .select("id")
+      .eq("teacher_name", row.teacher_name)
+      .eq("classroom", row.classroom)
+      .eq("academic_term", row.academic_term);
+    if (projErr) throw projErr;
+    if (!projects || projects.length !== 1) return null;
+
+    const { data: assessments, error: aErr } = await supabase
+      .from("pbl_assessments")
+      .select("student_id, total_score, overall_result")
+      .eq("project_id", projects[0].id);
+    if (aErr) throw aErr;
+    if (!assessments || assessments.length === 0) return null;
+
+    const failing = assessments
+      .filter((r) => r.overall_result === "fail" || r.overall_result === "ไม่ผ่าน")
+      .sort((a, b) => String(a.student_id).localeCompare(String(b.student_id)));
+    if (failing.length === 0) return null;
+
+    return {
+      note: "นักเรียนที่ผลประเมิน PBL ล่าสุดยังไม่ผ่าน (จากโปรเจกต์ที่ตรงกับหัวข้อวิจัยนี้)",
+      headers: ["รหัสนักเรียน", "คะแนนรวม", "ผลการประเมิน"],
+      rows: failing.map((r) => [
+        String(r.student_id),
+        String(r.total_score ?? "-"),
+        "ไม่ผ่าน",
+      ]),
+    };
+  }
+
+  return null; // GapRepeat, RedZone, AbandonedRepropose — no verified per-student source
+}
+
 function buildComparisonTable(before: MetricData, after: MetricData): string {
   const beforeNum = Number(before.value);
   const afterNum = Number(after.value);
@@ -190,6 +332,7 @@ function buildHTML(
   before: MetricData,
   after: MetricData,
   logs: LogsSummary,
+  appendix: AppendixTable | null,
   directorName: string
 ): string {
   const { term, year } = formatTerm(row.academic_term as string);
@@ -208,6 +351,22 @@ function buildHTML(
   const recFuture = (ai.recommendations?.future_research ?? [])
     .map((r) => `<li>${escapeHtml(r)}</li>`)
     .join("");
+
+  const appendixHtml = appendix
+    ? `
+<h2>ภาคผนวก: ผลรายบุคคล (ระบุด้วยรหัสประจำตัวนักเรียน)</h2>
+<p>${escapeHtml(appendix.note)}</p>
+<table>
+  <tr>${appendix.headers.map((h) => `<th>${escapeHtml(h)}</th>`).join("")}</tr>
+  ${appendix.rows
+    .map(
+      (cells) =>
+        `<tr>${cells.map((c) => `<td style="text-align:center;">${escapeHtml(c)}</td>`).join("")}</tr>`
+    )
+    .join("")}
+</table>
+<p style="font-size:12px;color:#555;margin-top:6px;">หมายเหตุ: รายงานนี้ใช้รหัสประจำตัวนักเรียนแทนชื่อ เพื่อคุ้มครองข้อมูลส่วนบุคคลของผู้เรียน (PDPA)</p>`
+    : "";
 
   return `<!DOCTYPE html>
 <html lang="th">
@@ -394,6 +553,7 @@ ${buildComparisonTable(before, after)}
 <ul>${recClassroom || "<li>-</li>"}</ul>
 <p style="font-weight:600;">การวิจัยครั้งต่อไป</p>
 <ul>${recFuture || "<li>-</li>"}</ul>
+${appendixHtml}
 
 <div class="sign-section">
   <table class="sign-table">
@@ -511,9 +671,10 @@ serve(async (req) => {
     if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY is not configured in Supabase Secrets");
 
     const aiResult = await callClaude(anthropicKey, row, before, after, logs);
+    const appendix = await buildStudentAppendix(supabase, row);
 
     const dirName = director_name ?? "ผู้อำนวยการโรงเรียนวรนาถวิทยากำแพงเพชร";
-    const html = buildHTML(row, aiResult, before, after, logs, dirName);
+    const html = buildHTML(row, aiResult, before, after, logs, appendix, dirName);
 
     return new Response(html, {
       status: 200,
