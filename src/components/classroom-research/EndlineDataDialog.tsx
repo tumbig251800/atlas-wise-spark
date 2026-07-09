@@ -21,13 +21,18 @@ interface Props {
   onClose: () => void;
 }
 
-// Only PBL types have a source (pbl_assessments scores) verified safe to
-// re-query directly. See useComputeCurrentMetric for why UnitBlindSpot,
-// StayLong, GapRepeat, and RedZone are excluded.
-const RECOMPUTE_SUPPORTED_TYPES: ResearchIssueType[] = [
-  "PBLWeakCompetency",
-  "PBLStudentFailing",
-];
+// Per-type guidance shown above the recompute button — reminds the teacher
+// that a real re-assessment of students must exist in ATLAS first (PLC
+// closing a case is a process, not a measurement). Types absent from this
+// map (GapRepeat, RedZone, AbandonedRepropose) are manual-entry only.
+const RECOMPUTE_GUIDANCE: Partial<Record<ResearchIssueType, string>> = {
+  UnitBlindSpot:
+    "คำนวณจากคะแนนหลังหน่วยจริงใน ATLAS — ครูต้องกรอกคะแนนหลังหน่วยรอบใหม่ (หลังเริ่มวิจัย) ก่อน ตัวเลขจึงสะท้อนผลจริง",
+  StayLong:
+    "คำนวณจากสถานะซ่อมเสริมล่าสุด (PASS/STAY) — ครูต้องบันทึกผลซ่อมเสริมรอบใหม่ก่อน",
+  PBLWeakCompetency: "คำนวณจากคะแนนประเมิน PBL ล่าสุดในระบบ",
+  PBLStudentFailing: "คำนวณจากคะแนนประเมิน PBL ล่าสุดในระบบ",
+};
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -41,27 +46,27 @@ export function EndlineDataDialog({ research, open, onClose }: Props) {
   const [label, setLabel] = useState("");
   const [value, setValue] = useState("");
   const [capturedAt, setCapturedAt] = useState(todayIso());
-  const [recomputeUnavailable, setRecomputeUnavailable] = useState(false);
+  const [unavailableReason, setUnavailableReason] = useState<string | null>(null);
 
   useEffect(() => {
     if (research) {
       setLabel(research.after_data?.label ?? "");
       setValue(research.after_data?.value != null ? String(research.after_data.value) : "");
       setCapturedAt(research.after_data?.captured_at ?? todayIso());
-      setRecomputeUnavailable(false);
+      setUnavailableReason(null);
     }
   }, [research]);
 
   if (!research) return null;
 
-  const canOfferRecompute =
-    RECOMPUTE_SUPPORTED_TYPES.includes(research.issue_type) && !recomputeUnavailable;
+  const recomputeGuidance = RECOMPUTE_GUIDANCE[research.issue_type];
 
   const handleRecompute = () => {
+    setUnavailableReason(null);
     computeMetric.mutate(research, {
       onSuccess: (result) => {
-        if (!result) {
-          setRecomputeUnavailable(true);
+        if (result.kind === "unavailable") {
+          setUnavailableReason(result.reason);
           return;
         }
         setLabel(result.label);
@@ -126,21 +131,29 @@ export function EndlineDataDialog({ research, open, onClose }: Props) {
         </DialogHeader>
 
         <div className="space-y-4">
-          {canOfferRecompute ? (
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={handleRecompute}
-              disabled={computeMetric.isPending}
-              className="w-full"
-            >
-              {computeMetric.isPending ? (
-                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-              ) : (
-                <Sparkles className="h-4 w-4 mr-1" />
+          {recomputeGuidance ? (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">{recomputeGuidance}</p>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleRecompute}
+                disabled={computeMetric.isPending}
+                className="w-full"
+              >
+                {computeMetric.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4 mr-1" />
+                )}
+                คำนวณจากข้อมูล ATLAS อัตโนมัติ
+              </Button>
+              {unavailableReason && (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md p-2">
+                  {unavailableReason}
+                </p>
               )}
-              คำนวณจากข้อมูล ATLAS อัตโนมัติ
-            </Button>
+            </div>
           ) : (
             <p className="text-xs text-muted-foreground">
               หัวข้อประเภทนี้ยังไม่รองรับการคำนวณอัตโนมัติ กรอกข้อมูลเองได้ด้านล่าง

@@ -104,9 +104,15 @@ export function useResearchLogCounts(researchIds: string[]) {
   });
 }
 
-export interface ComputedMetric {
-  label: string;
-  value: number;
+export type ComputeResult =
+  | { kind: "ok"; label: string; value: number }
+  | { kind: "unavailable"; reason: string };
+
+function thaiMonth(yearMonth: string): string {
+  return new Date(`${yearMonth}-01`).toLocaleDateString("th-TH", {
+    month: "short",
+    year: "numeric",
+  });
 }
 
 const PBL_COMPETENCY_COLUMNS = [
@@ -119,7 +125,7 @@ const PBL_COMPETENCY_COLUMNS = [
 
 async function computePblMetric(
   research: ClassroomResearchSuggestion
-): Promise<ComputedMetric | null> {
+): Promise<ComputeResult> {
   // classroom_research_suggestions doesn't store a project_id — only recompute
   // when exactly one pbl_projects row matches, otherwise we'd be guessing which
   // project the original baseline came from.
@@ -131,7 +137,12 @@ async function computePblMetric(
     .eq("academic_term", research.academic_term);
 
   if (projectsError) throw projectsError;
-  if (!projects || projects.length !== 1) return null;
+  if (!projects || projects.length !== 1) {
+    return {
+      kind: "unavailable",
+      reason: "ระบุโปรเจกต์ PBL ให้อัตโนมัติไม่ได้ (ไม่พบ หรือพบหลายโปรเจกต์) — กรอกข้อมูลเอง",
+    };
+  }
 
   const { data: assessments, error: assessmentsError } = await supabase
     .from("pbl_assessments")
@@ -139,7 +150,9 @@ async function computePblMetric(
     .eq("project_id", projects[0].id);
 
   if (assessmentsError) throw assessmentsError;
-  if (!assessments || assessments.length === 0) return null;
+  if (!assessments || assessments.length === 0) {
+    return { kind: "unavailable", reason: "ยังไม่มีผลประเมิน PBL ของโปรเจกต์นี้ในระบบ" };
+  }
 
   const dimensionAverages = PBL_COMPETENCY_COLUMNS.map(
     (col) =>
@@ -151,44 +164,143 @@ async function computePblMetric(
   ).length;
 
   if (research.issue_type === "PBLStudentFailing") {
-    return { label: "จำนวนนักเรียนไม่ผ่าน PBL (ปัจจุบัน)", value: failingCount };
+    return { kind: "ok", label: "จำนวนนักเรียนไม่ผ่าน PBL (ปัจจุบัน)", value: failingCount };
   }
-  return { label: "คะแนนสมรรถนะ PBL ต่ำสุด (5 ด้าน เฉลี่ย, ปัจจุบัน)", value: minAverage };
+  return {
+    kind: "ok",
+    label: "คะแนนสมรรถนะ PBL ต่ำสุด (5 ด้าน เฉลี่ย, ปัจจุบัน)",
+    value: minAverage,
+  };
 }
 
 /**
- * Re-run the same kind of query that produced this research's before_data,
- * to get a live "current" value for the Endline form — so teachers don't have
- * to hand-count students. Deliberately narrow to PBL only after verifying
- * against live data:
- *  - UnitBlindSpot rejected: action_plan_items.status is a workflow/ticket
- *    state (open/verified/dismissed) closed via human PLC sign-off, not by a
- *    re-tested score — counting status='open' would report "0 remaining" the
- *    moment a case is administratively closed, even if nobody was re-tested.
- *  - StayLong rejected: remedial_tracking has a UNIQUE(student_id, subject,
- *    grade_level, academic_term) constraint — it's an upsert snapshot of each
- *    student's LATEST remedial result, not an append-only log of every round.
- *    The original baseline's "stay >= 2 รอบ" can't be recovered by counting
- *    rows here; that "รอบ" concept isn't represented in this table at all.
+ * UnitBlindSpot endline: re-measure from unit_assessments — actual per-student
+ * unit test scores — using the school-standard "< 50%" criterion (same as
+ * atlas-mcp's unit crosscheck). Returns the latest month's count alongside the
+ * same-definition count for the baseline month, so before/after in the research
+ * write-up compare identical measures (one-group pretest-posttest).
+ */
+async function computeUnitBlindSpotMetric(
+  research: ClassroomResearchSuggestion
+): Promise<ComputeResult> {
+  let query = supabase
+    .from("unit_assessments")
+    .select("score, total_score, assessed_date")
+    .eq("teacher_id", research.teacher_id)
+    .eq("academic_term", research.academic_term);
+  if (research.grade_level) query = query.eq("grade_level", research.grade_level);
+  if (research.classroom) query = query.eq("classroom", research.classroom);
+  if (research.subject) query = query.eq("subject", research.subject);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  if (!data || data.length === 0) {
+    return { kind: "unavailable", reason: "ยังไม่มีคะแนนหลังหน่วยของวิชา/ห้องนี้ในระบบ" };
+  }
+
+  const byMonth: Record<string, { total: number; below: number }> = {};
+  data.forEach((row) => {
+    if (!row.assessed_date || !row.total_score) return;
+    const month = String(row.assessed_date).slice(0, 7);
+    byMonth[month] ??= { total: 0, below: 0 };
+    byMonth[month].total++;
+    if (Number(row.score) / Number(row.total_score) < 0.5) byMonth[month].below++;
+  });
+
+  const months = Object.keys(byMonth).sort();
+  if (months.length === 0) {
+    return { kind: "unavailable", reason: "ยังไม่มีคะแนนหลังหน่วยของวิชา/ห้องนี้ในระบบ" };
+  }
+
+  const latestMonth = months[months.length - 1];
+  const baselineCapturedMonth = research.before_data?.captured_at?.slice(0, 7);
+  const baselineMonth =
+    baselineCapturedMonth && byMonth[baselineCapturedMonth]
+      ? baselineCapturedMonth
+      : months[0];
+
+  if (latestMonth === baselineMonth) {
+    return {
+      kind: "unavailable",
+      reason:
+        "ยังไม่มีคะแนนหลังหน่วยรอบใหม่หลังช่วง baseline — ต้องกรอกคะแนนหลังหน่วยรอบใหม่ก่อน จึงจะคำนวณผลได้",
+    };
+  }
+
+  return {
+    kind: "ok",
+    value: byMonth[latestMonth].below,
+    label: `นักเรียนได้คะแนนหลังหน่วยต่ำกว่า 50% เดือน ${thaiMonth(latestMonth)} (นิยามเดียวกัน เดือน ${thaiMonth(baselineMonth)} = ${byMonth[baselineMonth].below} คน จากผู้เข้าสอบ ${byMonth[latestMonth].total} คน)`,
+  };
+}
+
+/**
+ * StayLong endline: remedial_tracking stores each student's LATEST real
+ * remedial outcome (pass/stay, one row per student/subject/term by unique
+ * constraint). Counting current 'stay' rows answers "how many still haven't
+ * passed" — a valid same-direction endline. The baseline's "≥2 รอบ" round
+ * count is not recoverable from this table; the label states the measure
+ * honestly so the research write-up can disclose the definition difference.
+ */
+async function computeStayLongMetric(
+  research: ClassroomResearchSuggestion
+): Promise<ComputeResult> {
+  let query = supabase
+    .from("remedial_tracking")
+    .select("status")
+    .eq("teacher_id", research.teacher_id)
+    .eq("academic_term", research.academic_term);
+  if (research.grade_level) query = query.eq("grade_level", research.grade_level);
+  if (research.classroom) query = query.eq("classroom", research.classroom);
+  if (research.subject) query = query.eq("subject", research.subject);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  if (!data || data.length === 0) {
+    return { kind: "unavailable", reason: "ยังไม่มีข้อมูลซ่อมเสริมของวิชา/ห้องนี้ในระบบ" };
+  }
+
+  const stillStay = data.filter((row) => row.status === "stay").length;
+  return {
+    kind: "ok",
+    value: stillStay,
+    label: "นักเรียนที่สถานะซ่อมเสริมล่าสุดยังเป็น STAY (ยังไม่ผ่าน)",
+  };
+}
+
+/**
+ * Compute a live "current" value for the Endline form from REAL child
+ * assessment records — never from workflow/ticket state. PLC closing a case
+ * is a problem-solving process, not a re-measurement of students; research
+ * endline must come from tables that record actual per-student results:
+ *  - UnitBlindSpot → unit_assessments (unit test scores, < 50% criterion)
+ *  - StayLong → remedial_tracking (latest real remedial outcome per student)
+ *  - PBL → pbl_assessments (5-competency scores)
  *  - GapRepeat/RedZone excluded: their detection logic lives in the external
- *    n8n workflow. (A `strike_counter` table with a real strike_count column
- *    exists and looks promising for GapRepeat specifically, but needs its own
- *    verification pass before being trusted here — not done in this change.)
- * PBL assessment scores are a direct, unambiguous re-measurement with no
- * workflow-state or upsert-history traps, so they're the only supported path.
- * Returns null when unsupported or ambiguous — caller falls back to manual entry.
+ *    n8n workflow (strike_counter looks promising for GapRepeat later, but
+ *    its update semantics are n8n-owned and unverified — manual entry only).
+ * NOTE: action_plan_items.status was evaluated and rejected as a source —
+ * it's a workflow state closed via PLC sign-off, which would fake a
+ * "0 remaining" endline without any student being re-tested.
  */
 export function useComputeCurrentMetric() {
   return useMutation({
     mutationFn: async (
       research: ClassroomResearchSuggestion
-    ): Promise<ComputedMetric | null> => {
+    ): Promise<ComputeResult> => {
       switch (research.issue_type) {
+        case "UnitBlindSpot":
+          return computeUnitBlindSpotMetric(research);
+        case "StayLong":
+          return computeStayLongMetric(research);
         case "PBLWeakCompetency":
         case "PBLStudentFailing":
           return computePblMetric(research);
         default:
-          return null; // UnitBlindSpot, StayLong, GapRepeat, RedZone, AbandonedRepropose — manual entry only
+          return {
+            kind: "unavailable",
+            reason: "หัวข้อประเภทนี้ยังไม่รองรับการคำนวณอัตโนมัติ",
+          }; // GapRepeat, RedZone, AbandonedRepropose — manual entry only
       }
     },
   });
