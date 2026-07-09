@@ -65,6 +65,7 @@ interface LogsSummary {
 
 interface AIReport {
   abstract: string;
+  related_concepts: string;
   results_narrative: string;
   summary: string;
   discussion: string;
@@ -92,7 +93,8 @@ async function callClaude(
 3. ห้ามระบุชื่อนักเรียนรายบุคคล
 4. ถ้าคำอธิบายตัวชี้วัดก่อน-หลังนิยามไม่ตรงกันทุกคำ ให้ระบุเรื่องนี้ไว้ใน limitations อย่างตรงไปตรงมา
 5. ถ้าจำนวนคาบที่สอนจริงยังน้อยเมื่อเทียบกับแผน ให้ระบุใน limitations
-6. อย่าสร้างตารางในข้อความ — ตารางเปรียบเทียบระบบสร้างให้แล้ว เขียนเป็นความเรียงอธิบายประกอบ`;
+6. อย่าสร้างตารางในข้อความ — ตารางเปรียบเทียบระบบสร้างให้แล้ว เขียนเป็นความเรียงอธิบายประกอบ
+7. ใน related_concepts ห้ามอ้างอิงชื่อบุคคล ชื่อนักวิชาการ ปี ค.ศ./พ.ศ. ชื่อวารสาร หรือแหล่งอ้างอิงใดๆ โดยเด็ดขาด — อธิบายแนวคิดด้วยภาษาของตนเองล้วนๆ (การแต่งอ้างอิงปลอมทำลายความน่าเชื่อถือของรายงานทั้งฉบับ)`;
 
   const userPrompt = `เขียนเนื้อหารายงานวิจัยชั้นเรียนจากข้อมูลจริงต่อไปนี้
 
@@ -123,6 +125,7 @@ async function callClaude(
 ## โครงสร้าง JSON ที่ต้องการ
 {
   "abstract": "บทคัดย่อ 1 ย่อหน้า (ปัญหา วิธีการ ผลหลัก)",
+  "related_concepts": "แนวคิดที่เกี่ยวข้อง 1-2 ย่อหน้า: อธิบายหลักการของนวัตกรรม/วิธีการที่ใช้ ว่าคืออะไร ทำงานอย่างไร และเหมาะกับปัญหานี้เพราะอะไร — ห้ามระบุชื่อบุคคล ปี หรือแหล่งอ้างอิงใดๆ",
   "results_narrative": "ความเรียงอธิบายผลการวิจัยประกอบตารางก่อน-หลัง 1-2 ย่อหน้า",
   "summary": "สรุปผลการวิจัยตอบคำถามวิจัยตรงๆ 1 ย่อหน้า",
   "discussion": "อภิปรายผล เชื่อมโยงผลกับนวัตกรรมด้วยภาษาความสัมพันธ์/แนวโน้ม 1-2 ย่อหน้า",
@@ -512,7 +515,10 @@ function downloadDoc() {
   ${before.source ? `&nbsp;·&nbsp; แหล่งข้อมูล: ${escapeHtml(before.source)}` : ""}
 </div>
 
-<h2>2. คำถามวิจัยและวัตถุประสงค์</h2>
+<h2>2. แนวคิดที่เกี่ยวข้อง</h2>
+<p>${escapeHtml(ai.related_concepts)}</p>
+
+<h2>3. คำถามวิจัยและวัตถุประสงค์</h2>
 <div class="info-grid">
   <span class="label">คำถามวิจัย:</span>
   <span>${escapeHtml(row.research_question as string)}</span>
@@ -520,10 +526,10 @@ function downloadDoc() {
   <span>${escapeHtml(row.objective as string)}</span>
 </div>
 
-<h2>3. กลุ่มเป้าหมาย</h2>
+<h2>4. กลุ่มเป้าหมาย</h2>
 <p>${escapeHtml(row.target_group as string)}</p>
 
-<h2>4. วิธีดำเนินการวิจัย</h2>
+<h2>5. วิธีดำเนินการวิจัย</h2>
 <p>${escapeHtml(row.intervention as string)}</p>
 <p>${logsLine}</p>
 <div class="info-grid">
@@ -535,20 +541,20 @@ function downloadDoc() {
   <span>${escapeHtml(row.analysis_method as string)}</span>
 </div>
 
-<h2>5. ผลการวิจัย</h2>
+<h2>6. ผลการวิจัย</h2>
 ${buildComparisonTable(before, after)}
 <p style="margin-top:10px;">${escapeHtml(ai.results_narrative)}</p>
 
-<h2>6. สรุปผลการวิจัย</h2>
+<h2>7. สรุปผลการวิจัย</h2>
 <p>${escapeHtml(ai.summary)}</p>
 
-<h2>7. อภิปรายผล</h2>
+<h2>8. อภิปรายผล</h2>
 <p>${escapeHtml(ai.discussion)}</p>
 
-<h2>8. ข้อจำกัดของการวิจัย</h2>
+<h2>9. ข้อจำกัดของการวิจัย</h2>
 <ul>${limitationsList || "<li>-</li>"}</ul>
 
-<h2>9. ข้อเสนอแนะ</h2>
+<h2>10. ข้อเสนอแนะ</h2>
 <p style="font-weight:600;">การนำไปใช้ในชั้นเรียน</p>
 <ul>${recClassroom || "<li>-</li>"}</ul>
 <p style="font-weight:600;">การวิจัยครั้งต่อไป</p>
