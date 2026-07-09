@@ -47,6 +47,23 @@ const ISSUE_TYPE_CONFIG: Record<
     label: "ห้องเรียนกลุ่มเสี่ยง",
     className: "bg-destructive/20 text-destructive border-destructive/30",
   },
+  AbandonedRepropose: {
+    label: "เลิกทำแล้วเสนอใหม่",
+    className: "bg-slate-100 text-slate-700 border-slate-200",
+  },
+  PBLWeakCompetency: {
+    label: "PBL สมรรถนะอ่อน",
+    className: "bg-purple-100 text-purple-700 border-purple-200",
+  },
+  PBLStudentFailing: {
+    label: "PBL นักเรียนไม่ผ่าน",
+    className: "bg-red-100 text-red-700 border-red-200",
+  },
+};
+
+const FALLBACK_ISSUE_TYPE_CONFIG = {
+  label: "ไม่ระบุประเภท",
+  className: "bg-gray-100 text-gray-700 border-gray-200",
 };
 
 export function StatusBadge({ status }: { status: ResearchStatus }) {
@@ -55,6 +72,6 @@ export function StatusBadge({ status }: { status: ResearchStatus }) {
 }
 
 export function IssueTypeBadge({ issueType }: { issueType: ResearchIssueType }) {
-  const config = ISSUE_TYPE_CONFIG[issueType];
+  const config = ISSUE_TYPE_CONFIG[issueType] ?? FALLBACK_ISSUE_TYPE_CONFIG;
   return <Badge className={config.className}>{config.label}</Badge>;
 }

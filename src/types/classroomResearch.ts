@@ -2,7 +2,10 @@ export type ResearchIssueType =
   | "GapRepeat"
   | "UnitBlindSpot"
   | "StayLong"
-  | "RedZone";
+  | "RedZone"
+  | "AbandonedRepropose"
+  | "PBLWeakCompetency"
+  | "PBLStudentFailing";
 
 export type ResearchStatus =
   | "suggested"
