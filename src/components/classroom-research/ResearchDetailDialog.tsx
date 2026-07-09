@@ -31,6 +31,8 @@ interface Props {
   onClose: () => void;
   onEdit: (research: ClassroomResearchSuggestion) => void;
   canEdit: boolean;
+  /** Count of teaching_logs linked to this research. Undefined while still loading. */
+  logCount?: number;
 }
 
 function formatThaiDate(dateStr: string): string {
@@ -47,6 +49,7 @@ export function ResearchDetailDialog({
   onClose,
   onEdit,
   canEdit,
+  logCount,
 }: Props) {
   const { toast } = useToast();
   const updateStatus = useUpdateResearchStatus();
@@ -172,6 +175,11 @@ export function ResearchDetailDialog({
               <div className="text-sm">
                 {research.grade_level}/{research.classroom} · {research.subject}
               </div>
+              {logCount !== undefined && (
+                <div className="text-sm">
+                  📝 บันทึกหลังสอนที่เชื่อมโยงแล้ว: <strong>{logCount}</strong> คาบ
+                </div>
+              )}
             </DialogDescription>
           </DialogHeader>
 

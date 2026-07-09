@@ -7,10 +7,12 @@ import type { ClassroomResearchSuggestion } from "@/types/classroomResearch";
 interface Props {
   research: ClassroomResearchSuggestion;
   showTeacherName?: boolean;
+  /** Count of teaching_logs linked to this research. Undefined while still loading. */
+  logCount?: number;
   onViewDetail: (research: ClassroomResearchSuggestion) => void;
 }
 
-export function ResearchCard({ research, showTeacherName = false, onViewDetail }: Props) {
+export function ResearchCard({ research, showTeacherName = false, logCount, onViewDetail }: Props) {
   return (
     <Card className="hover:shadow-md transition-shadow">
       <CardContent className="p-4 space-y-3">
@@ -37,6 +39,9 @@ export function ResearchCard({ research, showTeacherName = false, onViewDetail }
             <span>·</span>
             <span>{research.subject}</span>
           </div>
+          {logCount !== undefined && (
+            <div>📝 บันทึกแล้ว {logCount} คาบ</div>
+          )}
         </div>
 
         {/* Detected Problem */}

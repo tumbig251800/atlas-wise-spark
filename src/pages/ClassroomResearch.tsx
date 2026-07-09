@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FileSearch, BookOpen } from "lucide-react";
-import { useClassroomResearch } from "@/hooks/useClassroomResearch";
+import { useClassroomResearch, useResearchLogCounts } from "@/hooks/useClassroomResearch";
 import { useUserRole } from "@/hooks/useUserRole";
 import { ResearchCard } from "@/components/classroom-research/ResearchCard";
 import { ResearchDetailDialog } from "@/components/classroom-research/ResearchDetailDialog";
@@ -63,6 +63,23 @@ export default function ClassroomResearch() {
     });
     return counts;
   }, [filteredByTeacher]);
+
+  // Research ids eligible for a teaching-log count (suggested/abandoned have nothing to count)
+  const countableIds = useMemo(() => {
+    return visibleResearch
+      .filter((r) => r.status === "selected" || r.status === "in_progress" || r.status === "completed")
+      .map((r) => r.id);
+  }, [visibleResearch]);
+
+  const { data: logCounts } = useResearchLogCounts(countableIds);
+
+  // Resolve a count for a countable research id: undefined while still loading,
+  // otherwise an explicit 0 (not blank) when nothing has been logged yet.
+  const resolveLogCount = (research: ClassroomResearchSuggestion): number | undefined => {
+    if (!countableIds.includes(research.id)) return undefined;
+    if (!logCounts) return undefined;
+    return logCounts[research.id] ?? 0;
+  };
 
   // Unique teachers (for admin/lead dropdown)
   const teachers = useMemo(() => {
@@ -228,6 +245,7 @@ export default function ClassroomResearch() {
                     key={research.id}
                     research={research}
                     showTeacherName={isAdminOrLead}
+                    logCount={resolveLogCount(research)}
                     onViewDetail={setDetailDialogResearch}
                   />
                 ))}
@@ -244,6 +262,7 @@ export default function ClassroomResearch() {
         onClose={() => setDetailDialogResearch(null)}
         onEdit={setEditDialogResearch}
         canEdit={detailDialogResearch ? canEditResearch(detailDialogResearch) : false}
+        logCount={detailDialogResearch ? resolveLogCount(detailDialogResearch) : undefined}
       />
 
       {/* Edit Dialog */}

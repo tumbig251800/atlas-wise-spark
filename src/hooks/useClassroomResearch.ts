@@ -78,6 +78,33 @@ export function useClassroomResearch() {
 }
 
 /**
+ * Batch-count teaching_logs linked (via research_id) to each given research id.
+ * One query for the whole list — avoids an N+1 query per card.
+ */
+export function useResearchLogCounts(researchIds: string[]) {
+  return useQuery({
+    queryKey: ["research-log-counts", researchIds],
+    enabled: researchIds.length > 0,
+    queryFn: async (): Promise<Record<string, number>> => {
+      const { data, error } = await supabase
+        .from("teaching_logs")
+        .select("research_id")
+        .in("research_id", researchIds);
+
+      if (error) throw error;
+
+      const counts: Record<string, number> = {};
+      (data ?? []).forEach((row) => {
+        if (row.research_id) {
+          counts[row.research_id] = (counts[row.research_id] ?? 0) + 1;
+        }
+      });
+      return counts;
+    },
+  });
+}
+
+/**
  * Update a research suggestion.
  * Always sets updated_at = now() automatically via database trigger or explicit update.
  */
