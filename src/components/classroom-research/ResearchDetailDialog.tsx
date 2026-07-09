@@ -19,7 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Edit, CheckCircle2, XCircle, FileText, Loader2, ClipboardCheck } from "lucide-react";
+import { Edit, CheckCircle2, XCircle, FileText, Loader2, ClipboardCheck, BookOpenCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useUpdateResearchStatus } from "@/hooks/useClassroomResearch";
 import { StatusBadge, IssueTypeBadge } from "./StatusBadge";
@@ -56,7 +56,7 @@ export function ResearchDetailDialog({
   const { toast } = useToast();
   const updateStatus = useUpdateResearchStatus();
   const [confirmAbandonOpen, setConfirmAbandonOpen] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatingDoc, setGeneratingDoc] = useState<"outline" | "report" | null>(null);
   const [endlineDialogOpen, setEndlineDialogOpen] = useState(false);
 
   if (!research) return null;
@@ -106,7 +106,11 @@ export function ResearchDetailDialog({
     );
   };
 
-  const handleGenerateDocument = async () => {
+  // Shared flow for both document generators (outline = เค้าโครง, report = ฉบับสมบูรณ์)
+  const openGeneratedDoc = async (kind: "outline" | "report") => {
+    const functionName =
+      kind === "outline" ? "generate-research-docx" : "generate-research-report";
+
     // เปิด window ทันที (ต้องอยู่ใน user gesture context ก่อน await)
     const win = window.open("", "_blank");
     if (!win) {
@@ -119,13 +123,13 @@ export function ResearchDetailDialog({
     }
     win.document.write("<html><body style='font-family:sans-serif;padding:40px;'>⏳ กำลังสร้างเอกสาร กรุณารอสักครู่...</body></html>");
 
-    setIsGenerating(true);
+    setGeneratingDoc(kind);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("กรุณาเข้าสู่ระบบก่อน");
 
       const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-research-docx`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${functionName}`,
         {
           method: "POST",
           headers: {
@@ -156,7 +160,7 @@ export function ResearchDetailDialog({
         variant: "destructive",
       });
     } finally {
-      setIsGenerating(false);
+      setGeneratingDoc(null);
     }
   };
 
@@ -275,6 +279,22 @@ export function ResearchDetailDialog({
                       <ClipboardCheck className="h-4 w-4 mr-1" />
                       บันทึกข้อมูลหลังทำ (Endline)
                     </Button>
+                    {research.after_data && (
+                      <Button
+                        onClick={() => openGeneratedDoc("report")}
+                        disabled={generatingDoc !== null}
+                        className="w-full sm:w-auto bg-green-600 hover:bg-green-700"
+                      >
+                        {generatingDoc === "report" ? (
+                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                        ) : (
+                          <BookOpenCheck className="h-4 w-4 mr-1" />
+                        )}
+                        {generatingDoc === "report"
+                          ? "กำลังเขียนรายงาน..."
+                          : "เขียนรายงานวิจัยฉบับสมบูรณ์"}
+                      </Button>
+                    )}
                   </div>
                 </>
               )}
@@ -308,16 +328,16 @@ export function ResearchDetailDialog({
                   {research.status === "selected" && (
                     <>
                       <Button
-                        onClick={handleGenerateDocument}
-                        disabled={isGenerating}
+                        onClick={() => openGeneratedDoc("outline")}
+                        disabled={generatingDoc !== null}
                         className="w-full sm:flex-1"
                       >
-                        {isGenerating ? (
+                        {generatingDoc === "outline" ? (
                           <Loader2 className="h-4 w-4 mr-1 animate-spin" />
                         ) : (
                           <FileText className="h-4 w-4 mr-1" />
                         )}
-                        {isGenerating ? "กำลังสร้างเอกสาร..." : "สร้างเค้าโครงวิจัย"}
+                        {generatingDoc === "outline" ? "กำลังสร้างเอกสาร..." : "สร้างเค้าโครงวิจัย"}
                       </Button>
                       <Button
                         variant="outline"
