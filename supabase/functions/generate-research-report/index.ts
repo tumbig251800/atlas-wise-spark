@@ -81,7 +81,8 @@ async function callClaude(
   row: Record<string, unknown>,
   before: MetricData,
   after: MetricData,
-  logs: LogsSummary
+  logs: LogsSummary,
+  stats: DescriptiveStats | null
 ): Promise<AIReport> {
   const anthropic = new Anthropic({ apiKey });
 
@@ -116,6 +117,20 @@ async function callClaude(
 ## ผลการวัดจริง (ใช้ตัวเลขชุดนี้เท่านั้น)
 ก่อนทำวิจัย (Baseline): ${before.label} = ${before.value} (เก็บเมื่อ ${before.captured_at ?? "-"})
 หลังทำวิจัย (Endline): ${after.label} = ${after.value} (เก็บเมื่อ ${after.captured_at ?? "-"})
+${
+  stats
+    ? `
+## สถิติพื้นฐานของกลุ่มเป้าหมาย (คำนวณจากคะแนนรายบุคคลจริงโดยระบบ — ห้ามคำนวณ x̄/S.D./ร้อยละใหม่เอง ใช้ตัวเลขชุดนี้เท่านั้นเวลาพูดถึงค่าเฉลี่ยหรือส่วนเบี่ยงเบนมาตรฐาน)
+กลุ่ม: ${stats.group_label} (n=${stats.n_before} คน)
+ก่อนทำวิจัย: x̄ = ${stats.mean_before}, S.D. = ${stats.sd_before}, ร้อยละผ่านเกณฑ์ (${stats.criterion_label}) = ${stats.pass_rate_before}%
+หลังทำวิจัย: ${
+        stats.n_after != null
+          ? `x̄ = ${stats.mean_after}, S.D. = ${stats.sd_after}, ร้อยละผ่านเกณฑ์ (${stats.criterion_label}) = ${stats.pass_rate_after}% (n=${stats.n_after})`
+          : "ยังไม่มีข้อมูล"
+      }
+`
+    : ""
+}
 
 ## การดำเนินการจริง (จากบันทึกหลังสอนที่ผูกกับงานวิจัยนี้)
 จำนวนคาบที่บันทึก: ${logs.count} คาบ
@@ -156,6 +171,53 @@ interface AppendixTable {
 }
 
 /**
+ * Descriptive statistics for the research target group (code-computed from
+ * real per-student scores — never AI-generated, per the "no invented
+ * numbers" rule). Covers the level-1 stats a Thai classroom-research write-up
+ * needs: x̄ (mean), S.D., n, and pass-rate against the criterion. n_after/
+ * mean_after/etc. are null when the target group hasn't been re-tested yet.
+ */
+interface DescriptiveStats {
+  group_label: string;
+  criterion_label: string;
+  n_before: number;
+  mean_before: number;
+  sd_before: number;
+  pass_rate_before: number;
+  n_after: number | null;
+  mean_after: number | null;
+  sd_after: number | null;
+  pass_rate_after: number | null;
+}
+
+interface AppendixResult {
+  appendix: AppendixTable;
+  stats: DescriptiveStats | null;
+}
+
+function round2(x: number): number {
+  return Math.round(x * 100) / 100;
+}
+
+function meanOf(xs: number[]): number {
+  return xs.reduce((a, b) => a + b, 0) / xs.length;
+}
+
+// Sample standard deviation (n-1 denominator) — matches the formula Thai
+// basic-education research methodology courses use, and is the same
+// quantity a later paired t-test would need.
+function sdOf(xs: number[]): number {
+  if (xs.length < 2) return 0;
+  const m = meanOf(xs);
+  const variance = xs.reduce((sum, x) => sum + (x - m) ** 2, 0) / (xs.length - 1);
+  return Math.sqrt(variance);
+}
+
+function passRate(xs: number[], criterion: number): number {
+  return round2((xs.filter((x) => x >= criterion).length / xs.length) * 100);
+}
+
+/**
  * Per-student appendix, identified by student ID code only — never names.
  * Built entirely by code from real assessment records; student identifiers
  * are NOT sent to the AI. Codes let school staff trace back who each row is
@@ -165,7 +227,7 @@ async function buildStudentAppendix(
   // deno-lint-ignore no-explicit-any
   supabase: any,
   row: Record<string, unknown>
-): Promise<AppendixTable | null> {
+): Promise<AppendixResult | null> {
   const issueType = row.issue_type as string;
 
   if (issueType === "UnitBlindSpot") {
@@ -204,20 +266,46 @@ async function buildStudentAppendix(
 
     const fmtPct = (p: number | undefined) =>
       p == null ? "-" : String(Math.round(p * 10) / 10);
+
+    // Descriptive stats over the target group only (students below 50% at
+    // baseline) — same group the appendix table lists, so numbers stay
+    // consistent across the report. "After" values only include students
+    // who actually have a latest-month score; n_after can be smaller than
+    // n_before if some target students weren't re-tested yet.
+    const beforeScores = targets.map((sid) => byMonth[baseMonth][sid]);
+    const afterScores = targets
+      .map((sid) => byMonth[lastMonth]?.[sid])
+      .filter((v): v is number => v != null);
+    const stats: DescriptiveStats = {
+      group_label: `นักเรียนกลุ่มเป้าหมาย (คะแนนหลังหน่วยต่ำกว่า 50% ที่เดือน ${thaiMonthLabel(baseMonth)})`,
+      criterion_label: "≥ 50%",
+      n_before: beforeScores.length,
+      mean_before: round2(meanOf(beforeScores)),
+      sd_before: round2(sdOf(beforeScores)),
+      pass_rate_before: passRate(beforeScores, 50),
+      n_after: afterScores.length > 0 ? afterScores.length : null,
+      mean_after: afterScores.length > 0 ? round2(meanOf(afterScores)) : null,
+      sd_after: afterScores.length > 0 ? round2(sdOf(afterScores)) : null,
+      pass_rate_after: afterScores.length > 0 ? passRate(afterScores, 50) : null,
+    };
+
     return {
-      note: `กลุ่มเป้าหมาย: นักเรียนที่ได้คะแนนหลังหน่วยต่ำกว่า 50% ในเดือน ${thaiMonthLabel(baseMonth)} เทียบกับผลเดือน ${thaiMonthLabel(lastMonth)} (เกณฑ์ 50% ตามมาตรฐานที่ใช้ในระบบ ATLAS)`,
-      headers: [
-        "รหัสนักเรียน",
-        `คะแนน % (${thaiMonthLabel(baseMonth)})`,
-        `คะแนน % (${thaiMonthLabel(lastMonth)})`,
-        "ผลเทียบเกณฑ์ล่าสุด",
-      ],
-      rows: targets.map((sid) => {
-        const b = byMonth[baseMonth][sid];
-        const a = byMonth[lastMonth]?.[sid];
-        const verdict = a == null ? "ไม่มีข้อมูล" : a < 50 ? "ยังไม่ผ่านเกณฑ์" : "ผ่านเกณฑ์";
-        return [sid, fmtPct(b), fmtPct(a), verdict];
-      }),
+      appendix: {
+        note: `กลุ่มเป้าหมาย: นักเรียนที่ได้คะแนนหลังหน่วยต่ำกว่า 50% ในเดือน ${thaiMonthLabel(baseMonth)} เทียบกับผลเดือน ${thaiMonthLabel(lastMonth)} (เกณฑ์ 50% ตามมาตรฐานที่ใช้ในระบบ ATLAS)`,
+        headers: [
+          "รหัสนักเรียน",
+          `คะแนน % (${thaiMonthLabel(baseMonth)})`,
+          `คะแนน % (${thaiMonthLabel(lastMonth)})`,
+          "ผลเทียบเกณฑ์ล่าสุด",
+        ],
+        rows: targets.map((sid) => {
+          const b = byMonth[baseMonth][sid];
+          const a = byMonth[lastMonth]?.[sid];
+          const verdict = a == null ? "ไม่มีข้อมูล" : a < 50 ? "ยังไม่ผ่านเกณฑ์" : "ผ่านเกณฑ์";
+          return [sid, fmtPct(b), fmtPct(a), verdict];
+        }),
+      },
+      stats,
     };
   }
 
@@ -239,12 +327,15 @@ async function buildStudentAppendix(
       return String(a.student_id).localeCompare(String(b.student_id));
     });
     return {
-      note: "สถานะซ่อมเสริมล่าสุดของนักเรียนที่อยู่ในการซ่อมเสริมวิชานี้ (บันทึกจากผลการซ่อมเสริมจริง)",
-      headers: ["รหัสนักเรียน", "สถานะซ่อมเสริมล่าสุด"],
-      rows: sorted.map((r) => [
-        String(r.student_id),
-        r.status === "stay" ? "STAY (ยังไม่ผ่าน)" : "PASS (ผ่านแล้ว)",
-      ]),
+      appendix: {
+        note: "สถานะซ่อมเสริมล่าสุดของนักเรียนที่อยู่ในการซ่อมเสริมวิชานี้ (บันทึกจากผลการซ่อมเสริมจริง)",
+        headers: ["รหัสนักเรียน", "สถานะซ่อมเสริมล่าสุด"],
+        rows: sorted.map((r) => [
+          String(r.student_id),
+          r.status === "stay" ? "STAY (ยังไม่ผ่าน)" : "PASS (ผ่านแล้ว)",
+        ]),
+      },
+      stats: null, // status counts only, not a numeric score — no x̄/S.D. to compute
     };
   }
 
@@ -271,13 +362,16 @@ async function buildStudentAppendix(
     if (failing.length === 0) return null;
 
     return {
-      note: "นักเรียนที่ผลประเมิน PBL ล่าสุดยังไม่ผ่าน (จากโปรเจกต์ที่ตรงกับหัวข้อวิจัยนี้)",
-      headers: ["รหัสนักเรียน", "คะแนนรวม", "ผลการประเมิน"],
-      rows: failing.map((r) => [
-        String(r.student_id),
-        String(r.total_score ?? "-"),
-        "ไม่ผ่าน",
-      ]),
+      appendix: {
+        note: "นักเรียนที่ผลประเมิน PBL ล่าสุดยังไม่ผ่าน (จากโปรเจกต์ที่ตรงกับหัวข้อวิจัยนี้)",
+        headers: ["รหัสนักเรียน", "คะแนนรวม", "ผลการประเมิน"],
+        rows: failing.map((r) => [
+          String(r.student_id),
+          String(r.total_score ?? "-"),
+          "ไม่ผ่าน",
+        ]),
+      },
+      stats: null, // TODO: could compute x̄/S.D. from pbl_assessments 5-competency scores later
     };
   }
 
@@ -329,6 +423,39 @@ function buildComparisonTable(before: MetricData, after: MetricData): string {
 </table>`;
 }
 
+/**
+ * x̄ / S.D. / ร้อยละผ่านเกณฑ์ table for the research target group — the
+ * "level 1" descriptive stats block a Thai classroom-research write-up
+ * expects. Built purely from code (see DescriptiveStats), never from the AI.
+ */
+function buildStatsTable(stats: DescriptiveStats): string {
+  const fmt = (n: number | null) => (n == null ? "-" : escapeHtml(String(n)));
+  const fmtPct = (n: number | null) => (n == null ? "-" : `${escapeHtml(String(n))}%`);
+  return `<table>
+  <tr>
+    <th style="width:32%;">ค่าสถิติ</th>
+    <th>ก่อนทำวิจัย (n=${stats.n_before})</th>
+    <th>หลังทำวิจัย${stats.n_after != null ? ` (n=${stats.n_after})` : ""}</th>
+  </tr>
+  <tr>
+    <td style="font-weight:600;">ค่าเฉลี่ย (x̄)</td>
+    <td style="text-align:center;">${fmt(stats.mean_before)}</td>
+    <td style="text-align:center;">${fmt(stats.mean_after)}</td>
+  </tr>
+  <tr>
+    <td style="font-weight:600;">ส่วนเบี่ยงเบนมาตรฐาน (S.D.)</td>
+    <td style="text-align:center;">${fmt(stats.sd_before)}</td>
+    <td style="text-align:center;">${fmt(stats.sd_after)}</td>
+  </tr>
+  <tr>
+    <td style="font-weight:600;">ร้อยละผ่านเกณฑ์ (${escapeHtml(stats.criterion_label)})</td>
+    <td style="text-align:center;">${fmtPct(stats.pass_rate_before)}</td>
+    <td style="text-align:center;">${fmtPct(stats.pass_rate_after)}</td>
+  </tr>
+</table>
+<p style="font-size:12px;color:#555;margin-top:6px;">คำนวณจากคะแนนรายบุคคลของ${escapeHtml(stats.group_label)} — S.D. ใช้สูตรส่วนเบี่ยงเบนมาตรฐานของกลุ่มตัวอย่าง (หารด้วย n-1)</p>`;
+}
+
 function buildHTML(
   row: Record<string, unknown>,
   ai: AIReport,
@@ -336,6 +463,7 @@ function buildHTML(
   after: MetricData,
   logs: LogsSummary,
   appendix: AppendixTable | null,
+  stats: DescriptiveStats | null,
   directorName: string
 ): string {
   const { term, year } = formatTerm(row.academic_term as string);
@@ -543,6 +671,7 @@ function downloadDoc() {
 
 <h2>6. ผลการวิจัย</h2>
 ${buildComparisonTable(before, after)}
+${stats ? `<p style="margin-top:14px;font-weight:600;">สถิติพื้นฐาน (ค่าเฉลี่ยและส่วนเบี่ยงเบนมาตรฐาน)</p>${buildStatsTable(stats)}` : ""}
 <p style="margin-top:10px;">${escapeHtml(ai.results_narrative)}</p>
 
 <h2>7. สรุปผลการวิจัย</h2>
@@ -676,11 +805,27 @@ serve(async (req) => {
     const anthropicKey = rawKey.replace(/[^\x20-\x7E]/g, "").trim();
     if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY is not configured in Supabase Secrets");
 
-    const aiResult = await callClaude(anthropicKey, row, before, after, logs);
-    const appendix = await buildStudentAppendix(supabase, row);
+    const appendixResult = await buildStudentAppendix(supabase, row);
+    const aiResult = await callClaude(
+      anthropicKey,
+      row,
+      before,
+      after,
+      logs,
+      appendixResult?.stats ?? null
+    );
 
     const dirName = director_name ?? "ผู้อำนวยการโรงเรียนวรนาถวิทยากำแพงเพชร";
-    const html = buildHTML(row, aiResult, before, after, logs, appendix, dirName);
+    const html = buildHTML(
+      row,
+      aiResult,
+      before,
+      after,
+      logs,
+      appendixResult?.appendix ?? null,
+      appendixResult?.stats ?? null,
+      dirName
+    );
 
     return new Response(html, {
       status: 200,
