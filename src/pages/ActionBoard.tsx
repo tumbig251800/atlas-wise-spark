@@ -97,9 +97,9 @@ export default function ActionBoard() {
     dismissed: all.filter((i) => matchesFilter(i, "dismissed")).length,
   }), [all]);
 
-  const ISSUE_TYPES: IssueTypeFilter[] = ["RedZone", "MasteryDrop", "UnitBlindSpot", "IntegrityFlag"];
+  const ISSUE_TYPES: IssueTypeFilter[] = ["RedZone", "MasteryDrop", "UnitBlindSpot", "IntegrityFlag", "FlatScore"];
   const issueCounts = useMemo((): Record<IssueTypeFilter, number> => {
-    const base = { all: all.length, RedZone: 0, MasteryDrop: 0, UnitBlindSpot: 0, IntegrityFlag: 0 };
+    const base = { all: all.length, RedZone: 0, MasteryDrop: 0, UnitBlindSpot: 0, IntegrityFlag: 0, FlatScore: 0 };
     for (const item of all) {
       const t = item.issue_type as IssueTypeFilter;
       if (ISSUE_TYPES.includes(t)) base[t]++;

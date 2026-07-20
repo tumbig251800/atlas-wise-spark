@@ -4,7 +4,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search } from "lucide-react";
 
 export type ActionFilterChip = "all" | "overdue" | "open" | "verified" | "dismissed";
-export type IssueTypeFilter = "all" | "RedZone" | "MasteryDrop" | "UnitBlindSpot" | "IntegrityFlag";
+export type IssueTypeFilter = "all" | "RedZone" | "MasteryDrop" | "UnitBlindSpot" | "IntegrityFlag" | "FlatScore";
 
 interface Props {
   search: string;
@@ -30,6 +30,7 @@ const ISSUE_TABS: { value: IssueTypeFilter; label: string; color: string }[] = [
   { value: "MasteryDrop",    label: "📉 คะแนนร่วง",           color: "data-[state=active]:bg-orange-100 data-[state=active]:text-orange-800" },
   { value: "UnitBlindSpot",  label: "📦 คะแนนหลังหน่วยต่ำ",   color: "data-[state=active]:bg-blue-100 data-[state=active]:text-blue-800" },
   { value: "IntegrityFlag",  label: "🚩 ข้อมูลผิดปกติ",       color: "data-[state=active]:bg-gray-100 data-[state=active]:text-gray-800" },
+  { value: "FlatScore",      label: "🎯 คะแนนนิ่ง",           color: "data-[state=active]:bg-teal-100 data-[state=active]:text-teal-800" },
 ];
 
 export function ActionFilters({ search, onSearchChange, filter, onFilterChange, counts, issueType, onIssueTypeChange, issueCounts }: Props) {
@@ -55,7 +56,7 @@ export function ActionFilters({ search, onSearchChange, filter, onFilterChange, 
 
       {/* Issue type tabs */}
       <Tabs value={issueType} onValueChange={(v) => onIssueTypeChange(v as IssueTypeFilter)}>
-        <TabsList className="w-full grid grid-cols-5">
+        <TabsList className="w-full grid grid-cols-6">
           {ISSUE_TABS.map((tab) => (
             <TabsTrigger key={tab.value} value={tab.value} className={`gap-1 text-xs ${tab.color}`}>
               {tab.label}

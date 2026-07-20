@@ -14,12 +14,14 @@ const ISSUE_TYPE_LABELS: Record<string, string> = {
   RedZone: "🚨 Red Zone",
   MasteryDrop: "📉 Mastery Drop",
   UnitBlindSpot: "👁️ Unit Blind Spot",
+  FlatScore: "🎯 คะแนนนิ่ง",
 };
 
 const ISSUE_TYPE_COLORS: Record<string, string> = {
   RedZone: "bg-red-50 text-red-700 border-red-200",
   MasteryDrop: "bg-orange-50 text-orange-700 border-orange-200",
   UnitBlindSpot: "bg-blue-50 text-blue-700 border-blue-200",
+  FlatScore: "bg-teal-50 text-teal-700 border-teal-200",
 };
 
 export function PlcQueueCard({ group, onAiDraft, isLoading }: PlcQueueCardProps) {

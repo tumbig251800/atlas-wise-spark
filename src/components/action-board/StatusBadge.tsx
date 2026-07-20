@@ -40,6 +40,7 @@ export function IssueTypeBadge({ type }: { type: string }) {
     MasteryDrop:   { label: "📉 คะแนนร่วง",           className: "bg-orange-100 text-orange-800 border border-orange-300" },
     IntegrityFlag: { label: "🚩 ข้อมูลผิดปกติ",       className: "bg-purple-100 text-purple-800 border border-purple-300" },
     UnitBlindSpot: { label: "📦 คะแนนหลังหน่วยต่ำ",   className: "bg-indigo-100 text-indigo-800 border border-indigo-300" },
+    FlatScore:     { label: "🎯 คะแนนนิ่ง",           className: "bg-teal-100 text-teal-800 border border-teal-300" },
   };
   const info = map[type] ?? { label: type, className: "bg-gray-100 text-gray-800" };
   return (

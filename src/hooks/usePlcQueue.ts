@@ -7,29 +7,33 @@ export type PlcQueueGroup = {
   subject: string;
   gradeBand: "ป.1-2" | "ป.3-4" | "ป.5-6";
   items: ActionItem[];
-  dominantType: "RedZone" | "MasteryDrop" | "UnitBlindSpot";
+  dominantType: string;
   averageMetric: number | null;
   teacherIds: string[];
   teacherNames: string[];
   weekSlot: number; // สัปดาห์ที่ควรจัด (1, 2, 3, ...) — ครูที่ซ้ำกันต้องไม่อยู่สัปดาห์เดียวกัน
 };
 
+// Base priority comes from the row's own `severity` column (set at insert time by
+// whoever created the item — n8n, edge function, etc.) so any issue_type, including
+// ones this file has never heard of, is ranked correctly by default. The per-type
+// bonus below only fine-tunes ordering *within* a severity band for the two types
+// where we have a meaningful metric scale to sort on.
+const SEVERITY_BASE: Record<string, number> = { critical: 1000, high: 700, medium: 400, low: 200 };
+
 function calculatePriority(item: ActionItem): number {
+  const base = SEVERITY_BASE[item.severity] ?? 300;
   const type = item.issue_type;
   const metric = Number(item.metric_value ?? 0);
 
-  if (type === "RedZone") return 1000;
+  let bonus = 0;
   if (type === "MasteryDrop") {
-    if (metric >= 1.0) return 900;
-    if (metric >= 0.5) return 800;
-    return 700;
+    bonus = metric >= 1.0 ? 200 : metric >= 0.5 ? 100 : 0;
+  } else if (type === "UnitBlindSpot") {
+    bonus = metric < 50 ? 200 : metric < 60 ? 100 : 0;
   }
-  if (type === "UnitBlindSpot") {
-    if (metric < 50) return 600;
-    if (metric < 60) return 500;
-    return 400;
-  }
-  return 0;
+
+  return base + bonus;
 }
 
 function getGradeBand(gradeLevel: string | null): "ป.1-2" | "ป.3-4" | "ป.5-6" | null {
@@ -76,15 +80,11 @@ export function usePlcQueue() {
 
       const maxPriority = Math.max(...items.map(calculatePriority));
 
-      const typeCounts: Record<string, number> = {};
-      items.forEach((item) => {
-        typeCounts[item.issue_type] = (typeCounts[item.issue_type] ?? 0) + 1;
-      });
-      // Prioritise severe types: MasteryDrop > RedZone > UnitBlindSpot
-      const TYPE_RANK: Record<string, number> = { RedZone: 3, MasteryDrop: 2, UnitBlindSpot: 1 };
-      const dominantType = Object.entries(typeCounts)
-        .sort((a, b) => (TYPE_RANK[b[0]] ?? 0) - (TYPE_RANK[a[0]] ?? 0))[0]?.[0] as
-        "RedZone" | "MasteryDrop" | "UnitBlindSpot";
+      // Badge shows whichever item is actually driving the group's priority —
+      // stays consistent with maxPriority above instead of a separately maintained rank table.
+      const dominantType = items.reduce((worst, item) =>
+        calculatePriority(item) > calculatePriority(worst) ? item : worst
+      , items[0]).issue_type;
 
       const metricsWithValues = items.filter((i) => i.metric_value !== null);
       const averageMetric =

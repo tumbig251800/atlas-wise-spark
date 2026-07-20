@@ -10,6 +10,7 @@ const ISSUE_CONFIGS = [
   { key: "MasteryDrop",   label: "คะแนนร่วง",            icon: "📉", bar: "bg-orange-400" },
   { key: "UnitBlindSpot", label: "คะแนนหลังหน่วยต่ำ",    icon: "📦", bar: "bg-blue-500" },
   { key: "IntegrityFlag", label: "ข้อมูลผิดปกติ",        icon: "🚩", bar: "bg-gray-400" },
+  { key: "FlatScore",     label: "คะแนนนิ่ง",            icon: "🎯", bar: "bg-teal-500" },
 ] as const;
 
 export function ActionStatsBar({ items }: Props) {
@@ -50,7 +51,7 @@ export function ActionStatsBar({ items }: Props) {
       </div>
 
       {/* Per issue type breakdown */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {ISSUE_CONFIGS.map(({ key, label, icon, bar }) => {
           const typeItems = items.filter((i) => i.issue_type === key);
           const typeClosed = typeItems.filter((i) => i.status === "verified" || i.status === "dismissed").length;
