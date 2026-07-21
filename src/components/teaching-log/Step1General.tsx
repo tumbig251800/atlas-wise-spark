@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { getSubjectsForGrade } from "@/lib/subjectNormalization";
 import type { ActiveResearchMatch } from "@/hooks/useClassroomResearch";
 
 interface Step1Props {
@@ -33,45 +34,8 @@ interface Step1Props {
 const GRADES = ["ป.1", "ป.2", "ป.3", "ป.4", "ป.5", "ป.6"];
 const CLASSROOMS = ["KBW", "2"];
 
-// วิชาที่ชื่อเปลี่ยนไปตามหลักสูตรฐานสมรรถนะ (ป.1-3 พ.ศ. 2568) — ป.4-6 ยังใช้ชื่อเดิม
-// เพราะหลักสูตรฐานสมรรถนะระดับประถมปลายยังไม่ประกาศใช้ อย่ารวมสองชุดนี้ไว้ใน list เดียวกัน
-// ไม่งั้นครูจะเลือกชื่อวิชาผิดชั้นได้ (เคยเกิดขึ้นจริงกับ teaching_logs)
-const SUBJECTS_UPPER_PRIMARY = ["ภาษาไทย", "คณิตศาสตร์", "วิทยาศาสตร์"]; // ป.4-6
-const SUBJECTS_LOWER_PRIMARY = [
-  "การอ่านและการเขียนเพื่อการสื่อสาร",
-  "การคิดคำนวณ",
-  "การเรียนรู้เพื่อเข้าใจธรรมชาติและวิทยาศาสตร์",
-]; // ป.1-3
-
-// วิชาที่ชื่อเหมือนกันทุกชั้น ไม่ได้เปลี่ยนตามหลักสูตรฐานสมรรถนะ
-const SUBJECTS_SHARED = [
-  "การงานอาชีพ",
-  "ศิลปะ",
-  "สังคมศึกษา",
-  "ภาษาจีน",
-  "ภาษาอังกฤษเพื่อการสื่อสาร",
-  "ประวัติศาสตร์",
-  "หน้าที่พลเมือง",
-  "ต้านทุจริต",
-  "ความเป็นพลเมืองและชีวิตในสังคม",
-  "การเรียนรู้ทักษะศิลปะและวัฒนธรรม",
-  "พลศึกษาและสุขภาวะ",
-  "สุขศึกษาและพลศึกษา",
-  "ภาษาอังกฤษ",
-  "ภาษาอังกฤษ KBW",
-  "การอ่านและการเขียนเพื่อการสื่อสารภาษาอังกฤษ",
-];
-
-function getSubjectsForGrade(gradeLevel: string): string[] {
-  if (["ป.1", "ป.2", "ป.3"].includes(gradeLevel)) {
-    return [...SUBJECTS_LOWER_PRIMARY, ...SUBJECTS_SHARED];
-  }
-  if (["ป.4", "ป.5", "ป.6"].includes(gradeLevel)) {
-    return [...SUBJECTS_UPPER_PRIMARY, ...SUBJECTS_SHARED];
-  }
-  // ยังไม่เลือกชั้น — โชว์ทุกวิชาไปก่อน
-  return [...SUBJECTS_LOWER_PRIMARY, ...SUBJECTS_UPPER_PRIMARY, ...SUBJECTS_SHARED];
-}
+// รายการวิชา canonical + getSubjectsForGrade ย้ายไปเป็น single source of truth
+// ที่ src/lib/subjectNormalization.ts (ใช้ร่วมกับ importer เพื่อ normalize ชื่อวิชา)
 
 export function Step1General({ data, onChange, errors, teacherName, matchedResearch, researchLinked, onToggleResearch }: Step1Props) {
   const dateValue = data.teachingDate ? new Date(`${data.teachingDate}T00:00:00`) : new Date();

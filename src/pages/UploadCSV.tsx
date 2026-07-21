@@ -218,6 +218,18 @@ function TeachingLogTab() {
               </div>
             </div>
           )}
+          {parsed.warnings.length > 0 && (
+            <div className="rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-3 flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 text-yellow-500 shrink-0 mt-0.5" />
+              <div className="text-sm">
+                <p className="font-medium text-yellow-700 dark:text-yellow-400">คำเตือน (นำเข้าต่อได้ แต่ควรตรวจสอบ):</p>
+                <ul className="list-disc list-inside mt-1 text-yellow-600 dark:text-yellow-300">
+                  {parsed.warnings.slice(0, 5).map((w, i) => <li key={i}>{w}</li>)}
+                  {parsed.warnings.length > 5 && <li>และอีก {parsed.warnings.length - 5} รายการ</li>}
+                </ul>
+              </div>
+            </div>
+          )}
           <p className="text-sm">พบ <strong>{parsed.rows.length}</strong> แถวที่พร้อมนำเข้า</p>
           <Button onClick={handleUpload} disabled={!canUpload} className="gap-2">
             {uploading ? <><Loader2 className="h-4 w-4 animate-spin" />กำลังนำเข้า...</> : <><Upload className="h-4 w-4" />นำเข้าข้อมูล</>}
@@ -401,6 +413,18 @@ function AssessmentTab() {
                 <ul className="list-disc list-inside mt-1 text-amber-600 dark:text-amber-300">
                   {parsed.errors.slice(0, 5).map((e, i) => <li key={i}>{e}</li>)}
                   {parsed.errors.length > 5 && <li>และอีก {parsed.errors.length - 5} แถว</li>}
+                </ul>
+              </div>
+            </div>
+          )}
+          {parsed.warnings.length > 0 && (
+            <div className="rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-3 flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 text-yellow-500 shrink-0 mt-0.5" />
+              <div className="text-sm">
+                <p className="font-medium text-yellow-700 dark:text-yellow-400">คำเตือน (นำเข้าต่อได้ แต่ควรตรวจสอบ):</p>
+                <ul className="list-disc list-inside mt-1 text-yellow-600 dark:text-yellow-300">
+                  {parsed.warnings.slice(0, 5).map((w, i) => <li key={i}>{w}</li>)}
+                  {parsed.warnings.length > 5 && <li>และอีก {parsed.warnings.length - 5} รายการ</li>}
                 </ul>
               </div>
             </div>

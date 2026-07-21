@@ -4,6 +4,8 @@
  * ป้องกันข้อผิดพลาดเช่น ชั้นเขียนผิด, ห้องสลับ, เทอมผิด format
  */
 
+import { resolveSubjectForImport } from "./subjectNormalization";
+
 export type ValidationResult = {
   isValid: boolean;
   normalized: string;
@@ -334,10 +336,17 @@ export function validateExcelMetadata(data: {
 
   const [gradeLevel, classroom] = gcResult.normalized.split("/");
 
+  // Normalize ชื่อวิชาให้เป็นมาตรฐานก่อนบันทึก (aliased = แปลงเงียบๆ, unknown = เตือนครู)
+  const normalizedSubject = resolveSubjectForImport(
+    data.subject,
+    gradeLevel,
+    allWarnings,
+  );
+
   return {
     isValid: allErrors.length === 0,
     normalized: {
-      subject: data.subject.trim(),
+      subject: normalizedSubject,
       gradeLevel,
       classroom,
       unitName: data.unitName.trim(),

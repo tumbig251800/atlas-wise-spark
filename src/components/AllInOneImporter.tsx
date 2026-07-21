@@ -60,7 +60,7 @@ export function AllInOneImporter() {
       const parseResult = await parseAllInOneXLSX(f);
       setParsed(parseResult);
     } else {
-      setParsed({ rows: [], errors: ["รองรับเฉพาะไฟล์ .csv หรือ .xlsx"] });
+      setParsed({ rows: [], errors: ["รองรับเฉพาะไฟล์ .csv หรือ .xlsx"], warnings: [] });
     }
   }, []);
 
@@ -238,6 +238,17 @@ export function AllInOneImporter() {
               ))}
               {parsed.errors.length > 3 && (
                 <div>และอีก {parsed.errors.length - 3} รายการ</div>
+              )}
+            </div>
+          )}
+          {parsed.warnings.length > 0 && (
+            <div className="rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-2 text-sm text-yellow-800 dark:text-yellow-200">
+              <p className="font-medium mb-1">คำเตือน (นำเข้าต่อได้ แต่ควรตรวจสอบ):</p>
+              {parsed.warnings.slice(0, 3).map((w, i) => (
+                <div key={i}>{w}</div>
+              ))}
+              {parsed.warnings.length > 3 && (
+                <div>และอีก {parsed.warnings.length - 3} รายการ</div>
               )}
             </div>
           )}

@@ -3,6 +3,7 @@
  * Supports format matching Export (Thai headers) + Google Forms multi-line headers
  */
 import { cleanClassroomData } from "./utils";
+import { resolveSubjectForImport } from "./subjectNormalization";
 
 const MAJOR_GAP_VALUES = ["k-gap", "p-gap", "a-gap", "a2-gap", "system-gap", "success"] as const;
 const ACTIVITY_MODE_VALUES = ["active", "passive", "constructive"] as const;
@@ -31,6 +32,7 @@ export interface ParsedCSVRow {
 export interface ParseResult {
   rows: ParsedCSVRow[];
   errors: string[];
+  warnings: string[];
 }
 
 /**
@@ -222,9 +224,10 @@ function findDataStart(rows: string[]): { headerIdx: number; dataStartIdx: numbe
 
 export function parseCSVFile(text: string): ParseResult {
   const errors: string[] = [];
+  const warnings: string[] = [];
   const rows = splitCSVRows(text);
   if (rows.length < 2) {
-    return { rows: [], errors: ["ไฟล์ว่างหรือมีเฉพาะหัวคอลัมน์"] };
+    return { rows: [], errors: ["ไฟล์ว่างหรือมีเฉพาะหัวคอลัมน์"], warnings };
   }
 
   const { headerIdx, dataStartIdx } = findDataStart(rows);
@@ -245,7 +248,8 @@ export function parseCSVFile(text: string): ParseResult {
     const grade_level = get("grade");
     const roomRaw = get("room");
     const classroom = cleanClassroomData(roomRaw) || roomRaw || "";
-    const subject = get("subject");
+    const subjectRaw = get("subject");
+    const subject = resolveSubjectForImport(subjectRaw, grade_level, warnings);
 
     if (!teaching_date || !grade_level || !classroom || !subject) {
       errors.push(`แถว ${i + 1}: ขาดข้อมูลจำเป็น (วันที่ ระดับชั้น ห้อง วิชา)`);
@@ -311,5 +315,5 @@ export function parseCSVFile(text: string): ParseResult {
     });
   }
 
-  return { rows: parsed, errors };
+  return { rows: parsed, errors, warnings };
 }

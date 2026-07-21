@@ -4,6 +4,8 @@
  * Headers are flexible (Thai/English) — order detected automatically
  */
 
+import { resolveSubjectForImport } from "./subjectNormalization";
+
 export interface ParsedAssessmentRow {
   student_id: string;
   student_name: string | null;
@@ -20,6 +22,7 @@ export interface ParsedAssessmentRow {
 export interface AssessmentParseResult {
   rows: ParsedAssessmentRow[];
   errors: string[];
+  warnings: string[];
 }
 
 const ASSESSMENT_HEADER_MAP: Record<string, string[]> = {
@@ -91,7 +94,7 @@ export function parseAssessmentCSV(text: string): AssessmentParseResult {
   const lines = cleaned.split(/\r?\n/).filter((l) => l.trim());
 
   if (lines.length < 2) {
-    return { rows: [], errors: ["ไฟล์ว่างหรือมีเฉพาะหัวคอลัมน์"] };
+    return { rows: [], errors: ["ไฟล์ว่างหรือมีเฉพาะหัวคอลัมน์"], warnings: [] };
   }
 
   const headers = parseCSVLine(lines[0]);
@@ -104,11 +107,13 @@ export function parseAssessmentCSV(text: string): AssessmentParseResult {
       errors: [
         "ไม่พบคอลัมน์ที่จำเป็น: ต้องมี 'รหัสนักเรียน' และ 'คะแนน' ในหัวคอลัมน์",
       ],
+      warnings: [],
     };
   }
 
   const rows: ParsedAssessmentRow[] = [];
   const errors: string[] = [];
+  const warnings: string[] = [];
 
   for (let i = 1; i < lines.length; i++) {
     const cols = parseCSVLine(lines[i]);
@@ -122,8 +127,8 @@ export function parseAssessmentCSV(text: string): AssessmentParseResult {
     const student_id = get("student_id");
     const scoreStr = get("score");
     const totalStr = get("total_score");
-    const subject = get("subject");
     const grade_level = get("grade_level");
+    const subject = resolveSubjectForImport(get("subject"), grade_level, warnings);
     const classroom = get("classroom");
 
     if (!student_id || !scoreStr) {
@@ -155,5 +160,5 @@ export function parseAssessmentCSV(text: string): AssessmentParseResult {
     });
   }
 
-  return { rows, errors };
+  return { rows, errors, warnings };
 }

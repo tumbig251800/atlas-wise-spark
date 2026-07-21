@@ -6,6 +6,7 @@ import * as XLSX from "xlsx";
 import { COMPETENCY_TEMPLATE_HEADERS } from "@/lib/competencyTemplate";
 import { CAPABILITY_KEYS_2026 } from "@/lib/capabilityConstants2026";
 import { supabase } from "@/lib/atlasSupabase";
+import { resolveSubjectForImport } from "@/lib/subjectNormalization";
 
 const db = supabase as unknown as {
   from: (table: string) => ReturnType<typeof supabase.from>;
@@ -39,6 +40,7 @@ export interface ParsedAllInOneRow {
 export interface AllInOneParseResult {
   rows: ParsedAllInOneRow[];
   errors: string[];
+  warnings: string[];
 }
 
 export interface UpsertResult {
@@ -104,10 +106,11 @@ export function parseAllInOneCSV(text: string): AllInOneParseResult {
   const cleaned = text.replace(BOM, "");
   const lines = cleaned.split(/\r?\n/).filter((l) => l.trim());
   const errors: string[] = [];
+  const warnings: string[] = [];
   const rows: ParsedAllInOneRow[] = [];
 
   if (lines.length < 2) {
-    return { rows: [], errors: ["ไฟล์ว่างหรือมีเฉพาะหัวคอลัมน์"] };
+    return { rows: [], errors: ["ไฟล์ว่างหรือมีเฉพาะหัวคอลัมน์"], warnings };
   }
 
   const headerLine = parseCSVLine(lines[0]);
@@ -135,12 +138,13 @@ export function parseAllInOneCSV(text: string): AllInOneParseResult {
     }
 
     const getFrom = (k: string) => get(cols, k);
+    const grade_level = getFrom("grade_level");
     rows.push({
       student_id,
       student_name: getFrom("student_name"),
-      subject: getFrom("subject"),
+      subject: resolveSubjectForImport(getFrom("subject"), grade_level, warnings),
       unit_name,
-      grade_level: getFrom("grade_level"),
+      grade_level,
       classroom: getFrom("classroom"),
       academic_term: getFrom("academic_term"),
       score: getFrom("score") || "",
@@ -159,7 +163,7 @@ export function parseAllInOneCSV(text: string): AllInOneParseResult {
     });
   }
 
-  return { rows, errors };
+  return { rows, errors, warnings };
 }
 
 /** Parse XLSX file (first sheet) using COMPETENCY_TEMPLATE_HEADERS. */
@@ -172,13 +176,13 @@ export function parseAllInOneXLSX(file: File): Promise<AllInOneParseResult> {
         const wb = XLSX.read(data, { type: "array" });
         const first = wb.SheetNames[0];
         if (!first) {
-          resolve({ rows: [], errors: ["ไม่มีชีตในไฟล์"] });
+          resolve({ rows: [], errors: ["ไม่มีชีตในไฟล์"], warnings: [] });
           return;
         }
         const ws = wb.Sheets[first];
         const json = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1, defval: "" });
         if (!json.length) {
-          resolve({ rows: [], errors: ["ไฟล์ว่าง"] });
+          resolve({ rows: [], errors: ["ไฟล์ว่าง"], warnings: [] });
           return;
         }
         const headerRow = (json[0] || []).map((c) => String(c).trim());
@@ -189,6 +193,7 @@ export function parseAllInOneXLSX(file: File): Promise<AllInOneParseResult> {
         });
 
         const errors: string[] = [];
+        const warnings: string[] = [];
         const rows: ParsedAllInOneRow[] = [];
         const get = (row: string[], key: string): string =>
           (colIndex.get(key) !== undefined ? row[colIndex.get(key)!] : "").trim();
@@ -206,12 +211,13 @@ export function parseAllInOneXLSX(file: File): Promise<AllInOneParseResult> {
             errors.push(`แถว ${i + 1}: ไม่มีหน่วยการเรียนรู้`);
             continue;
           }
+          const grade_level = get(row, "grade_level");
           rows.push({
             student_id,
             student_name: get(row, "student_name"),
-            subject: get(row, "subject"),
+            subject: resolveSubjectForImport(get(row, "subject"), grade_level, warnings),
             unit_name,
-            grade_level: get(row, "grade_level"),
+            grade_level,
             classroom: get(row, "classroom"),
             academic_term: get(row, "academic_term"),
             score: get(row, "score") || "",
@@ -229,9 +235,9 @@ export function parseAllInOneXLSX(file: File): Promise<AllInOneParseResult> {
             competency_note: get(row, "competency_note"),
           });
         }
-        resolve({ rows, errors });
+        resolve({ rows, errors, warnings });
       } catch (e) {
-        resolve({ rows: [], errors: [e instanceof Error ? e.message : "อ่านไฟล์ไม่สำเร็จ"] });
+        resolve({ rows: [], errors: [e instanceof Error ? e.message : "อ่านไฟล์ไม่สำเร็จ"], warnings: [] });
       }
     };
     reader.readAsArrayBuffer(file);
