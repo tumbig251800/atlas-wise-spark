@@ -9,6 +9,7 @@ import { supabase } from "@/lib/atlasSupabase";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useActionItems, usePassActionItem, ACTION_ITEMS_KEY, daysRemaining, type ActionItem } from "@/hooks/useActionItems";
+import { isActiveQueueStatus, isHistoryStatus } from "@/pages/actionBoardStatus";
 import { ActionStatsBar } from "@/components/action-board/ActionStatsBar";
 import { ActionFilters, type ActionFilterChip, type IssueTypeFilter } from "@/components/action-board/ActionFilters";
 import { ActionTable } from "@/components/action-board/ActionTable";
@@ -117,9 +118,12 @@ export default function ActionBoard() {
     );
   }, [all, filter, search, issueType]);
 
-  // Split into queue (open/watching) and history (verified/dismissed/resolved)
+  // Active queue = open / watching / resolved. "resolved" is NOT a closed state:
+  // the teacher marked it done, but the case stays active and waits for a
+  // monitoring result before it can be closed (verified). History holds only the
+  // truly-closed states (verified / dismissed).
   const queueItems = useMemo(() => {
-    return filtered.filter((i) => i.status === "open" || i.status === "watching");
+    return filtered.filter((i) => isActiveQueueStatus(i.status));
   }, [filtered]);
 
   // Separate UnitBlindSpot for grouped view
@@ -151,8 +155,10 @@ export default function ActionBoard() {
     return { teachers: teachers.size, units: units.size };
   }, [queueItems]);
 
+  // History = closed cases only. "resolved" is intentionally excluded — it is an
+  // active, waiting-for-monitoring state, not a closed case (see queueItems).
   const historyItems = useMemo(() => {
-    return filtered.filter((i) => i.status === "verified" || i.status === "dismissed" || i.status === "resolved");
+    return filtered.filter((i) => isHistoryStatus(i.status));
   }, [filtered]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -312,7 +318,7 @@ export default function ActionBoard() {
               </div>
             )}
 
-            {/* Section 1: คิวนิเทศ (open + watching) */}
+            {/* Section 1: คิวนิเทศ (open + watching + resolved/รอติดตามผล) */}
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-semibold">คิวนิเทศ</h2>
@@ -385,7 +391,7 @@ export default function ActionBoard() {
               )}
             </div>
 
-            {/* Section 2: ประวัติ (verified + dismissed + resolved) - Collapsible */}
+            {/* Section 2: ประวัติ (verified + dismissed เท่านั้น — ปิดเคสแล้ว) - Collapsible */}
             <Collapsible open={historyOpen} onOpenChange={setHistoryOpen}>
               <div className="flex items-center justify-between py-2">
                 <div className="flex items-center gap-2">

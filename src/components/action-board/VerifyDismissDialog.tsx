@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { useResolveActionItem, type ActionItem } from "@/hooks/useActionItems";
+import { useResolveActionItem, requiresMonitoringBeforeVerify, type ActionItem } from "@/hooks/useActionItems";
 
 interface Props {
   open: boolean;
@@ -43,7 +43,7 @@ export function VerifyDismissDialog({ open, mode, item, onClose }: Props) {
   const description = isDismiss
     ? "รายการนี้จะถูกปิดและไม่ปรากฏในรายการค้างอีก กรุณาระบุเหตุผล"
     : isResolve
-    ? "บันทึกว่าครูได้แก้ไขปัญหาแล้ว รอผู้บริหารยืนยัน (Verify)"
+    ? "บันทึกว่าครูได้ดำเนินการแก้ไขแล้ว เคสจะยังเปิดอยู่และรอผลการติดตาม (monitoring) ก่อนจึงปิดเคสได้"
     : "ยืนยันว่าปัญหานี้ได้รับการแก้ไขแล้ว";
   const buttonLabel = isDismiss ? "Dismiss" : isResolve ? "บันทึกว่าแก้แล้ว" : "Verify";
 
@@ -51,6 +51,18 @@ export function VerifyDismissDialog({ open, mode, item, onClose }: Props) {
     if (!user) return;
     if (isDismiss && !note.trim()) {
       toast({ title: "กรุณาระบุเหตุผล", variant: "destructive" });
+      return;
+    }
+    // WP-S0.1 interim guard: block closing a PLC Impact Loop case to "verified"
+    // until WP6 adds a monitoring-result gate. Dismiss/resolve are unaffected, and
+    // IntegrityFlag (data-quality) verify is intentionally still allowed.
+    if (!isDismiss && !isResolve && requiresMonitoringBeforeVerify(item)) {
+      toast({
+        title: "ยังปิดเคสไม่ได้ — รอการติดตามผล",
+        description:
+          "เคสนี้จะปิด (Verify) ได้ก็ต่อเมื่อมีผลการติดตาม (monitoring) ที่ยืนยันแล้ว ซึ่งจะเปิดใช้งานใน WP6",
+        variant: "destructive",
+      });
       return;
     }
     try {

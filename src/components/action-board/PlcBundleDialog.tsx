@@ -13,7 +13,7 @@ import { Loader2, FileDown, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { usePlcSessions, useTeacherList } from "@/hooks/usePlcSessions";
-import { useBulkDismissActionItems, type ActionItem } from "@/hooks/useActionItems";
+import type { ActionItem } from "@/hooks/useActionItems";
 import type { PlcSession } from "@/types/plc";
 import { PLC_OUTCOME_LABELS, GRADE_BANDS } from "@/types/plc";
 import { downloadPlcDocx } from "@/lib/downloadPlcDocx";
@@ -50,7 +50,6 @@ export function PlcBundleDialog({ open, teacherName, items, onClose }: Props) {
   const { user } = useAuth();
   const { toast } = useToast();
   const { savePlcSession } = usePlcSessions();
-  const bulkDismiss = useBulkDismissActionItems();
   const { data: teacherList = [] } = useTeacherList();
 
   const groups = useMemo(() => groupItems(items), [items]);
@@ -124,7 +123,7 @@ export function PlcBundleDialog({ open, teacherName, items, onClose }: Props) {
   const isFormValid =
     topic.trim().length > 0 && problemStatement.trim().length > 0 && selectedKeys.size > 0;
 
-  const isBusy = savePlcSession.isPending || bulkDismiss.isPending;
+  const isBusy = savePlcSession.isPending;
 
   const handleSave = async (andDownload = false) => {
     if (!isFormValid) {
@@ -154,20 +153,16 @@ export function PlcBundleDialog({ open, teacherName, items, onClose }: Props) {
     try {
       const savedSession = await savePlcSession.mutateAsync(sessionPayload);
 
-      if (selectedItems.length > 0) {
-        await bulkDismiss.mutateAsync({
-          ids: selectedItems.map((i) => i.id),
-          note: `PLC: ${topic}`,
-        });
-      }
-
+      // WP-S0 Safety Containment: this PLC-save path must NOT close/dismiss any
+      // action item — it records the PLC session only. The DB-enforced closure
+      // guard (verified requires a monitoring result) lands in WP6.
       if (andDownload) {
         await downloadPlcDocx({ ...sessionPayload, id: savedSession?.id }, selectedItems);
       }
 
       toast({
         title: "บันทึก PLC สำเร็จ",
-        description: `ปิด ${selectedItems.length} รายการ${andDownload ? " + ดาวน์โหลดเอกสาร" : ""}`,
+        description: `บันทึก PLC พร้อมผูก ${selectedItems.length} รายการที่เกี่ยวข้อง${andDownload ? " + ดาวน์โหลดเอกสาร" : ""}`,
       });
       onClose();
     } catch (err: unknown) {
@@ -185,7 +180,7 @@ export function PlcBundleDialog({ open, teacherName, items, onClose }: Props) {
             บันทึก PLC — {teacherName}
           </DialogTitle>
           <DialogDescription>
-            เลือกกลุ่มปัญหา กรอก PLC แล้วกด "บันทึก + ดาวน์โหลด .docx" เพื่อรับหลักฐาน สพฐ. และปิดเคสพร้อมกัน
+            เลือกกลุ่มปัญหา กรอก PLC แล้วกด "บันทึก + ดาวน์โหลด .docx" เพื่อบันทึกการประชุมและรับหลักฐาน สพฐ.
           </DialogDescription>
         </DialogHeader>
 
@@ -325,7 +320,7 @@ export function PlcBundleDialog({ open, teacherName, items, onClose }: Props) {
 
           {selectedKeys.size > 0 && (
             <div className="rounded-md bg-purple-50 border border-purple-200 px-4 py-3 text-sm text-purple-800">
-              บันทึกนี้จะ <strong>ปิด {selectedItems.length} รายการ</strong> จาก {selectedKeys.size} กลุ่ม
+              บันทึกนี้จะ <strong>ผูก {selectedItems.length} รายการ</strong> จาก {selectedKeys.size} กลุ่ม เข้ากับ PLC นี้ (ไม่ปิดเคสอัตโนมัติ)
             </div>
           )}
         </div>
@@ -335,7 +330,7 @@ export function PlcBundleDialog({ open, teacherName, items, onClose }: Props) {
             ยกเลิก
           </Button>
           <Button variant="outline" onClick={() => handleSave(false)} disabled={isBusy || !isFormValid}>
-            {savePlcSession.isPending && !bulkDismiss.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            {savePlcSession.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
             บันทึก PLC
           </Button>
           <Button

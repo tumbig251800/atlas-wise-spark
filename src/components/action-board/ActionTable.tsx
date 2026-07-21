@@ -10,7 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight, ExternalLink, CheckCircle2, XCircle, Bot, ClipboardList, Send, Share2, Users } from "lucide-react";
+import { ChevronDown, ChevronRight, ExternalLink, CheckCircle2, XCircle, Bot, ClipboardList, Send, Share2, Users, Clock } from "lucide-react";
 import { ACTION_ITEMS_KEY, type ActionItem } from "@/hooks/useActionItems";
 import { StatusBadge, IssueTypeBadge, SeverityBadge } from "./StatusBadge";
 import { useNidetVisits } from "@/hooks/useNidetVisits";
@@ -203,11 +203,14 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss, onPass
 
     setPlcModalOpen(false);
 
-    // If outcome is resolved, suggest user to verify
+    // WP-S0.1: PLC "resolved" records the meeting only — the case stays OPEN and
+    // waits for monitoring/follow-up. It must NOT be closed via Verify yet; the
+    // DB-enforced closure guard lands in WP6.
     if (session.outcome_type === "resolved") {
       toast({
-        title: "PLC แก้ไขได้แล้ว — กด Verify เพื่อปิดเคส",
-        description: "PLC ระบุว่าแก้ไขได้แล้ว คุณสามารถกด Verify เพื่อปิดเคสนี้ได้",
+        title: "บันทึก PLC แล้ว — เคสยังเปิดอยู่",
+        description:
+          "PLC ระบุว่าแก้ไขได้แล้ว แต่เคสจะยังเปิดอยู่และรอการติดตามผล (monitoring) ก่อนจึงปิดเคสได้",
         duration: 5000,
       });
     }
@@ -538,14 +541,16 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss, onPass
                                   <CheckCircle2 className="h-4 w-4 mr-1" /> ครูแก้แล้ว
                                 </Button>
                               )}
-                              {/* Verify — for resolved items waiting for admin confirmation */}
+                              {/* WP-S0.1: PLC Impact Loop cases cannot be closed via Verify
+                                  until WP6 adds a monitoring-result gate. Show a waiting
+                                  state instead of an active Verify button. */}
                               {item.status === "resolved" && (
-                                <Button
-                                  size="sm"
-                                  onClick={(e) => { e.stopPropagation(); onVerify(item); }}
+                                <span
+                                  className="inline-flex items-center rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700"
+                                  title="เคสจะปิดได้ก็ต่อเมื่อมีผลการติดตาม (monitoring) ยืนยัน — เปิดใช้งานใน WP6"
                                 >
-                                  <CheckCircle2 className="h-4 w-4 mr-1" /> Verify
-                                </Button>
+                                  <Clock className="h-3.5 w-3.5 mr-1" /> รอติดตามผล
+                                </span>
                               )}
                             </>
                           )}

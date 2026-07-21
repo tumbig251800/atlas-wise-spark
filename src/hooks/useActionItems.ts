@@ -6,6 +6,24 @@ export type ActionItem = Tables<"action_plan_items">;
 
 export const ACTION_ITEMS_KEY = ["action-items"] as const;
 
+/**
+ * WP-S0.1 interim UI guard.
+ *
+ * A PLC Impact Loop case (a classroom/student-outcome issue) must NOT be closed
+ * to `verified` until WP6 adds a DB-enforced monitoring-result gate. Until then
+ * the Verify path is blocked client-side for these cases.
+ *
+ * `IntegrityFlag` is a data-entry/data-quality fix — not a student-outcome case —
+ * so it keeps its own "ยืนยันครูแก้แล้ว" verify flow and is intentionally allowed.
+ *
+ * NOTE: this is a temporary UI-only guard. The authoritative closure invariant
+ * (verified requires a passed, verified monitoring result for the same case) is
+ * enforced at the database level in WP6.
+ */
+export function requiresMonitoringBeforeVerify(item: Pick<ActionItem, "issue_type">): boolean {
+  return item.issue_type !== "IntegrityFlag";
+}
+
 export function useActionItems() {
   return useQuery({
     queryKey: ACTION_ITEMS_KEY,
