@@ -152,8 +152,16 @@ function ReportCard({ report, studentName, studentId, grade, classroom, academic
                   </td>
                   <td className="py-1 px-2 text-right">
                     {s.score}/{s.maxScore} &middot; {s.percent}%
-                    {s.prevPercent !== null && s.percent > s.prevPercent && (
+                    {s.prevPercent === null ? (
+                      <span
+                        style={{ color: "#8a8a8a", fontSize: "0.85em" }}
+                      > &middot; หน่วยแรก</span>
+                    ) : s.percent > s.prevPercent ? (
                       <span style={{ color: "#3b6d11" }}> &uarr;{s.prevPercent}%</span>
+                    ) : s.percent < s.prevPercent ? (
+                      <span style={{ color: "#a32d2d" }}> &darr;{s.prevPercent}%</span>
+                    ) : (
+                      <span style={{ color: "#8a8a8a" }}> ={s.prevPercent}%</span>
                     )}
                   </td>
                   <td className={borderLeft ? "py-1 pl-2 pr-1 text-right" : "py-1 pl-2 pr-3 text-right"} style={{ color: LEVEL_COLOR[s.level] }}>{s.level}</td>
