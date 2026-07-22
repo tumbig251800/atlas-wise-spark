@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/atlasSupabase";
 import type { PlcSession } from "@/types/plc";
 import { useToast } from "@/hooks/use-toast";
-import { ACTION_ITEMS_KEY } from "@/hooks/useActionItems";
 
 export const PLC_SESSIONS_KEY = ["plc_sessions"];
 
@@ -42,36 +41,16 @@ export function usePlcSessions() {
 
       if (error) throw error;
 
-      // ผลลัพธ์ "แก้ไขได้แล้ว — ปิดเคส" → ปิดเคสที่ผูกไว้อัตโนมัติ
-      // (อื่นๆ: ยังไม่พอ/ทำต่อ → คงเปิดไว้ให้นิเทศ/PLC ต่อ)
-      const linkedIds = ((result as PlcSession).linked_action_item_ids ??
-        data.linked_action_item_ids ?? []) as number[];
-      if ((result as PlcSession).outcome_type === "resolved" && linkedIds.length > 0) {
-        const dateStr = (result as PlcSession).session_date ?? data.session_date ?? "";
-        const { error: closeErr } = await supabase
-          .from("action_plan_items")
-          .update({
-            status: "verified",
-            verified_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            resolution_note: `ปิดเคสจากการทำ PLC — แก้ไขได้แล้ว (${dateStr})`,
-          })
-          .in("id", linkedIds)
-          .in("status", ["open", "watching"]);
-        if (closeErr) throw closeErr;
-      }
-
+      // WP-S0 Safety Containment: this PLC-save path must NOT close/verify any
+      // action_plan_items — it records the PLC session only. The DB-enforced
+      // closure guard (verified requires a monitoring result) lands in WP6.
       return result as PlcSession;
     },
-    onSuccess: (result) => {
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: PLC_SESSIONS_KEY });
-      qc.invalidateQueries({ queryKey: ACTION_ITEMS_KEY });
       toast({
         title: "บันทึก PLC สำเร็จ",
-        description:
-          result.outcome_type === "resolved"
-            ? "บันทึก PLC และปิดเคสที่เกี่ยวข้องเรียบร้อยแล้ว"
-            : "ข้อมูล PLC ถูกบันทึกเรียบร้อยแล้ว",
+        description: "ข้อมูล PLC ถูกบันทึกเรียบร้อยแล้ว",
       });
     },
     onError: (error: Error) => {
