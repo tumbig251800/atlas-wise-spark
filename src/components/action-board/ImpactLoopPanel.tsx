@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, Circle, Loader2, Flag, RotateCcw } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useImpactLoop } from "@/hooks/useImpactLoop";
+import { CaseStudentPicker } from "@/components/action-board/CaseStudentPicker";
 import type { ActionItem } from "@/hooks/useActionItems";
 import {
   IMPACT_LOOP_STEPS,
@@ -106,6 +107,13 @@ export function ImpactLoopPanel({ item }: { item: ActionItem }) {
           </span>
         )}
       </div>
+
+      {/* U2: pick students once the case is confirmed */}
+      {currentIdx >= 2 && (
+        <div className="pt-3 border-t">
+          <CaseStudentPicker item={item} />
+        </div>
+      )}
     </Card>
   );
 }
