@@ -176,14 +176,14 @@ CREATE POLICY intervention_plan_students_teacher_all
             WHERE ip.id = intervention_plan_id
               AND (ip.responsible_user_id = (select auth.uid()) OR ip.created_by = (select auth.uid())))
     AND EXISTS (SELECT 1 FROM public.students s
-                WHERE s.id = student_id AND s.teacher_id = (select auth.uid()))
+                WHERE s.id = intervention_plan_students.student_id AND s.teacher_id = (select auth.uid()))
   )
   WITH CHECK (
     EXISTS (SELECT 1 FROM public.intervention_plans ip
             WHERE ip.id = intervention_plan_id
               AND (ip.responsible_user_id = (select auth.uid()) OR ip.created_by = (select auth.uid())))
     AND EXISTS (SELECT 1 FROM public.students s
-                WHERE s.id = student_id AND s.teacher_id = (select auth.uid()))
+                WHERE s.id = intervention_plan_students.student_id AND s.teacher_id = (select auth.uid()))
   );
 CREATE POLICY intervention_plan_students_lead_select
   ON public.intervention_plan_students FOR SELECT TO authenticated
@@ -258,7 +258,7 @@ CREATE POLICY monitoring_results_owner_select
     -- result [student_id IS NULL] stays visible to the plan owner)
     (student_id IS NULL
      OR EXISTS (SELECT 1 FROM public.students s
-                WHERE s.id = student_id AND s.teacher_id = (select auth.uid())))
+                WHERE s.id = monitoring_results.student_id AND s.teacher_id = (select auth.uid())))
     AND (recorded_by = (select auth.uid())
          OR EXISTS (SELECT 1 FROM public.intervention_plans ip
                     WHERE ip.id = intervention_plan_id
@@ -272,7 +272,7 @@ CREATE POLICY monitoring_results_owner_insert
     -- a per-student result must reference the teacher's OWN roster (roster scoping)
     AND (student_id IS NULL
          OR EXISTS (SELECT 1 FROM public.students s
-                    WHERE s.id = student_id AND s.teacher_id = (select auth.uid())))
+                    WHERE s.id = monitoring_results.student_id AND s.teacher_id = (select auth.uid())))
     AND EXISTS (SELECT 1 FROM public.intervention_plans ip
                 WHERE ip.id = intervention_plan_id
                   AND (ip.responsible_user_id = (select auth.uid()) OR ip.created_by = (select auth.uid())))
@@ -290,7 +290,7 @@ CREATE POLICY monitoring_results_owner_update
     verified_by IS NULL AND verified_at IS NULL          -- teacher edits stay unverified
     AND (student_id IS NULL
          OR EXISTS (SELECT 1 FROM public.students s
-                    WHERE s.id = student_id AND s.teacher_id = (select auth.uid())))
+                    WHERE s.id = monitoring_results.student_id AND s.teacher_id = (select auth.uid())))
     AND (recorded_by = (select auth.uid())
          OR EXISTS (SELECT 1 FROM public.intervention_plans ip
                     WHERE ip.id = intervention_plan_id
@@ -307,7 +307,7 @@ CREATE POLICY monitoring_results_owner_delete
     -- roster scoping: cannot delete a per-student result outside own roster
     AND (student_id IS NULL
          OR EXISTS (SELECT 1 FROM public.students s
-                    WHERE s.id = student_id AND s.teacher_id = (select auth.uid())))
+                    WHERE s.id = monitoring_results.student_id AND s.teacher_id = (select auth.uid())))
     AND (recorded_by = (select auth.uid())
          OR EXISTS (SELECT 1 FROM public.intervention_plans ip
                     WHERE ip.id = intervention_plan_id

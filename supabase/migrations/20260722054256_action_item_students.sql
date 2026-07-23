@@ -77,7 +77,7 @@ CREATE POLICY action_item_students_teacher_select
     )
     AND EXISTS (
       SELECT 1 FROM public.students s
-      WHERE s.id = student_id
+      WHERE s.id = action_item_students.student_id
         AND s.teacher_id = (select auth.uid())
     )
   );
@@ -94,7 +94,7 @@ CREATE POLICY action_item_students_teacher_insert
     )
     AND EXISTS (
       SELECT 1 FROM public.students s
-      WHERE s.id = student_id
+      WHERE s.id = action_item_students.student_id
         AND s.teacher_id = (select auth.uid())
     )
   );
@@ -110,7 +110,7 @@ CREATE POLICY action_item_students_teacher_update
     )
     AND EXISTS (
       SELECT 1 FROM public.students s
-      WHERE s.id = student_id
+      WHERE s.id = action_item_students.student_id
         AND s.teacher_id = (select auth.uid())
     )
   )
@@ -123,7 +123,7 @@ CREATE POLICY action_item_students_teacher_update
     )
     AND EXISTS (
       SELECT 1 FROM public.students s
-      WHERE s.id = student_id
+      WHERE s.id = action_item_students.student_id
         AND s.teacher_id = (select auth.uid())
     )
   );
@@ -139,7 +139,7 @@ CREATE POLICY action_item_students_teacher_delete
     )
     AND EXISTS (
       SELECT 1 FROM public.students s
-      WHERE s.id = student_id
+      WHERE s.id = action_item_students.student_id
         AND s.teacher_id = (select auth.uid())
     )
   );
