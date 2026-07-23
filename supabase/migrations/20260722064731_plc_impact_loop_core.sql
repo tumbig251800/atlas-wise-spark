@@ -53,24 +53,18 @@ ALTER TABLE public.plc_session_action_items ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.plc_session_action_items FROM PUBLIC, anon;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.plc_session_action_items TO authenticated;
 
--- Linking model (product decision): a teacher may link an Action Item THEY OWN
--- to any PLC session — PLC sessions are collaborative, multi-attendee meetings,
--- so "the action I own was discussed in this PLC" is a legitimate statement and
--- PLC session ownership is intentionally NOT required. Oversight (lead/admin) may
--- also manage links. Ownership of the *Action Item* remains the access boundary.
-CREATE POLICY plc_session_action_items_teacher_all
+-- Linking model (product decision, WP1A design): PLC is orchestrated TOP-DOWN by
+-- leadership (admin/lead bundle Action Items into PLC sessions). Teachers may only
+-- SEE which PLC their own Action Item was linked to (read-only); they do not create
+-- or change links. Ownership of the *Action Item* is the read boundary for teachers.
+CREATE POLICY plc_session_action_items_teacher_select
   ON public.plc_session_action_items
-  FOR ALL TO authenticated
+  FOR SELECT TO authenticated
   USING (
     EXISTS (SELECT 1 FROM public.action_plan_items a
             WHERE a.id = action_item_id AND a.teacher_id = (select auth.uid()))
-  )
-  WITH CHECK (
-    linked_by = (select auth.uid())
-    AND EXISTS (SELECT 1 FROM public.action_plan_items a
-                WHERE a.id = action_item_id AND a.teacher_id = (select auth.uid()))
   );
--- lead / admin oversight: read + manage links
+-- lead / admin oversight: read + manage links (create/unlink)
 CREATE POLICY plc_session_action_items_lead_all
   ON public.plc_session_action_items
   FOR ALL TO authenticated
@@ -199,76 +193,15 @@ CREATE POLICY intervention_plan_students_director_select
   USING (has_role((select auth.uid()), 'director'::app_role));
 
 -- =====================================================================
--- 4. supervision_requests  (support tool; never auto-created)
+-- 4. (supervision) — intentionally NO new table here.
+--    Product decision (WP1A design Q1): supervision is TOP-DOWN — teachers do
+--    not request supervision; leadership (admin/lead) arranges and records it.
+--    The Impact Loop therefore reuses the existing `nidet_visits` table
+--    (leadership-driven observation + 8-dimension rubric, full UI already built)
+--    as the supervision record. A per-intervention_plan "request/assignment"
+--    workflow (the earlier supervision_requests table) was removed as it did not
+--    match how the school actually works.
 -- =====================================================================
-CREATE TABLE IF NOT EXISTS public.supervision_requests (
-  id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  intervention_plan_id uuid NOT NULL,
-  reason               text NOT NULL,
-  requested_by         uuid NOT NULL,
-  assigned_to          uuid,
-  status               text NOT NULL DEFAULT 'requested',
-  created_at           timestamptz NOT NULL DEFAULT now(),
-  completed_at         timestamptz,
-  result_summary       text,
-  CONSTRAINT supervision_requests_plan_fkey
-    FOREIGN KEY (intervention_plan_id) REFERENCES public.intervention_plans (id) ON DELETE CASCADE,
-  CONSTRAINT supervision_requests_requested_by_fkey
-    FOREIGN KEY (requested_by) REFERENCES auth.users (id) ON DELETE RESTRICT,
-  CONSTRAINT supervision_requests_assigned_to_fkey
-    FOREIGN KEY (assigned_to) REFERENCES auth.users (id) ON DELETE SET NULL,
-  CONSTRAINT supervision_requests_reason_not_blank_check
-    CHECK (length(btrim(reason)) > 0),
-  CONSTRAINT supervision_requests_status_check
-    CHECK (status = ANY (ARRAY['requested'::text,'assigned'::text,'completed'::text,'cancelled'::text]))
-);
-CREATE INDEX IF NOT EXISTS idx_supervision_requests_plan        ON public.supervision_requests (intervention_plan_id);
-CREATE INDEX IF NOT EXISTS idx_supervision_requests_assigned_to ON public.supervision_requests (assigned_to);
-CREATE INDEX IF NOT EXISTS idx_supervision_requests_requested_by ON public.supervision_requests (requested_by);
-
-ALTER TABLE public.supervision_requests ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON public.supervision_requests FROM PUBLIC, anon;
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.supervision_requests TO authenticated;
-
--- teacher requests supervision for a plan they own (no auto-create: explicit INSERT only)
-CREATE POLICY supervision_requests_requester_select
-  ON public.supervision_requests FOR SELECT TO authenticated
-  USING (requested_by = (select auth.uid()));
-CREATE POLICY supervision_requests_requester_insert
-  ON public.supervision_requests FOR INSERT TO authenticated
-  WITH CHECK (
-    requested_by = (select auth.uid())
-    AND EXISTS (SELECT 1 FROM public.intervention_plans ip
-                WHERE ip.id = intervention_plan_id
-                  AND (ip.responsible_user_id = (select auth.uid()) OR ip.created_by = (select auth.uid())))
-  );
--- requester may withdraw (cancel) their own request while it is not yet
--- completed; the only end-state they can write is 'cancelled'.
-CREATE POLICY supervision_requests_requester_cancel
-  ON public.supervision_requests FOR UPDATE TO authenticated
-  USING (requested_by = (select auth.uid()) AND status <> 'completed')
-  WITH CHECK (requested_by = (select auth.uid()) AND status = 'cancelled');
-
--- assigned supervisor may complete their own assignment
-CREATE POLICY supervision_requests_assignee_select
-  ON public.supervision_requests FOR SELECT TO authenticated
-  USING (assigned_to = (select auth.uid()));
-CREATE POLICY supervision_requests_assignee_update
-  ON public.supervision_requests FOR UPDATE TO authenticated
-  USING (assigned_to = (select auth.uid()))
-  WITH CHECK (assigned_to = (select auth.uid()));
--- lead / admin: read all + assign
-CREATE POLICY supervision_requests_lead_select
-  ON public.supervision_requests FOR SELECT TO authenticated
-  USING (has_role((select auth.uid()), 'lead'::app_role) OR is_admin());
-CREATE POLICY supervision_requests_lead_update
-  ON public.supervision_requests FOR UPDATE TO authenticated
-  USING (has_role((select auth.uid()), 'lead'::app_role) OR is_admin())
-  WITH CHECK (has_role((select auth.uid()), 'lead'::app_role) OR is_admin());
--- director read
-CREATE POLICY supervision_requests_director_select
-  ON public.supervision_requests FOR SELECT TO authenticated
-  USING (has_role((select auth.uid()), 'director'::app_role));
 
 -- =====================================================================
 -- 5. monitoring_results  (before/after evidence; verify = lead|admin only)
@@ -500,11 +433,10 @@ CREATE TRIGGER trg_action_plan_items_closure_guard
 --    never change after creation. No dynamic SQL (to_jsonb read only), no
 --    HTTP/webhook, SECURITY INVOKER. Two classes:
 --    (a) parent-FK re-parenting (a plan belongs to one Action Item; a
---        monitoring/supervision row to one plan) — blocks attaching evidence to
---        another teacher's case / feeding the closure guard from the wrong tree.
---    (b) audit authorship (created_by / recorded_by / requested_by) and the
---        supervision `reason` — cannot be rewritten by ANYONE (incl. lead/admin),
---        so history cannot be falsified.
+--        monitoring row to one plan) — blocks attaching evidence to another
+--        teacher's case / feeding the closure guard from the wrong tree.
+--    (b) audit authorship (created_by / recorded_by) — cannot be rewritten by
+--        ANYONE (incl. lead/admin), so history cannot be falsified.
 -- =====================================================================
 CREATE OR REPLACE FUNCTION public.plc_forbid_column_change()
 RETURNS trigger
@@ -534,11 +466,6 @@ CREATE TRIGGER trg_monitoring_results_no_reparent
   BEFORE UPDATE OF intervention_plan_id ON public.monitoring_results
   FOR EACH ROW EXECUTE FUNCTION public.plc_forbid_column_change('intervention_plan_id');
 
-DROP TRIGGER IF EXISTS trg_supervision_requests_no_reparent ON public.supervision_requests;
-CREATE TRIGGER trg_supervision_requests_no_reparent
-  BEFORE UPDATE OF intervention_plan_id ON public.supervision_requests
-  FOR EACH ROW EXECUTE FUNCTION public.plc_forbid_column_change('intervention_plan_id');
-
 -- (b) audit-authorship immutability (universal — even lead/admin cannot rewrite)
 DROP TRIGGER IF EXISTS trg_intervention_plans_created_by_immutable ON public.intervention_plans;
 CREATE TRIGGER trg_intervention_plans_created_by_immutable
@@ -549,16 +476,6 @@ DROP TRIGGER IF EXISTS trg_monitoring_results_recorded_by_immutable ON public.mo
 CREATE TRIGGER trg_monitoring_results_recorded_by_immutable
   BEFORE UPDATE OF recorded_by ON public.monitoring_results
   FOR EACH ROW EXECUTE FUNCTION public.plc_forbid_column_change('recorded_by');
-
-DROP TRIGGER IF EXISTS trg_supervision_requests_requested_by_immutable ON public.supervision_requests;
-CREATE TRIGGER trg_supervision_requests_requested_by_immutable
-  BEFORE UPDATE OF requested_by ON public.supervision_requests
-  FOR EACH ROW EXECUTE FUNCTION public.plc_forbid_column_change('requested_by');
-
-DROP TRIGGER IF EXISTS trg_supervision_requests_reason_immutable ON public.supervision_requests;
-CREATE TRIGGER trg_supervision_requests_reason_immutable
-  BEFORE UPDATE OF reason ON public.supervision_requests
-  FOR EACH ROW EXECUTE FUNCTION public.plc_forbid_column_change('reason');
 
 -- =====================================================================
 -- 9. Reassigning intervention_plans.responsible_user_id is an OVERSIGHT action:
