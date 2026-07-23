@@ -10,6 +10,7 @@ import type { ActionItem } from "@/hooks/useActionItems";
 import { PLC_OUTCOME_LABELS, type PlcSession } from "@/types/plc";
 import { mapRow, type NidetRow } from "@/hooks/useNidetVisits";
 import { NidetVisitCard } from "@/components/action-board/NidetVisitCard";
+import { ImpactLoopPanel } from "@/components/action-board/ImpactLoopPanel";
 import { downloadPlcDocx } from "@/lib/downloadPlcDocx";
 import { useToast } from "@/hooks/use-toast";
 
@@ -259,6 +260,8 @@ function SupervisionPrepCard({ item }: { item: ActionItem }) {
 
   return (
     <div className="rounded-lg border border-sky-300 bg-sky-50 p-4 space-y-3">
+      <ImpactLoopPanel item={item} />
+
       <div className="font-medium text-sky-900 text-base">🎯 เตรียมรับการนิเทศ</div>
 
       <div className="space-y-1 text-sm text-sky-900">

@@ -12,23 +12,93 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
+      action_item_students: {
+        Row: {
+          action_item_id: number
+          created_at: string
+          created_by: string
+          selection_source: string
+          student_id: string
+        }
+        Insert: {
+          action_item_id: number
+          created_at?: string
+          created_by: string
+          selection_source: string
+          student_id: string
+        }
+        Update: {
+          action_item_id?: number
+          created_at?: string
+          created_by?: string
+          selection_source?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "action_item_students_action_item_id_fkey"
+            columns: ["action_item_id"]
+            isOneToOne: false
+            referencedRelation: "action_plan_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "action_item_students_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       action_plan_items: {
         Row: {
+          ai_draft: Json | null
           ai_owner: string | null
           ai_priority: string | null
           ai_summary: string | null
           auto_resolved: boolean
           calendar_event_id: string | null
           calendar_html_link: string | null
+          case_confirmed_at: string | null
+          case_confirmed_by: string | null
           classroom: string | null
+          closed_after_monitoring_at: string | null
           created_at: string
           detail: string | null
           due_date: string | null
           due_in_days: number | null
+          evidence_context: Json | null
           grade_level: string | null
           id: number
+          impact_loop_status: string | null
           issue_key: string
           issue_type: string
           mastery_avg_previous: number | null
@@ -38,6 +108,7 @@ export type Database = {
           notify_channel: string | null
           notify_date: string | null
           notify_note: string | null
+          project_id: string | null
           referral_agency: string | null
           referral_date: string | null
           referral_note: string | null
@@ -47,6 +118,7 @@ export type Database = {
           run_date: string | null
           severity: string
           status: string
+          student_scope_type: string | null
           subject: string | null
           teacher_id: string | null
           teacher_name: string | null
@@ -58,19 +130,25 @@ export type Database = {
           wf4_logged_at: string | null
         }
         Insert: {
+          ai_draft?: Json | null
           ai_owner?: string | null
           ai_priority?: string | null
           ai_summary?: string | null
           auto_resolved?: boolean
           calendar_event_id?: string | null
           calendar_html_link?: string | null
+          case_confirmed_at?: string | null
+          case_confirmed_by?: string | null
           classroom?: string | null
+          closed_after_monitoring_at?: string | null
           created_at?: string
           detail?: string | null
           due_date?: string | null
           due_in_days?: number | null
+          evidence_context?: Json | null
           grade_level?: string | null
           id?: number
+          impact_loop_status?: string | null
           issue_key: string
           issue_type?: string
           mastery_avg_previous?: number | null
@@ -80,6 +158,7 @@ export type Database = {
           notify_channel?: string | null
           notify_date?: string | null
           notify_note?: string | null
+          project_id?: string | null
           referral_agency?: string | null
           referral_date?: string | null
           referral_note?: string | null
@@ -89,6 +168,7 @@ export type Database = {
           run_date?: string | null
           severity?: string
           status?: string
+          student_scope_type?: string | null
           subject?: string | null
           teacher_id?: string | null
           teacher_name?: string | null
@@ -100,19 +180,25 @@ export type Database = {
           wf4_logged_at?: string | null
         }
         Update: {
+          ai_draft?: Json | null
           ai_owner?: string | null
           ai_priority?: string | null
           ai_summary?: string | null
           auto_resolved?: boolean
           calendar_event_id?: string | null
           calendar_html_link?: string | null
+          case_confirmed_at?: string | null
+          case_confirmed_by?: string | null
           classroom?: string | null
+          closed_after_monitoring_at?: string | null
           created_at?: string
           detail?: string | null
           due_date?: string | null
           due_in_days?: number | null
+          evidence_context?: Json | null
           grade_level?: string | null
           id?: number
+          impact_loop_status?: string | null
           issue_key?: string
           issue_type?: string
           mastery_avg_previous?: number | null
@@ -122,6 +208,7 @@ export type Database = {
           notify_channel?: string | null
           notify_date?: string | null
           notify_note?: string | null
+          project_id?: string | null
           referral_agency?: string | null
           referral_date?: string | null
           referral_note?: string | null
@@ -131,6 +218,7 @@ export type Database = {
           run_date?: string | null
           severity?: string
           status?: string
+          student_scope_type?: string | null
           subject?: string | null
           teacher_id?: string | null
           teacher_name?: string | null
@@ -141,7 +229,15 @@ export type Database = {
           watch_started_at?: string | null
           wf4_logged_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "action_plan_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "annual_projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ai_rate_limits: {
         Row: {
@@ -160,6 +256,155 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      annual_projects: {
+        Row: {
+          academic_year: string
+          budget: number | null
+          created_at: string | null
+          end_quarter: number | null
+          id: string
+          objective: string | null
+          owner_name: string | null
+          project_code: string
+          project_name: string
+          start_quarter: number | null
+        }
+        Insert: {
+          academic_year?: string
+          budget?: number | null
+          created_at?: string | null
+          end_quarter?: number | null
+          id?: string
+          objective?: string | null
+          owner_name?: string | null
+          project_code: string
+          project_name: string
+          start_quarter?: number | null
+        }
+        Update: {
+          academic_year?: string
+          budget?: number | null
+          created_at?: string | null
+          end_quarter?: number | null
+          id?: string
+          objective?: string | null
+          owner_name?: string | null
+          project_code?: string
+          project_name?: string
+          start_quarter?: number | null
+        }
+        Relationships: []
+      }
+      classroom_research_suggestions: {
+        Row: {
+          academic_term: string
+          after_data: Json | null
+          analysis_method: string | null
+          before_data: Json | null
+          classroom: string
+          created_at: string | null
+          data_collection_method: string | null
+          detected_problem: string
+          doc_draft_url: string | null
+          doc_final_url: string | null
+          doc_format: string | null
+          ethics_confirmed: boolean | null
+          ethics_confirmed_at: string | null
+          evidence_summary: string
+          grade_level: string
+          id: string
+          intervention: string | null
+          issue_type: string
+          linked_action_plan_id: number | null
+          objective: string | null
+          research_question: string | null
+          research_title: string
+          status: string
+          subject: string
+          success_indicator: string | null
+          suggestion_key: string
+          target_group: string | null
+          teacher_id: string | null
+          teacher_name: string
+          tools: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          academic_term: string
+          after_data?: Json | null
+          analysis_method?: string | null
+          before_data?: Json | null
+          classroom: string
+          created_at?: string | null
+          data_collection_method?: string | null
+          detected_problem: string
+          doc_draft_url?: string | null
+          doc_final_url?: string | null
+          doc_format?: string | null
+          ethics_confirmed?: boolean | null
+          ethics_confirmed_at?: string | null
+          evidence_summary: string
+          grade_level: string
+          id?: string
+          intervention?: string | null
+          issue_type: string
+          linked_action_plan_id?: number | null
+          objective?: string | null
+          research_question?: string | null
+          research_title: string
+          status?: string
+          subject: string
+          success_indicator?: string | null
+          suggestion_key: string
+          target_group?: string | null
+          teacher_id?: string | null
+          teacher_name: string
+          tools?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          academic_term?: string
+          after_data?: Json | null
+          analysis_method?: string | null
+          before_data?: Json | null
+          classroom?: string
+          created_at?: string | null
+          data_collection_method?: string | null
+          detected_problem?: string
+          doc_draft_url?: string | null
+          doc_final_url?: string | null
+          doc_format?: string | null
+          ethics_confirmed?: boolean | null
+          ethics_confirmed_at?: string | null
+          evidence_summary?: string
+          grade_level?: string
+          id?: string
+          intervention?: string | null
+          issue_type?: string
+          linked_action_plan_id?: number | null
+          objective?: string | null
+          research_question?: string | null
+          research_title?: string
+          status?: string
+          subject?: string
+          success_indicator?: string | null
+          suggestion_key?: string
+          target_group?: string | null
+          teacher_id?: string | null
+          teacher_name?: string
+          tools?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "classroom_research_suggestions_linked_action_plan_id_fkey"
+            columns: ["linked_action_plan_id"]
+            isOneToOne: false
+            referencedRelation: "action_plan_items"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       diagnostic_events: {
         Row: {
@@ -241,6 +486,105 @@ export type Database = {
           },
         ]
       }
+      intervention_plan_students: {
+        Row: {
+          created_at: string
+          intervention_plan_id: string
+          student_id: string
+        }
+        Insert: {
+          created_at?: string
+          intervention_plan_id: string
+          student_id: string
+        }
+        Update: {
+          created_at?: string
+          intervention_plan_id?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "intervention_plan_students_plan_fkey"
+            columns: ["intervention_plan_id"]
+            isOneToOne: false
+            referencedRelation: "intervention_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intervention_plan_students_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      intervention_plans: {
+        Row: {
+          action_item_id: number
+          baseline_summary: Json | null
+          created_at: string
+          created_by: string
+          id: string
+          intervention_method: string | null
+          objective: string
+          plc_session_id: string | null
+          responsible_user_id: string | null
+          start_date: string | null
+          status: string
+          target_date: string | null
+          target_outcome: Json | null
+          updated_at: string
+        }
+        Insert: {
+          action_item_id: number
+          baseline_summary?: Json | null
+          created_at?: string
+          created_by: string
+          id?: string
+          intervention_method?: string | null
+          objective: string
+          plc_session_id?: string | null
+          responsible_user_id?: string | null
+          start_date?: string | null
+          status?: string
+          target_date?: string | null
+          target_outcome?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          action_item_id?: number
+          baseline_summary?: Json | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          intervention_method?: string | null
+          objective?: string
+          plc_session_id?: string | null
+          responsible_user_id?: string | null
+          start_date?: string | null
+          status?: string
+          target_date?: string | null
+          target_outcome?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "intervention_plans_action_item_id_fkey"
+            columns: ["action_item_id"]
+            isOneToOne: false
+            referencedRelation: "action_plan_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intervention_plans_plc_session_id_fkey"
+            columns: ["plc_session_id"]
+            isOneToOne: false
+            referencedRelation: "plc_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lesson_plan_snapshots: {
         Row: {
           classroom: string
@@ -283,6 +627,69 @@ export type Database = {
         }
         Relationships: []
       }
+      monitoring_results: {
+        Row: {
+          after_evidence: Json
+          before_evidence: Json
+          created_at: string
+          id: string
+          intervention_plan_id: string
+          monitoring_date: string
+          notes: string | null
+          recorded_by: string
+          result_status: string
+          student_id: string | null
+          updated_at: string
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          after_evidence: Json
+          before_evidence: Json
+          created_at?: string
+          id?: string
+          intervention_plan_id: string
+          monitoring_date?: string
+          notes?: string | null
+          recorded_by: string
+          result_status: string
+          student_id?: string | null
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          after_evidence?: Json
+          before_evidence?: Json
+          created_at?: string
+          id?: string
+          intervention_plan_id?: string
+          monitoring_date?: string
+          notes?: string | null
+          recorded_by?: string
+          result_status?: string
+          student_id?: string | null
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "monitoring_results_plan_fkey"
+            columns: ["intervention_plan_id"]
+            isOneToOne: false
+            referencedRelation: "intervention_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "monitoring_results_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nidet_visits: {
         Row: {
           action_item_id: number
@@ -291,6 +698,9 @@ export type Database = {
           follow_up_method: string | null
           id: string
           improvements: string | null
+          linked_action_item_ids: number[]
+          nidet_type: string
+          outcome_type: string | null
           recommendations: string | null
           rubric_activity_design: number | null
           rubric_classroom_climate: number | null
@@ -313,6 +723,9 @@ export type Database = {
           follow_up_method?: string | null
           id?: string
           improvements?: string | null
+          linked_action_item_ids?: number[]
+          nidet_type?: string
+          outcome_type?: string | null
           recommendations?: string | null
           rubric_activity_design?: number | null
           rubric_classroom_climate?: number | null
@@ -335,6 +748,9 @@ export type Database = {
           follow_up_method?: string | null
           id?: string
           improvements?: string | null
+          linked_action_item_ids?: number[]
+          nidet_type?: string
+          outcome_type?: string | null
           recommendations?: string | null
           rubric_activity_design?: number | null
           rubric_classroom_climate?: number | null
@@ -359,6 +775,101 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      pbl_assessments: {
+        Row: {
+          com_score: number | null
+          created_at: string | null
+          id: string
+          life_score: number | null
+          notes: string | null
+          overall_result: string | null
+          problem_score: number | null
+          project_id: string
+          student_id: string
+          student_name: string | null
+          tech_score: number | null
+          think_score: number | null
+          total_score: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          com_score?: number | null
+          created_at?: string | null
+          id?: string
+          life_score?: number | null
+          notes?: string | null
+          overall_result?: string | null
+          problem_score?: number | null
+          project_id: string
+          student_id: string
+          student_name?: string | null
+          tech_score?: number | null
+          think_score?: number | null
+          total_score?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          com_score?: number | null
+          created_at?: string | null
+          id?: string
+          life_score?: number | null
+          notes?: string | null
+          overall_result?: string | null
+          problem_score?: number | null
+          project_id?: string
+          student_id?: string
+          student_name?: string | null
+          tech_score?: number | null
+          think_score?: number | null
+          total_score?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pbl_assessments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "pbl_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pbl_projects: {
+        Row: {
+          academic_term: string
+          classroom: string
+          created_at: string | null
+          grade_level: string
+          id: string
+          month: string
+          project_name: string
+          teacher_name: string
+          updated_at: string | null
+        }
+        Insert: {
+          academic_term: string
+          classroom: string
+          created_at?: string | null
+          grade_level: string
+          id?: string
+          month: string
+          project_name: string
+          teacher_name: string
+          updated_at?: string | null
+        }
+        Update: {
+          academic_term?: string
+          classroom?: string
+          created_at?: string | null
+          grade_level?: string
+          id?: string
+          month?: string
+          project_name?: string
+          teacher_name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       pivot_events: {
         Row: {
@@ -428,12 +939,51 @@ export type Database = {
           },
         ]
       }
+      plc_session_action_items: {
+        Row: {
+          action_item_id: number
+          created_at: string
+          linked_by: string
+          plc_session_id: string
+        }
+        Insert: {
+          action_item_id: number
+          created_at?: string
+          linked_by: string
+          plc_session_id: string
+        }
+        Update: {
+          action_item_id?: number
+          created_at?: string
+          linked_by?: string
+          plc_session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plc_session_action_items_action_item_id_fkey"
+            columns: ["action_item_id"]
+            isOneToOne: false
+            referencedRelation: "action_plan_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plc_session_action_items_plc_session_id_fkey"
+            columns: ["plc_session_id"]
+            isOneToOne: false
+            referencedRelation: "plc_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       plc_sessions: {
         Row: {
           action_steps: string | null
+          actions_closed_at: string | null
           approach: string | null
+          calendar_event_id: string | null
           created_at: string
           created_by: string | null
+          discussion_points: Json | null
           duration_minutes: number | null
           facilitator_name: string
           grade_band: string | null
@@ -452,9 +1002,12 @@ export type Database = {
         }
         Insert: {
           action_steps?: string | null
+          actions_closed_at?: string | null
           approach?: string | null
+          calendar_event_id?: string | null
           created_at?: string
           created_by?: string | null
+          discussion_points?: Json | null
           duration_minutes?: number | null
           facilitator_name?: string
           grade_band?: string | null
@@ -473,9 +1026,12 @@ export type Database = {
         }
         Update: {
           action_steps?: string | null
+          actions_closed_at?: string | null
           approach?: string | null
+          calendar_event_id?: string | null
           created_at?: string
           created_by?: string | null
+          discussion_points?: Json | null
           duration_minutes?: number | null
           facilitator_name?: string
           grade_band?: string | null
@@ -523,6 +1079,148 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      project_kpis: {
+        Row: {
+          atlas_metric: string | null
+          created_at: string | null
+          id: string
+          kpi_name: string
+          project_id: string | null
+          target_value: number
+          unit: string | null
+        }
+        Insert: {
+          atlas_metric?: string | null
+          created_at?: string | null
+          id?: string
+          kpi_name: string
+          project_id?: string | null
+          target_value: number
+          unit?: string | null
+        }
+        Update: {
+          atlas_metric?: string | null
+          created_at?: string | null
+          id?: string
+          kpi_name?: string
+          project_id?: string | null
+          target_value?: number
+          unit?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_kpis_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "annual_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_progress: {
+        Row: {
+          actual_value: number | null
+          id: string
+          kpi_id: string | null
+          measured_at: string | null
+          notes: string | null
+          period: string
+          project_id: string | null
+          status: string | null
+        }
+        Insert: {
+          actual_value?: number | null
+          id?: string
+          kpi_id?: string | null
+          measured_at?: string | null
+          notes?: string | null
+          period: string
+          project_id?: string | null
+          status?: string | null
+        }
+        Update: {
+          actual_value?: number | null
+          id?: string
+          kpi_id?: string | null
+          measured_at?: string | null
+          notes?: string | null
+          period?: string
+          project_id?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_progress_kpi_id_fkey"
+            columns: ["kpi_id"]
+            isOneToOne: false
+            referencedRelation: "project_kpis"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_progress_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "annual_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      remedial_tracking: {
+        Row: {
+          academic_term: string | null
+          classroom: string | null
+          created_at: string | null
+          grade_level: string | null
+          id: string
+          recorded_at: string | null
+          status: string
+          student_id: string
+          subject: string | null
+          teacher_id: string | null
+          teaching_log_id: string
+          term: string | null
+          unit_name: string | null
+        }
+        Insert: {
+          academic_term?: string | null
+          classroom?: string | null
+          created_at?: string | null
+          grade_level?: string | null
+          id?: string
+          recorded_at?: string | null
+          status: string
+          student_id: string
+          subject?: string | null
+          teacher_id?: string | null
+          teaching_log_id: string
+          term?: string | null
+          unit_name?: string | null
+        }
+        Update: {
+          academic_term?: string | null
+          classroom?: string | null
+          created_at?: string | null
+          grade_level?: string | null
+          id?: string
+          recorded_at?: string | null
+          status?: string
+          student_id?: string
+          subject?: string | null
+          teacher_id?: string | null
+          teaching_log_id?: string
+          term?: string | null
+          unit_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "remedial_tracking_teaching_log_id_fkey"
+            columns: ["teaching_log_id"]
+            isOneToOne: false
+            referencedRelation: "teaching_logs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       strike_counter: {
         Row: {
@@ -800,56 +1498,14 @@ export type Database = {
           unit_name?: string | null
           updated_at?: string
         }
-        Relationships: []
-      }
-      remedial_tracking: {
-        Row: {
-          id: string
-          teaching_log_id: string
-          student_id: string
-          status: "pass" | "stay"
-          teacher_id: string | null
-          grade_level: string | null
-          classroom: string | null
-          subject: string | null
-          academic_term: string | null
-          recorded_at: string
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          teaching_log_id: string
-          student_id: string
-          status: "pass" | "stay"
-          teacher_id?: string | null
-          grade_level?: string | null
-          classroom?: string | null
-          subject?: string | null
-          academic_term?: string | null
-          recorded_at?: string
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          teaching_log_id?: string
-          student_id?: string
-          status?: "pass" | "stay"
-          teacher_id?: string | null
-          grade_level?: string | null
-          classroom?: string | null
-          subject?: string | null
-          academic_term?: string | null
-          recorded_at?: string
-          created_at?: string
-        }
         Relationships: [
           {
-            foreignKeyName: "remedial_tracking_teaching_log_id_fkey"
-            columns: ["teaching_log_id"]
+            foreignKeyName: "teaching_logs_research_id_fkey"
+            columns: ["research_id"]
             isOneToOne: false
-            referencedRelation: "teaching_logs"
+            referencedRelation: "classroom_research_suggestions"
             referencedColumns: ["id"]
-          }
+          },
         ]
       }
       topic_aliases: {
@@ -1076,9 +1732,102 @@ export type Database = {
         }
         Relationships: []
       }
+      zz_remedial_dedup_backup_20260715: {
+        Row: {
+          academic_term: string | null
+          classroom: string | null
+          created_at: string | null
+          grade_level: string | null
+          id: string | null
+          recorded_at: string | null
+          status: string | null
+          student_id: string | null
+          subject: string | null
+          teacher_id: string | null
+          teaching_log_id: string | null
+        }
+        Insert: {
+          academic_term?: string | null
+          classroom?: string | null
+          created_at?: string | null
+          grade_level?: string | null
+          id?: string | null
+          recorded_at?: string | null
+          status?: string | null
+          student_id?: string | null
+          subject?: string | null
+          teacher_id?: string | null
+          teaching_log_id?: string | null
+        }
+        Update: {
+          academic_term?: string | null
+          classroom?: string | null
+          created_at?: string | null
+          grade_level?: string | null
+          id?: string | null
+          recorded_at?: string | null
+          status?: string | null
+          student_id?: string | null
+          subject?: string | null
+          teacher_id?: string | null
+          teaching_log_id?: string | null
+        }
+        Relationships: []
+      }
+      zz_subject_fix_backup_20260715: {
+        Row: {
+          old_subject: string | null
+          row_id: string | null
+          tbl: string | null
+        }
+        Insert: {
+          old_subject?: string | null
+          row_id?: string | null
+          tbl?: string | null
+        }
+        Update: {
+          old_subject?: string | null
+          row_id?: string | null
+          tbl?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
-      [_ in never]: never
+      v_research_candidates: {
+        Row: {
+          academic_term: string | null
+          age_days: number | null
+          candidate_source: string | null
+          classroom: string | null
+          grade_level: string | null
+          issue_type: string | null
+          pbl_competency: string | null
+          pbl_failing_count: number | null
+          pbl_score: number | null
+          severity: string | null
+          subject: string | null
+          teacher_id: string | null
+          teacher_name: string | null
+        }
+        Relationships: []
+      }
+      v_research_candidates_n8n: {
+        Row: {
+          classroom: string | null
+          detected_problem: string | null
+          evidence_summary: string | null
+          gap_focus: string | null
+          grade_level: string | null
+          issue_type: string | null
+          metric_value: number | null
+          severity: string | null
+          subject: string | null
+          teacher_id: string | null
+          teacher_name: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       check_and_set_rate_limit: {
@@ -1089,6 +1838,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      exec_sql: { Args: { sql: string }; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1105,7 +1855,7 @@ export type Database = {
     }
     Enums: {
       activity_mode: "active" | "passive" | "constructive"
-      app_role: "teacher" | "director"
+      app_role: "teacher" | "director" | "lead"
       major_gap:
         | "k-gap"
         | "p-gap"
@@ -1238,10 +1988,13 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       activity_mode: ["active", "passive", "constructive"],
-      app_role: ["teacher", "director"],
+      app_role: ["teacher", "director", "lead"],
       major_gap: ["k-gap", "p-gap", "a-gap", "a2-gap", "system-gap", "success"],
     },
   },
