@@ -7,8 +7,11 @@
 -- wide-open policy `USING(true) WITH CHECK(true)` for authenticated, plus an
 -- anon-read policy and full anon grants — so today ANY authenticated user (and
 -- even anon) can insert/update/delete supervision records. This forward migration
--- replaces that with a top-down model. The original migration is NOT edited (it is
--- already applied in Production); this is a corrective forward migration.
+-- replaces that with a top-down model. It does NOT edit the original create file
+-- (20260601091026); the nidet_visits table and its open policies are present in
+-- the current Production schema (verified via read-only metadata query), so this
+-- corrective is written as a forward migration on top of the existing table. It
+-- has NOT yet been applied to any database.
 --
 -- UI compatibility (verified): teachers only READ their own action items' nidet
 -- visits (TeacherActionView / NidetVisitCard); creating/editing visits happens in
