@@ -67,6 +67,24 @@ export function usePlcBundleDraft() {
   });
 }
 
+function addBusinessDays(start: Date, days: number): Date {
+  const d = new Date(start);
+  let added = 0;
+  while (added < days) {
+    d.setDate(d.getDate() + 1);
+    const day = d.getDay();
+    if (day !== 0 && day !== 6) added++;
+  }
+  return d;
+}
+
+// AI-plan flow: suggest a meeting date 7 business days out, skipping Sat/Sun
+function suggestedSessionDate(): string {
+  const d = addBusinessDays(new Date(), 7);
+  const tzOffset = d.getTimezoneOffset() * 60000;
+  return new Date(d.getTime() - tzOffset).toISOString().slice(0, 10);
+}
+
 // Helper to convert draft result to prefilled PlcSession data
 export function draftToPrefilledPlc(
   draft: PlcBundleDraftResult,
@@ -111,5 +129,6 @@ export function draftToPrefilledPlc(
     subject: null,
     members,
     linked_action_item_ids: items.map((i) => i.id),
+    session_date: suggestedSessionDate(),
   };
 }

@@ -73,6 +73,7 @@ export function PlcModal({
   const [discussionPoints, setDiscussionPoints] = useState<string[]>([]);
   const [outcomeType, setOutcomeType] = useState<PlcSession["outcome_type"]>("continue_plc");
   const [nextPlcDate, setNextPlcDate] = useState("");
+  const [aiScheduled, setAiScheduled] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -93,9 +94,12 @@ export function PlcModal({
       setDiscussionPoints(existingSession.discussion_points ?? []);
       setOutcomeType(existingSession.outcome_type);
       setNextPlcDate(existingSession.next_plc_date || "");
+      setAiScheduled(existingSession.ai_scheduled ?? false);
     } else if (prefilledData) {
-      // Use prefilled data from AI planner
-      setSessionDate(todayISO());
+      // Use prefilled data from AI planner — session_date is AI-suggested (7 business
+      // days out, skips Sat/Sun), still editable by the admin before saving
+      setSessionDate(prefilledData.session_date || todayISO());
+      setAiScheduled(true);
       setDurationMinutes("");
       setPlcType(prefilledData.plc_type || "subject");
       setGradeBand(prefilledData.grade_band ?? "");
@@ -125,6 +129,7 @@ export function PlcModal({
       setActionSteps("");
       setOutcomeType("continue_plc");
       setNextPlcDate("");
+      setAiScheduled(false);
     }
   }, [open, existingSession, prefilledData, actionItem, authName]);
 
@@ -155,6 +160,7 @@ export function PlcModal({
       discussion_points: discussionPoints.length > 0 ? discussionPoints : null,
       outcome_type: outcomeType,
       next_plc_date: outcomeType === "continue_plc" && nextPlcDate ? nextPlcDate : null,
+      ai_scheduled: aiScheduled,
       linked_action_item_ids: prefilledData?.linked_action_item_ids ?? [actionItem.id],
       created_by: user?.id ?? null,
     };
