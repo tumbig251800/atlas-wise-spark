@@ -979,6 +979,7 @@ export type Database = {
         Row: {
           action_steps: string | null
           actions_closed_at: string | null
+          ai_scheduled: boolean
           approach: string | null
           calendar_event_id: string | null
           created_at: string
@@ -995,6 +996,8 @@ export type Database = {
           plc_type: string
           problem_statement: string | null
           root_cause: string | null
+          session_calendar_event_id: string | null
+          session_calendar_html_link: string | null
           session_date: string
           subject: string | null
           topic: string
@@ -1003,6 +1006,7 @@ export type Database = {
         Insert: {
           action_steps?: string | null
           actions_closed_at?: string | null
+          ai_scheduled?: boolean
           approach?: string | null
           calendar_event_id?: string | null
           created_at?: string
@@ -1019,6 +1023,8 @@ export type Database = {
           plc_type: string
           problem_statement?: string | null
           root_cause?: string | null
+          session_calendar_event_id?: string | null
+          session_calendar_html_link?: string | null
           session_date?: string
           subject?: string | null
           topic?: string
@@ -1027,6 +1033,7 @@ export type Database = {
         Update: {
           action_steps?: string | null
           actions_closed_at?: string | null
+          ai_scheduled?: boolean
           approach?: string | null
           calendar_event_id?: string | null
           created_at?: string
@@ -1043,6 +1050,8 @@ export type Database = {
           plc_type?: string
           problem_statement?: string | null
           root_cause?: string | null
+          session_calendar_event_id?: string | null
+          session_calendar_html_link?: string | null
           session_date?: string
           subject?: string | null
           topic?: string

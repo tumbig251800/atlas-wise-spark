@@ -15,6 +15,7 @@ export interface PlcSession {
   discussion_points: string[] | null;
   outcome_type: 'resolved' | 'need_supervision' | 'continue_plc';
   next_plc_date: string | null;
+  ai_scheduled: boolean;
   linked_action_item_ids: number[];
   created_by: string | null;
   created_at: string;
