@@ -14,6 +14,7 @@ import { ActionStatsBar } from "@/components/action-board/ActionStatsBar";
 import { ActionFilters, type ActionFilterChip, type IssueTypeFilter } from "@/components/action-board/ActionFilters";
 import { ActionTable } from "@/components/action-board/ActionTable";
 import { TeacherActionView } from "@/components/action-board/TeacherActionView";
+import { TeacherProposePlcDialog } from "@/components/action-board/TeacherProposePlcDialog";
 import { VerifyDismissDialog } from "@/components/action-board/VerifyDismissDialog";
 import { BulkDismissDialog } from "@/components/action-board/BulkDismissDialog";
 import { PlcModal } from "@/components/action-board/PlcModal";
@@ -167,7 +168,7 @@ export default function ActionBoard() {
 
   const passItem = usePassActionItem();
   const { role } = useAuth();
-  const { isTeacher, isLead, teacherId, teacherName, loading: roleLoading } = useUserRole();
+  const { isTeacher, isLead, isAdmin, teacherId, teacherName, loading: roleLoading } = useUserRole();
   const { toast } = useToast();
   const qc = useQueryClient();
   const [running, setRunning] = useState(false);
@@ -244,17 +245,23 @@ export default function ActionBoard() {
               {isTeacher ? "รายการติดตามของคุณ" : "Action Board"}
             </h1>
           </div>
-          {role === "director" && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRunWatchCheck}
-              disabled={running}
-            >
-              <RefreshCw className={`h-4 w-4 mr-1 ${running ? "animate-spin" : ""}`} />
-              รัน Watch Check ตอนนี้
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {isTeacher && teacherId && (
+              <TeacherProposePlcDialog teacherId={teacherId} teacherName={teacherName} />
+            )}
+            {(isAdmin || isLead) && <TeacherProposePlcDialog leadership />}
+            {role === "director" && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRunWatchCheck}
+                disabled={running}
+              >
+                <RefreshCw className={`h-4 w-4 mr-1 ${running ? "animate-spin" : ""}`} />
+                รัน Watch Check ตอนนี้
+              </Button>
+            )}
+          </div>
         </div>
 
         {error && (

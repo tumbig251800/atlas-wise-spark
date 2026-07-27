@@ -10,6 +10,7 @@ import type { ActionItem } from "@/hooks/useActionItems";
 import { PLC_OUTCOME_LABELS, type PlcSession } from "@/types/plc";
 import { mapRow, type NidetRow } from "@/hooks/useNidetVisits";
 import { NidetVisitCard } from "@/components/action-board/NidetVisitCard";
+import { ImpactLoopPanel } from "@/components/action-board/ImpactLoopPanel";
 import { downloadPlcDocx } from "@/lib/downloadPlcDocx";
 import { useToast } from "@/hooks/use-toast";
 
@@ -259,6 +260,8 @@ function SupervisionPrepCard({ item }: { item: ActionItem }) {
 
   return (
     <div className="rounded-lg border border-sky-300 bg-sky-50 p-4 space-y-3">
+      <ImpactLoopPanel item={item} />
+
       <div className="font-medium text-sky-900 text-base">🎯 เตรียมรับการนิเทศ</div>
 
       <div className="space-y-1 text-sm text-sky-900">
@@ -341,11 +344,48 @@ function ResolvedCard({ item }: { item: ActionItem }) {
   );
 }
 
+// Teacher-proposed PLC case (bottom-up): the teacher raised this problem
+// themselves. Shows the problem + the Impact Loop panel so they (and the admin,
+// who co-considers) can confirm the case and manage the loop.
+function TeacherProposedCard({ item }: { item: ActionItem }) {
+  const SEVERITY_TH: Record<string, string> = {
+    critical: "🔴 รุนแรงมาก",
+    high: "🟠 รุนแรง",
+    medium: "🟡 ปานกลาง",
+  };
+  return (
+    <div className="rounded-lg border border-violet-300 bg-violet-50 p-4 space-y-3">
+      <ImpactLoopPanel item={item} />
+
+      <div className="font-medium text-violet-900 text-base">📌 PLC ที่คุณเปิดเอง</div>
+      <div className="space-y-1 text-sm text-violet-900">
+        {item.detail && (
+          <div>
+            <span className="text-violet-700">ปัญหา:</span> {item.detail}
+          </div>
+        )}
+        <div className="flex flex-wrap gap-x-4">
+          <span>
+            <span className="text-violet-700">ห้อง:</span> {item.grade_level ?? "—"}/{item.classroom ?? "—"}
+          </span>
+          <span>
+            <span className="text-violet-700">วิชา:</span> {item.subject ?? "—"}
+          </span>
+          <span>
+            <span className="text-violet-700">ความรุนแรง:</span> {SEVERITY_TH[item.severity] ?? item.severity}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TeacherCard({ item }: { item: ActionItem }) {
   if (item.status === "watching") return <WatchingCard item={item} />;
   if (item.status === "resolved") return <ResolvedCard item={item} />;
   // status === 'open' from here.
   if (item.issue_type === "IntegrityFlag") return <IntegrityFlagCard item={item} />;
+  if (item.issue_type === "TeacherProposed") return <TeacherProposedCard item={item} />;
   if (item.issue_type === "MasteryDrop" || item.issue_type === "RedZone" || item.issue_type === "UnitBlindSpot")
     return <SupervisionPrepCard item={item} />;
   return null;

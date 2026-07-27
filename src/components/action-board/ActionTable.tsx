@@ -15,6 +15,7 @@ import { ACTION_ITEMS_KEY, type ActionItem } from "@/hooks/useActionItems";
 import { StatusBadge, IssueTypeBadge, SeverityBadge } from "./StatusBadge";
 import { useNidetVisits } from "@/hooks/useNidetVisits";
 import { NidetVisitModal } from "./NidetVisitModal";
+import { ImpactLoopPanel } from "./ImpactLoopPanel";
 import { NidetVisitCard } from "./NidetVisitCard";
 import { NotifyTeacherModal } from "./NotifyTeacherModal";
 import { ReferralModal } from "./ReferralModal";
@@ -315,6 +316,7 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss, onPass
                   <TableRow className="bg-muted/20">
                     <TableCell colSpan={8} className="p-4">
                       <div className="space-y-3 text-sm">
+                        <ImpactLoopPanel item={item} />
                         {item.detail && (
                           <div>
                             <div className="text-xs uppercase text-muted-foreground mb-1">รายละเอียด</div>
