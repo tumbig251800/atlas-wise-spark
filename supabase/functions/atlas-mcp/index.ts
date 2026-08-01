@@ -1138,6 +1138,17 @@ Deno.serve(async (req: Request) => {
     });
   }
 
+  // Every POST (tools/list, tools/call, etc.) requires the shared API key —
+  // this server has no other auth (verify_jwt=false) and exposes school data.
+  const expectedKey = Deno.env.get("ATLAS_MCP_API_KEY");
+  const providedKey = req.headers.get("x-api-key");
+  if (!expectedKey || !providedKey || providedKey !== expectedKey) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
+    });
+  }
+
   let body: any;
   try {
     body = await req.json();

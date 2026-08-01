@@ -308,7 +308,7 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss, onPass
                   <TableCell><SeverityBadge severity={item.severity} /></TableCell>
                   <TableCell className="text-xs">{formatDate(item.due_date)}</TableCell>
                   <TableCell>
-                    <StatusBadge status={item.status} dueDate={item.due_date} />
+                    <StatusBadge status={item.status} dueDate={item.due_date} autoResolved={item.auto_resolved} />
                   </TableCell>
                 </TableRow>
 
