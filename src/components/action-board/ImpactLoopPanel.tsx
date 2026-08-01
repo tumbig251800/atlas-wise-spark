@@ -5,6 +5,7 @@ import { CheckCircle2, Circle, Loader2, Flag, RotateCcw } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useImpactLoop } from "@/hooks/useImpactLoop";
 import { CaseStudentPicker } from "@/components/action-board/CaseStudentPicker";
+import { MonitoringResultsPanel } from "@/components/action-board/MonitoringResultsPanel";
 import type { ActionItem } from "@/hooks/useActionItems";
 import {
   IMPACT_LOOP_STEPS,
@@ -22,12 +23,12 @@ import {
  */
 export function ImpactLoopPanel({ item }: { item: ActionItem }) {
   const { user } = useAuth();
-  const { startImpactLoop, confirmCase } = useImpactLoop();
+  const { startImpactLoop, confirmCase, startMonitoring } = useImpactLoop();
 
   const status = (item.impact_loop_status ?? null) as ImpactLoopStatus | null;
   const currentIdx = impactLoopStepIndex(status);
   const terminal = isImpactLoopTerminal(status);
-  const busy = startImpactLoop.isPending || confirmCase.isPending;
+  const busy = startImpactLoop.isPending || confirmCase.isPending || startMonitoring.isPending;
 
   return (
     <Card className="p-4 space-y-4 border-primary/20">
@@ -88,12 +89,15 @@ export function ImpactLoopPanel({ item }: { item: ActionItem }) {
           </Button>
         )}
 
-        {status && status !== "awaiting_confirmation" && !terminal && (
-          <span className="text-xs text-muted-foreground italic self-center">
-            ขั้นต่อไป: {currentIdx + 1 < IMPACT_LOOP_STEPS.length
-              ? IMPACT_LOOP_LABEL[IMPACT_LOOP_STEPS[currentIdx + 1]]
-              : "ปิดเคส"} (กำลังพัฒนาหน้าจอ)
-          </span>
+        {(status === "confirmed" || status === "plc_planned" || status === "intervention_active") && (
+          <Button
+            size="sm"
+            disabled={busy || !user}
+            onClick={() => user && startMonitoring.mutate({ item, userId: user.id })}
+          >
+            {startMonitoring.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+            เริ่มติดตามผล
+          </Button>
         )}
 
         {status === "continued" && (
@@ -112,6 +116,13 @@ export function ImpactLoopPanel({ item }: { item: ActionItem }) {
       {currentIdx >= 2 && (
         <div className="pt-3 border-t">
           <CaseStudentPicker item={item} />
+        </div>
+      )}
+
+      {/* Before/after monitoring evidence + admin verify + close */}
+      {status === "monitoring" && (
+        <div className="pt-3 border-t">
+          <MonitoringResultsPanel item={item} />
         </div>
       )}
     </Card>
