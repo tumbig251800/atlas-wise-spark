@@ -4,9 +4,13 @@ import { daysRemaining } from "@/hooks/useActionItems";
 interface Props {
   status: string;
   dueDate?: string | null;
+  /** True when an automation (e.g. WF-5) resolved this via a metric threshold,
+   * not a teacher's manual claim — still needs admin verify/dismiss, but the
+   * source is different and worth distinguishing at a glance. */
+  autoResolved?: boolean;
 }
 
-export function StatusBadge({ status, dueDate }: Props) {
+export function StatusBadge({ status, dueDate, autoResolved }: Props) {
   if (status === "watching") {
     return <Badge className="bg-amber-500 hover:bg-amber-500 text-white">👁 เฝ้าติดตาม</Badge>;
   }
@@ -17,7 +21,16 @@ export function StatusBadge({ status, dueDate }: Props) {
     return <Badge className="bg-slate-400 hover:bg-slate-400 text-white">ปิดเคส</Badge>;
   }
   if (status === "resolved") {
-    return <Badge className="bg-violet-500 hover:bg-violet-500 text-white">ครูแก้แล้ว</Badge>;
+    return autoResolved ? (
+      <Badge
+        className="bg-violet-100 text-violet-800 border border-violet-300 hover:bg-violet-100"
+        title="ระบบปิดให้อัตโนมัติเมื่อค่าเมตริกดีขึ้นตามเกณฑ์ — ยังรอแอดมิน/หัวหน้ายืนยันหรือปิดเคส"
+      >
+        ⚙️ แก้อัตโนมัติ (รอยืนยัน)
+      </Badge>
+    ) : (
+      <Badge className="bg-violet-500 hover:bg-violet-500 text-white">ครูแก้แล้ว (รอยืนยัน)</Badge>
+    );
   }
 
   const days = daysRemaining(dueDate ?? null);
