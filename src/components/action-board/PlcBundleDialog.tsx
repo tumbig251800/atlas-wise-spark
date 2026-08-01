@@ -17,6 +17,7 @@ import type { ActionItem } from "@/hooks/useActionItems";
 import type { PlcSession } from "@/types/plc";
 import { PLC_OUTCOME_LABELS, GRADE_BANDS } from "@/types/plc";
 import { downloadPlcDocx } from "@/lib/downloadPlcDocx";
+import { fetchNidetVisitsForItems } from "@/hooks/useNidetVisits";
 
 const INPUT = "w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
 
@@ -157,7 +158,8 @@ export function PlcBundleDialog({ open, teacherName, items, onClose }: Props) {
       // action item — it records the PLC session only. The DB-enforced closure
       // guard (verified requires a monitoring result) lands in WP6.
       if (andDownload) {
-        await downloadPlcDocx({ ...sessionPayload, id: savedSession?.id }, selectedItems);
+        const nidetVisits = await fetchNidetVisitsForItems(selectedItems.map((i) => i.id));
+        await downloadPlcDocx({ ...sessionPayload, id: savedSession?.id }, selectedItems, nidetVisits);
       }
 
       toast({
