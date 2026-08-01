@@ -41,6 +41,27 @@ export function mapRow(row: NidetRow): NidetVisit {
   };
 }
 
+// Fetch all visits relevant to a set of action items — either the visit's
+// primary target (action_item_id) or a bundled case it also covers
+// (linked_action_item_ids overlap). Used when generating documents that need
+// every linked visit, not just the latest one for a single item.
+export async function fetchNidetVisitsForItems(actionItemIds: number[]): Promise<NidetVisit[]> {
+  const ids = actionItemIds.filter((id) => Number.isFinite(id));
+  if (ids.length === 0) return [];
+
+  const idList = ids.join(",");
+  const { data, error } = await supabase
+    .from("nidet_visits")
+    .select("*")
+    .or(`action_item_id.in.(${idList}),linked_action_item_ids.ov.{${idList}}`)
+    .order("visit_date", { ascending: false })
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+
+  const byId = new Map(((data ?? []) as NidetRow[]).map(mapRow).map((v) => [v.id, v]));
+  return [...byId.values()];
+}
+
 export function useNidetVisits() {
   const [visit, setVisit] = useState<NidetVisit | null>(null);
   const [loading, setLoading] = useState(false);

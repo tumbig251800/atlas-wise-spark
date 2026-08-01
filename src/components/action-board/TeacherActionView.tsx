@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { RUBRIC_DIMENSIONS, type RubricKey, type NidetVisit } from "@/types/nidet";
 import type { ActionItem } from "@/hooks/useActionItems";
 import { PLC_OUTCOME_LABELS, type PlcSession } from "@/types/plc";
-import { mapRow, type NidetRow } from "@/hooks/useNidetVisits";
+import { mapRow, type NidetRow, fetchNidetVisitsForItems } from "@/hooks/useNidetVisits";
 import { NidetVisitCard } from "@/components/action-board/NidetVisitCard";
 import { ImpactLoopPanel } from "@/components/action-board/ImpactLoopPanel";
 import { downloadPlcDocx } from "@/lib/downloadPlcDocx";
@@ -162,12 +162,13 @@ function PlcSessionTeacherCard({
   const handleDownload = async () => {
     setDownloading(true);
     try {
-      const { data, error } = await supabase
-        .from("action_plan_items")
-        .select("*")
-        .in("id", session.linked_action_item_ids ?? []);
-      if (error) throw error;
-      await downloadPlcDocx(session, (data ?? []) as ActionItem[]);
+      const ids = session.linked_action_item_ids ?? [];
+      const [itemsResult, nidetVisits] = await Promise.all([
+        supabase.from("action_plan_items").select("*").in("id", ids),
+        fetchNidetVisitsForItems(ids),
+      ]);
+      if (itemsResult.error) throw itemsResult.error;
+      await downloadPlcDocx(session, (itemsResult.data ?? []) as ActionItem[], nidetVisits);
     } catch (err) {
       toast({
         title: "ดาวน์โหลดไม่สำเร็จ",

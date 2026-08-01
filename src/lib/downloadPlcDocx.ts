@@ -16,6 +16,7 @@ import {
 } from "docx";
 import type { PlcSession } from "@/types/plc";
 import type { ActionItem } from "@/hooks/useActionItems";
+import type { NidetVisit } from "@/types/nidet";
 
 const CW = 9746; // A4 content width (DXA)
 
@@ -155,6 +156,52 @@ function signatureTable() {
   });
 }
 
+function checkboxLine(boxes: Array<{ label: string; checked: boolean }>) {
+  const runs: TextRun[] = [];
+  boxes.forEach((box, i) => {
+    runs.push(tr((box.checked ? "☑ " : "☐ ") + box.label, 21, box.checked ? "111827" : "6B7280", box.checked));
+    if (i < boxes.length - 1) runs.push(tr("     ", 21));
+  });
+  return new Paragraph({ children: runs, spacing: { after: 80 }, indent: { left: 200 } });
+}
+
+function nidetSummaryLine(visit: NidetVisit) {
+  const parts = [visit.strengths, visit.improvements, visit.recommendations]
+    .map((p) => p?.trim())
+    .filter((p): p is string => !!p);
+  const excerpt = parts.length > 0 ? parts.join(" ") : "—";
+  const truncated =
+    excerpt.length > 220
+      ? excerpt.slice(0, 220).trimEnd() + "… (ดูรายละเอียดเต็มในบันทึกการนิเทศฉบับเต็ม)"
+      : excerpt;
+
+  return para(
+    [
+      tr(`บันทึกจากการนิเทศ (${formatThaiDate(visit.visit_date)}, ผู้นิเทศ: ${visit.supervisor_name || "—"}) : `, 20, "6B7280"),
+      tr(truncated, 20, "374151"),
+    ],
+    { spacing: { after: 60 }, indent: { left: 200 } }
+  );
+}
+
+function nidetToolsSection(visits: NidetVisit[]) {
+  const typesPresent = new Set(visits.map((v) => v.nidet_type));
+  const boxes = [
+    { label: "การนิเทศแบบพูดคุย (Coaching)", checked: typesPresent.has("conversation") },
+    { label: "Lesson Study", checked: false },
+    { label: "การสังเกตชั้นเรียน", checked: typesPresent.has("observation") },
+    { label: "อื่นๆ", checked: false },
+  ];
+
+  const children: Paragraph[] = [checkboxLine(boxes)];
+  if (visits.length === 0) {
+    children.push(textBlock("ยังไม่มีบันทึกการนิเทศที่เชื่อมโยงกับ PLC นี้"));
+  } else {
+    visits.forEach((v) => children.push(nidetSummaryLine(v)));
+  }
+  return children;
+}
+
 function formatThaiDate(iso: string | null | undefined): string {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -163,7 +210,11 @@ function formatThaiDate(iso: string | null | undefined): string {
   return `${d.getUTCDate()} ${months[d.getUTCMonth()]} ${d.getUTCFullYear() + 543}`;
 }
 
-export async function downloadPlcDocx(session: Partial<PlcSession>, items: ActionItem[]) {
+export async function downloadPlcDocx(
+  session: Partial<PlcSession>,
+  items: ActionItem[],
+  nidetVisits: NidetVisit[] = []
+) {
   const memberNames = (session.members ?? []).map((m) => m.teacher_name || m.teacher_id).join(", ");
   const outcomeMap: Record<string, string> = {
     continue_plc: "ดำเนินการต่อเนื่อง (Continue PLC)",
@@ -271,19 +322,24 @@ export async function downloadPlcDocx(session: Partial<PlcSession>, items: Actio
           textBlock(session.approach || "—"),
           blank(80),
 
+          // PLC tools / supervision (nidet)
+          sectionTitle("5. เครื่องมือที่ใช้ในกระบวนการ PLC"),
+          ...nidetToolsSection(nidetVisits),
+          blank(80),
+
           // Action
-          sectionTitle("5. การออกแบบกิจกรรม / เครื่องมือ / วิธีการเพื่อแก้ปัญหา"),
+          sectionTitle("6. การออกแบบกิจกรรม / เครื่องมือ / วิธีการเพื่อแก้ปัญหา"),
           textBlock(session.action_steps || "—"),
           blank(80),
 
           // Outcome + follow up
-          sectionTitle("6. ผลลัพธ์และการติดตาม"),
+          sectionTitle("7. ผลลัพธ์และการติดตาม"),
           fieldLine("ผลลัพธ์ PLC", outcomeMap[session.outcome_type ?? "continue_plc"] ?? "—"),
           fieldLine("วันนัด PLC ครั้งต่อไป", formatThaiDate(session.next_plc_date)),
           blank(80),
 
           // Evidence
-          sectionTitle("7. ภาพ / ร่องรอย / หลักฐานประกอบการ PLC"),
+          sectionTitle("8. ภาพ / ร่องรอย / หลักฐานประกอบการ PLC"),
           para([tr("(แนบภาพถ่าย / เอกสารประกอบด้านหลัง)", 18, "9CA3AF")],
             { spacing: { after: 20 }, indent: { left: 200 } }),
           new Table({

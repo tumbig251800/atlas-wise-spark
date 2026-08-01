@@ -6,6 +6,7 @@ import type { PlcSession } from "@/types/plc";
 import { PLC_OUTCOME_LABELS } from "@/types/plc";
 import { supabase } from "@/lib/atlasSupabase";
 import { downloadPlcDocx } from "@/lib/downloadPlcDocx";
+import { fetchNidetVisitsForItems } from "@/hooks/useNidetVisits";
 import { useToast } from "@/hooks/use-toast";
 import type { ActionItem } from "@/hooks/useActionItems";
 
@@ -54,8 +55,12 @@ export function PlcSessionCard({ session, onEdit }: PlcSessionCardProps) {
     e.stopPropagation();
     setDownloading(true);
     try {
-      const items = await fetchLinkedItems(session.linked_action_item_ids ?? []);
-      await downloadPlcDocx(session, items);
+      const ids = session.linked_action_item_ids ?? [];
+      const [items, nidetVisits] = await Promise.all([
+        fetchLinkedItems(ids),
+        fetchNidetVisitsForItems(ids),
+      ]);
+      await downloadPlcDocx(session, items, nidetVisits);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "ดาวน์โหลดไม่สำเร็จ";
       toast({ title: "เกิดข้อผิดพลาด", description: message, variant: "destructive" });
