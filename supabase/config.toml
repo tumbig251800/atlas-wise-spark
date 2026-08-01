@@ -20,6 +20,10 @@ verify_jwt = false
 [functions.atlas-mcp]
 verify_jwt = false
 
+# kindergarten-mcp: auth handled internally via KINDERGARTEN_MCP_API_KEY secret
+[functions.kindergarten-mcp]
+verify_jwt = false
+
 # atlas-mastery-watch: auth handled internally via requireAtlasUser
 [functions.atlas-mastery-watch]
 verify_jwt = false
