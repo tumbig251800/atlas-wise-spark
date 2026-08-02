@@ -1848,6 +1848,10 @@ export type Database = {
         Returns: boolean
       }
       exec_sql: { Args: { sql: string }; Returns: Json }
+      get_teacher_names: {
+        Args: { teacher_ids: string[] }
+        Returns: { user_id: string; full_name: string }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
