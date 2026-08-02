@@ -17,6 +17,7 @@ import {
 import type { PlcSession } from "@/types/plc";
 import type { ActionItem } from "@/hooks/useActionItems";
 import type { NidetVisit } from "@/types/nidet";
+import { supabase } from "@/lib/atlasSupabase";
 
 const CW = 9746; // A4 content width (DXA)
 
@@ -66,12 +67,117 @@ function fieldLine(label: string, value: string) {
   });
 }
 
-function textBlock(text: string) {
+function plainTextParagraph(text: string) {
   return new Paragraph({
     spacing: { after: 60 },
     indent: { left: 200 },
     children: [tr(text || "—", 22)],
   });
+}
+
+function isHtmlContent(text: string): boolean {
+  return /<\/?[a-z][^>]*>/i.test(text);
+}
+
+// Skip tags whose text content would otherwise leak into the document as
+// visible garbage (e.g. a stray <script>/<style> pasted into a field).
+const SKIPPED_TAGS = new Set(["script", "style"]);
+
+function collectInlineRuns(node: Node, bold: boolean, italics: boolean, runs: TextRun[]): void {
+  node.childNodes.forEach((child) => {
+    if (child.nodeType === Node.TEXT_NODE) {
+      const text = child.textContent ?? "";
+      if (text) runs.push(new TextRun({ text, size: 22, font: "TH SarabunPSK", color: "374151", bold, italics }));
+      return;
+    }
+    if (child.nodeType !== Node.ELEMENT_NODE) return;
+    const el = child as Element;
+    const tag = el.tagName.toLowerCase();
+    if (SKIPPED_TAGS.has(tag)) return;
+    if (tag === "br") {
+      runs.push(new TextRun({ text: "", break: 1, size: 22, font: "TH SarabunPSK" }));
+    } else if (tag === "strong" || tag === "b") {
+      collectInlineRuns(el, true, italics, runs);
+    } else if (tag === "em" || tag === "i") {
+      collectInlineRuns(el, bold, true, runs);
+    } else {
+      collectInlineRuns(el, bold, italics, runs);
+    }
+  });
+}
+
+/** Converts a (possibly HTML) field into real Word paragraphs/bullets instead of leaking raw tags. */
+function htmlToParagraphs(html: string): Paragraph[] {
+  const parsed = new DOMParser().parseFromString(html, "text/html");
+  const topNodes = Array.from(parsed.body.childNodes);
+  const paragraphs: Paragraph[] = [];
+  let strayRuns: TextRun[] = [];
+
+  const flushStray = () => {
+    if (strayRuns.length > 0) {
+      paragraphs.push(new Paragraph({ spacing: { after: 60 }, indent: { left: 200 }, children: strayRuns }));
+      strayRuns = [];
+    }
+  };
+
+  const addList = (listEl: Element, ordered: boolean) => {
+    let index = 1;
+    Array.from(listEl.children).forEach((li) => {
+      if (li.tagName.toLowerCase() !== "li") return;
+      const runs: TextRun[] = [];
+      if (ordered) {
+        runs.push(new TextRun({ text: `${index}. `, size: 22, font: "TH SarabunPSK", color: "374151" }));
+        index += 1;
+      }
+      collectInlineRuns(li, false, false, runs);
+      if (runs.length === 0) return;
+      paragraphs.push(
+        new Paragraph({
+          spacing: { after: 40 },
+          indent: { left: 200 },
+          bullet: ordered ? undefined : { level: 0 },
+          children: runs,
+        })
+      );
+    });
+  };
+
+  topNodes.forEach((node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const text = node.textContent ?? "";
+      if (text.trim()) strayRuns.push(new TextRun({ text, size: 22, font: "TH SarabunPSK", color: "374151" }));
+      return;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+    const el = node as Element;
+    const tag = el.tagName.toLowerCase();
+    if (SKIPPED_TAGS.has(tag)) return;
+
+    if (tag === "ul" || tag === "ol") {
+      flushStray();
+      addList(el, tag === "ol");
+    } else if (tag === "p" || tag === "div") {
+      flushStray();
+      const runs: TextRun[] = [];
+      collectInlineRuns(el, false, false, runs);
+      if (runs.length > 0) paragraphs.push(new Paragraph({ spacing: { after: 60 }, indent: { left: 200 }, children: runs }));
+    } else if (tag === "br") {
+      flushStray();
+      paragraphs.push(blank(40));
+    } else {
+      collectInlineRuns(el, false, false, strayRuns);
+    }
+  });
+  flushStray();
+
+  return paragraphs.length > 0 ? paragraphs : [plainTextParagraph("—")];
+}
+
+/** Renders a field that may be plain text or HTML (from the AI planner) as one or more paragraphs. */
+function textBlock(text: string): Paragraph[] {
+  const value = text || "";
+  if (!value) return [plainTextParagraph("—")];
+  return isHtmlContent(value) ? htmlToParagraphs(value) : [plainTextParagraph(value)];
 }
 
 function actionItemsTable(items: ActionItem[]) {
@@ -195,7 +301,7 @@ function nidetToolsSection(visits: NidetVisit[]) {
 
   const children: Paragraph[] = [checkboxLine(boxes)];
   if (visits.length === 0) {
-    children.push(textBlock("ยังไม่มีบันทึกการนิเทศที่เชื่อมโยงกับ PLC นี้"));
+    children.push(...textBlock("ยังไม่มีบันทึกการนิเทศที่เชื่อมโยงกับ PLC นี้"));
   } else {
     visits.forEach((v) => children.push(nidetSummaryLine(v)));
   }
@@ -210,12 +316,37 @@ function formatThaiDate(iso: string | null | undefined): string {
   return `${d.getUTCDate()} ${months[d.getUTCMonth()]} ${d.getUTCFullYear() + 543}`;
 }
 
+/**
+ * Resolves member display names via the get_teacher_names RPC (SECURITY DEFINER,
+ * scoped to user_id + full_name only — see migration 20260802120000) instead of
+ * trusting the teacher_name copy embedded in plc_sessions.members, which can be
+ * blank or inconsistently spelled. A direct `profiles` join can't be used here:
+ * RLS only lets a user read their own row (or every row if they're a director),
+ * so a regular teacher downloading their own PLC record wouldn't see teammates'
+ * names. Never falls back to showing the raw UUID.
+ */
+async function resolveMemberNames(
+  members: { teacher_id: string; teacher_name?: string }[]
+): Promise<string> {
+  if (members.length === 0) return "—";
+
+  const ids = [...new Set(members.map((m) => m.teacher_id).filter(Boolean))];
+  let nameByTeacherId = new Map<string, string>();
+  if (ids.length > 0) {
+    const { data, error } = await supabase.rpc("get_teacher_names", { teacher_ids: ids });
+    if (error) throw error;
+    nameByTeacherId = new Map((data ?? []).map((p) => [p.user_id, p.full_name]));
+  }
+
+  return members.map((m) => nameByTeacherId.get(m.teacher_id) || "(ไม่พบข้อมูลครู)").join(", ");
+}
+
 export async function downloadPlcDocx(
   session: Partial<PlcSession>,
   items: ActionItem[],
   nidetVisits: NidetVisit[] = []
 ) {
-  const memberNames = (session.members ?? []).map((m) => m.teacher_name || m.teacher_id).join(", ");
+  const memberNames = await resolveMemberNames(session.members ?? []);
   const outcomeMap: Record<string, string> = {
     continue_plc: "ดำเนินการต่อเนื่อง (Continue PLC)",
     resolved: "แก้ไขแล้ว (Resolved)",
@@ -267,7 +398,7 @@ export async function downloadPlcDocx(
             rows: [
               new TableRow({ children: [
                 new TableCell({ width: { size: Math.floor(CW/2), type: WidthType.DXA }, borders: noAllBorder, margins: { top:40, bottom:40, left:0, right:200 },
-                  children: [para([tr("ชื่อกลุ่มกิจกรรม : ", 21, "6B7280"), b(session.topic ? session.topic.slice(0, 30) : "—", 21)])] }),
+                  children: [para([tr("ชื่อกลุ่มกิจกรรม : ", 21, "6B7280"), b(session.topic || "—", 21)])] }),
                 new TableCell({ width: { size: CW - Math.floor(CW/2), type: WidthType.DXA }, borders: noAllBorder, margins: { top:40, bottom:40, left:0, right:0 },
                   children: [para([tr("วันที่ : ", 21, "6B7280"), b(formatThaiDate(session.session_date), 21)])] }),
               ]}),
@@ -294,12 +425,12 @@ export async function downloadPlcDocx(
           sectionTitle("ข้อมูลจากระบบ ATLAS — รายการปัญหาที่เชื่อมโยง"),
           para([tr("ข้อมูลนี้ดึงอัตโนมัติจากระบบ ATLAS ณ วันที่ประชุม", 18, "9CA3AF")],
             { spacing: { after: 60 }, indent: { left: 200 } }),
-          items.length > 0 ? actionItemsTable(items) : textBlock("—"),
+          ...(items.length > 0 ? [actionItemsTable(items)] : textBlock("—")),
           blank(100),
 
           // Problem
           sectionTitle("1. ประเด็นปัญหาที่จะพัฒนา  (เน้นคุณภาวผู้เรียน)"),
-          textBlock(session.problem_statement || "—"),
+          ...textBlock(session.problem_statement || "—"),
           blank(80),
 
           // Discussion points
@@ -308,18 +439,18 @@ export async function downloadPlcDocx(
             ? session.discussion_points!.map((pt, i) =>
                 para([tr(`${i + 1}. ${pt}`, 20)], { spacing: { after: 60 }, indent: { left: 200 } })
               )
-            : [textBlock("—")]
+            : textBlock("—")
           ),
           blank(80),
 
           // Cause
           sectionTitle("3. สาเหตุของปัญหา"),
-          textBlock(session.root_cause || "—"),
+          ...textBlock(session.root_cause || "—"),
           blank(80),
 
           // Knowledge
           sectionTitle("4. ความรู้ / หลักการที่นำมาใช้ / แนวทางการแก้ปัญหา"),
-          textBlock(session.approach || "—"),
+          ...textBlock(session.approach || "—"),
           blank(80),
 
           // PLC tools / supervision (nidet)
@@ -329,7 +460,7 @@ export async function downloadPlcDocx(
 
           // Action
           sectionTitle("6. การออกแบบกิจกรรม / เครื่องมือ / วิธีการเพื่อแก้ปัญหา"),
-          textBlock(session.action_steps || "—"),
+          ...textBlock(session.action_steps || "—"),
           blank(80),
 
           // Outcome + follow up

@@ -117,7 +117,7 @@ export function PlcBundleDialog({ open, teacherName, items, onClose }: Props) {
       .filter((id) => id !== user?.id)
       .map((id) => ({
         teacher_id: id,
-        teacher_name: teacherList.find((t) => t.user_id === id)?.full_name ?? id,
+        teacher_name: teacherList.find((t) => t.user_id === id)?.full_name ?? "(ไม่พบข้อมูลครู)",
       })),
   ];
 
