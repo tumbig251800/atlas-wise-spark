@@ -38,9 +38,21 @@ npx supabase login
 # 2. Link project
 npx supabase link --project-ref ebyelctqcdhjmqujeskx
 
-# 3. Deploy
-npx supabase functions deploy
+# 3. Deploy — ต้องระบุชื่อฟังก์ชันเสมอ
+npx supabase functions deploy <function-name>
+# เช่น: npx supabase functions deploy atlas-mcp
+
+# หรือใช้สคริปต์ที่มี guard กันเผลออยู่แล้ว (ต้องระบุชื่อฟังก์ชัน ไม่งั้น error ทันที):
+./scripts/deploy-functions.sh <function-name>
+# เช่น: ./scripts/deploy-functions.sh atlas-mcp
+# หรือผ่าน npm สำหรับฟังก์ชันที่มีสคริปต์ตั้งไว้แล้ว: npm run deploy:atlas-mcp
 ```
+
+⚠️ **ห้ามรัน `npx supabase functions deploy` แบบไม่ระบุชื่อฟังก์ชันเด็ดขาด** — คำสั่งนี้จะ deploy
+**ทุกโฟลเดอร์** ใน `supabase/functions/` พร้อมกัน รวมถึงโฟลเดอร์ทดลอง โค้ดที่ยังไม่เสร็จ หรือแม้แต่
+ไฟล์ที่ยังไม่ได้ commit เข้า git เลย เคยเกิดเหตุการณ์จริง: มีไฟล์ `delete-teacher-data` ที่ hard-delete
+ข้อมูลนักเรียนโดยไม่เช็คสิทธิ์เลย นอนอยู่ในโฟลเดอร์นี้เป็นเดือนโดยไม่มีใครรู้ตัว — โชคดีที่ไม่เคยมีใคร
+รันคำสั่งแบบไม่ระบุชื่อ ไม่งั้นจะขึ้น production ทันที (ดู `docs/SECURITY-AUDIT-2026-08-03-open-findings.md`)
 
 **หมายเหตุ:** ถ้าได้ Forbidden หลัง login อาจเป็นเพราะโปรเจกต์อยู่ภายใต้ Lovable Org — ใช้วิธีที่ 1 แทน
 
