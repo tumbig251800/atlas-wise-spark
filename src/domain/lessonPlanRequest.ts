@@ -1,4 +1,5 @@
 import type { LessonPlanConfig } from "@/components/lesson-plan/LessonPlanForm";
+import { parseStoredIds } from "@/lib/studentIds";
 
 /** Labels for snapshot equipment keys (domain — used when building Edge payload). */
 export const LESSON_PLAN_EQUIPMENT_LABELS: Record<string, string> = {
@@ -29,12 +30,8 @@ export function buildReflectionContextFromLogs(recentLogs: ReflectionLogRow[]): 
   recentLogs.forEach((log) => {
     gapCounts[log.major_gap] = (gapCounts[log.major_gap] || 0) + 1;
     masterySum += log.mastery_score;
-    if (log.remedial_ids) {
-      log.remedial_ids.split(",").forEach((id) => specialIds.add(id.trim()));
-    }
-    if (log.health_care_ids) {
-      log.health_care_ids.split(",").forEach((id) => specialIds.add(id.trim()));
-    }
+    parseStoredIds(log.remedial_ids).forEach((id) => specialIds.add(id));
+    parseStoredIds(log.health_care_ids).forEach((id) => specialIds.add(id));
   });
 
   const sortedGaps = Object.entries(gapCounts).sort((a, b) => b[1] - a[1]);

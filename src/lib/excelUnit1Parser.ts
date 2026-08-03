@@ -10,6 +10,7 @@
  * Sheet name format: "ป.X.Y" → grade_level="ป.X", classroom="Y"
  */
 import * as XLSX from "xlsx";
+import { validateStudentId } from "./dataValidator";
 
 // ==================== Types ====================
 
@@ -232,6 +233,7 @@ export function parseUnit1Excel(
         const json = XLSX.utils.sheet_to_json<string[]>(ws, {
           header: 1,
           defval: "",
+          raw: false,
         });
 
         if (json.length < 4) {
@@ -276,6 +278,12 @@ export function parseUnit1Excel(
           }
           if (!full_name) {
             errors.push(`แถว ${rowNum}: ไม่มีชื่อ-สกุล`);
+            continue;
+          }
+
+          const idCheck = validateStudentId(student_code);
+          if (!idCheck.isValid) {
+            errors.push(`แถว ${rowNum}: ${idCheck.errors[0]}`);
             continue;
           }
 

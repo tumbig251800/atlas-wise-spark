@@ -7,6 +7,7 @@ import { COMPETENCY_TEMPLATE_HEADERS } from "@/lib/competencyTemplate";
 import { CAPABILITY_KEYS_2026 } from "@/lib/capabilityConstants2026";
 import { supabase } from "@/lib/atlasSupabase";
 import { resolveSubjectForImport } from "@/lib/subjectNormalization";
+import { validateStudentId } from "@/lib/dataValidator";
 
 const db = supabase as unknown as {
   from: (table: string) => ReturnType<typeof supabase.from>;
@@ -136,6 +137,11 @@ export function parseAllInOneCSV(text: string): AllInOneParseResult {
       errors.push(`แถว ${i + 1}: ไม่มีหน่วยการเรียนรู้`);
       continue;
     }
+    const idCheck = validateStudentId(student_id);
+    if (!idCheck.isValid) {
+      errors.push(`แถว ${i + 1}: ${idCheck.errors[0]}`);
+      continue;
+    }
 
     const getFrom = (k: string) => get(cols, k);
     const grade_level = getFrom("grade_level");
@@ -180,7 +186,7 @@ export function parseAllInOneXLSX(file: File): Promise<AllInOneParseResult> {
           return;
         }
         const ws = wb.Sheets[first];
-        const json = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1, defval: "" });
+        const json = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1, defval: "", raw: false });
         if (!json.length) {
           resolve({ rows: [], errors: ["ไฟล์ว่าง"], warnings: [] });
           return;
@@ -209,6 +215,11 @@ export function parseAllInOneXLSX(file: File): Promise<AllInOneParseResult> {
           }
           if (!unit_name) {
             errors.push(`แถว ${i + 1}: ไม่มีหน่วยการเรียนรู้`);
+            continue;
+          }
+          const idCheck = validateStudentId(student_id);
+          if (!idCheck.isValid) {
+            errors.push(`แถว ${i + 1}: ${idCheck.errors[0]}`);
             continue;
           }
           const grade_level = get(row, "grade_level");
