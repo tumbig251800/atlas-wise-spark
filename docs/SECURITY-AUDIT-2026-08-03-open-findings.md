@@ -54,10 +54,10 @@ The list of 22 live functions includes 7 that have **no matching folder** in
 | `generate-kindergarten-research-suggestions` | Not found anywhere on this machine or in this repo's git history |
 | `generate-kindergarten-research-report` | Not found anywhere on this machine or in this repo's git history |
 | `kindergarten-mcp-7d40d75d3e4121d5b9d3034f2cd0db7253a28398` | Not found anywhere on this machine or in this repo's git history |
-| `woranat-oauth-consent` | Not found anywhere on this machine or in this repo's git history |
+| `woranat-oauth-consent` | **Recovered** — source retrieved from the Supabase Dashboard and kept at [docs/live-functions-reference/woranat-oauth-consent/](live-functions-reference/woranat-oauth-consent/README.md). Reviewed: uses `supabase.auth.oauth.*` (no custom OAuth flow), JWT + director/lead role check, full security-header set (CSP with `frame-ancestors 'none'`, `Referrer-Policy: no-referrer`, etc.) — **this one is fine as-is, no fix needed.** Note it's still live and in active use — see the README's warning before treating it like the archived functions above |
 
-None of these can be audited for auth/data-handling from this repo — their
-governance (who deployed them, from where, what they do) needs to be
+None of the remaining 6 can be audited for auth/data-handling from this repo
+— their governance (who deployed them, from where, what they do) needs to be
 confirmed at the source, wherever that is. This is out of scope for
-`atlas-wise-spark` to fix, but worth tracking since 5 of the 7 have no known
+`atlas-wise-spark` to fix, but worth tracking since 5 of them have no known
 location at all.
