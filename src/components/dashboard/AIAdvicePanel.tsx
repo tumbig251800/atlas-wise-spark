@@ -4,6 +4,7 @@ import { AlertTriangle, Brain, HeartPulse, Lightbulb, Trophy, Activity } from "l
 import type { TeachingLog } from "@/hooks/useDashboardData";
 import type { DiagnosticEvent } from "@/hooks/useDiagnosticData";
 import { buildStrictAnswerTH, type DecisionObject } from "@/lib/atlasStrictNarrator";
+import { isEmptyIdsValue, parseStoredIds } from "@/lib/studentIds";
 
 interface Props {
   logs: TeachingLog[];
@@ -63,7 +64,7 @@ function getRemedialInfo(log: TeachingLog, decision?: DecisionObject | null) {
   const total = log.total_students ?? 0;
   const count = decision != null && total > 0
     ? Math.round((decision.gap_rate / 100) * total)
-    : (log.remedial_ids || "").split(",").filter((x) => x.trim() && x !== "[None]" && x !== "[N/A]").length;
+    : parseStoredIds(log.remedial_ids).length;
   const pct = decision != null
     ? decision.gap_rate
     : total > 0 ? (count / total) * 100 : 0;
@@ -94,7 +95,7 @@ export function AIAdvicePanel({ logs, diagnosticEvents = [] }: Props) {
   const Icon = adviceData.icon;
 
   const healthCareEntries = last5.filter(
-    (l) => l.health_care_status && l.health_care_ids && (l.health_care_ids as string)?.trim() !== ""
+    (l) => l.health_care_status && !isEmptyIdsValue(l.health_care_ids as string | null)
   );
 
   const inconsistencies = last5.filter(
@@ -209,7 +210,7 @@ export function AIAdvicePanel({ logs, diagnosticEvents = [] }: Props) {
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                     {(() => {
-                      const ids = (log.remedial_ids || "").split(",").map((x) => x.trim()).filter((x) => x && x !== "[None]" && x !== "[N/A]");
+                      const ids = parseStoredIds(log.remedial_ids);
                       return ids.length > 0 ? (
                         <div>
                           <span className="text-muted-foreground">รหัสนักเรียนซ่อมเสริม: </span>

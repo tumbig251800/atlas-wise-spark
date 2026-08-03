@@ -3,6 +3,7 @@
  * Aggregates teaching logs + assessments, validates gaps, detects risks, analyzes strategies
  */
 import { normalizeUnit, sortByUnitKey } from "./unitNormalization";
+import { parseStoredIds } from "./studentIds";
 import type {
   TeachingLogRaw,
   UnitAssessmentRaw,
@@ -20,11 +21,7 @@ import type {
 
 /** Parse remedial_ids to array of student IDs */
 function parseRemedialIds(remedialIds: string | null): string[] {
-  if (!remedialIds || !remedialIds.trim()) return [];
-  return remedialIds
-    .split(",")
-    .map((x) => x.trim())
-    .filter((x) => x && x !== "[None]" && x !== "[N/A]");
+  return parseStoredIds(remedialIds);
 }
 
 /**

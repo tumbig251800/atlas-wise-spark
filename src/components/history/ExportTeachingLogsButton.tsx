@@ -20,6 +20,7 @@ import {
 import { Download, FileText, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { isEmptyIdsValue } from "@/lib/studentIds";
 
 interface ExportTeachingLogsButtonProps {
   teachers?: string[];
@@ -185,10 +186,10 @@ export function ExportTeachingLogsButton({
       content += `รูปแบบกิจกรรม: ${formatActivityLevel(log.activity_mode)}\n`;
       content += `Key Issue: ${log.key_issue || "-"}\n`;
       content += `Next Strategy: ${log.next_strategy || "-"}\n`;
-      if (log.remedial_ids && log.remedial_ids !== '[None]') {
+      if (!isEmptyIdsValue(log.remedial_ids)) {
         content += `นักเรียนซ่อมเสริม: ${log.remedial_ids}\n`;
       }
-      if (log.health_care_ids && log.health_care_ids !== '[None]') {
+      if (!isEmptyIdsValue(log.health_care_ids)) {
         content += `Health Care: ${log.health_care_ids}\n`;
       }
       if (log.health_care_status) {
