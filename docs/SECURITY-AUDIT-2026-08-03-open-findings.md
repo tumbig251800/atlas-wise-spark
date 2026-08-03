@@ -10,8 +10,11 @@ auth and no in-app caller were found and removed from production directly
 one archived at `docs/archived-functions/atlas-delete-logs/`, not deleted,
 since it had proper auth and just wasn't used).
 
-This document records two categories of findings that were **not** acted on
-in that round, so they don't get lost.
+This document records findings that were **not** fully resolved, so they
+don't get lost. Sections 1–2 are the original two categories from the morning
+pass. Sections 3–4 were added in the afternoon of the same day and are a
+**different class of problem** — not auth/data-exposure but a resource-exhaustion
+incident and a downstream dependency it exposed (see each section's note).
 
 ## 1. Fake-auth check — 3 functions still live
 
@@ -61,3 +64,110 @@ None of the remaining 6 can be audited for auth/data-handling from this repo
 confirmed at the source, wherever that is. This is out of scope for
 `atlas-wise-spark` to fix, but worth tracking since 5 of them have no known
 location at all.
+
+## 3. Resource-exhaustion incident — phantom health-check traffic on two MCP functions
+
+**This is NOT a security finding.** No data was read and the caller held a
+valid credential. It is a cost/availability problem, and its root cause is
+**still unknown** — it is an open finding.
+
+### What happened
+
+On 2026-08-03 the Supabase project `ebyelctqcdhjmqujeskx` had burned
+**363,319 of its 500,000** Free-plan Edge Function Invocations for the
+16 Jul – 16 Aug billing cycle. The burn rate was **~5,867 requests/hour
+(~98/min)** — enough to exhaust the quota in well under a day, at which point
+Supabase throttles the project and **every edge function stops**, taking down
+both ATLAS and the kindergarten system.
+
+`function_edge_logs` showed something hitting these two endpoints, alternating,
+every ~2 seconds, 24/7, since 2026-08-01:
+
+```
+GET | 200 | https://ebyelctqcdhjmqujeskx.supabase.co/functions/v1/atlas-mcp
+GET | 200 | https://ebyelctqcdhjmqujeskx.supabase.co/functions/v1/kindergarten-mcp
+```
+
+### Evidence it was a forgotten health check, not real use or an attack
+
+- **All `GET`, never `POST`.** The MCP protocol always calls tools over POST;
+  ~25,000 requests with zero POSTs means **no tool was ever invoked.**
+- Both functions answer `HEAD`/`GET` with a static `{status:"ok",...}` 200
+  **before any auth or DB access** (see `docs/archived-functions/atlas-mcp/index.ts`
+  line ~1127 and `docs/archived-functions/kindergarten-mcp/index.ts` line ~404).
+  That is exactly why every hit was **200, ~114 ms, 0 % 4xx, and produced only
+  `booted`/`shutdown` log lines with no query activity.**
+- **No `OPTIONS` preflight** → not a browser; server-to-server.
+- 4xx rate was 0 % → the caller had a valid credential (or was hitting the
+  unauthenticated GET path, which needs none).
+
+Conclusion: an automated health/uptime check that someone configured and
+forgot — real *usage* would be POSTs that touch the DB.
+
+### Action taken (2026-08-03)
+
+Both functions were **deleted from production** via
+`npx supabase functions delete {atlas-mcp,kindergarten-mcp} --project-ref ebyelctqcdhjmqujeskx`,
+then their source was **archived (not deleted)** to
+`docs/archived-functions/atlas-mcp/` and `docs/archived-functions/kindergarten-mcp/`
+and their `[functions.*]` blocks removed from `supabase/config.toml`. The
+`deploy:atlas-mcp` npm script was also removed from `package.json` — otherwise
+copying the folder back from the archive would make `npm run deploy:atlas-mcp`
+work again immediately, which is exactly what this cleanup is meant to prevent.
+See each archived folder's `README.md` for the full record and redeploy
+instructions.
+
+The Claude connectors people actually use run on **different** endpoints that
+were left untouched and are still live:
+
+| Connector | Endpoint | Status |
+|---|---|---|
+| Woranat School Atlas MCP | `/woranat-atlas-mcp` | live |
+| Woranat Kindergarten | `/kindergarten-mcp-7d40d75d3e4121d5b9d3034f2cd0db7253a28398` | live |
+
+After deletion, `woranat-atlas-mcp`'s logs showed **No results in 1 hour** —
+the caller did **not** move to another endpoint.
+
+### Still open — root cause not found
+
+The source of the traffic was **not** identified. Ruled out so far:
+n8n cloud (all 12 workflows checked), n8n local (Docker not installed on this
+machine), the ChatGPT connector (disconnecting it did not reduce the traffic),
+and the Claude connector (uses a different endpoint).
+
+**Warning:** if either function is ever redeployed, watch the invocation count
+immediately — whatever was polling may still be running and will resume hitting
+it.
+
+## 4. Downstream dependency exposed by section 3 — `woranat-chatgpt-mcp` still points at the removed `kindergarten-mcp`
+
+Separate item, surfaced while auditing references to the removed functions.
+
+`woranat-chatgpt-mcp` (a **live** function, still deployed — do not treat it
+like the archived ones) proxies its "kindergarten" upstream to the endpoint
+that was just removed:
+
+```js
+// supabase/functions/woranat-chatgpt-mcp/index.ts:100
+} else {
+    endpoint = `${supabaseUrl}/functions/v1/kindergarten-mcp`;   // ← removed in section 3
+    headers["x-api-key"] = env("KINDERGARTEN_MCP_API_KEY");
+}
+```
+
+Note the asymmetry: the same file's **atlas** branch already points at the
+current `woranat-atlas-mcp` (line 96), but the **kindergarten** branch still
+points at the bare `kindergarten-mcp` — **not** the live
+`kindergarten-mcp-7d40d75d3e4121d5b9d3034f2cd0db7253a28398`. So the kindergarten
+path of this proxy now targets a function that no longer exists and would return
+404.
+
+**Impact right now: none.** The ChatGPT connector this proxy serves has already
+been disconnected, so nothing is calling this path today.
+
+**Suggested fix (NOT applied this round — no code change and no deploy):** point
+line 100 at the live endpoint instead —
+`endpoint = \`${supabaseUrl}/functions/v1/kindergarten-mcp-7d40d75d3e4121d5b9d3034f2cd0db7253a28398\`;`
+— and confirm `KINDERGARTEN_MCP_API_KEY` matches what that function expects.
+Only do this if/when the ChatGPT kindergarten path is meant to work again;
+until then it can stay as-is since nothing depends on it.
