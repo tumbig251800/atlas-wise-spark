@@ -15,7 +15,6 @@
     "deploy:ai-summary": "bash scripts/deploy-functions.sh ai-summary",
     "deploy:ai-exam-gen": "bash scripts/deploy-functions.sh ai-exam-gen",
     "deploy:atlas-diagnostic": "bash scripts/deploy-functions.sh atlas-diagnostic",
-    "deploy:atlas-mcp": "bash scripts/deploy-functions.sh atlas-mcp",
     "deploy:import-pbl": "bash scripts/deploy-functions.sh import-pbl",
     "build": "vite build",
     "build:analyze": "ANALYZE=true vite build",
