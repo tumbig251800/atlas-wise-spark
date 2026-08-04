@@ -119,12 +119,25 @@ export default function Executive() {
   const { alerts, hasAlerts, fallingCount, redzoneCount } = useTrendAlerts();
 
   // Fetch all logs (director RLS sees all)
+  // teaching_logs มีเป็นพันแถว เกิน default row cap ของ Supabase (1000) ต้อง page ทีละก้อน
+  // ไม่งั้นข้อมูลเก่าในเทอมจะหายไปจากค่าเฉลี่ย/กราฟ/ AI สรุปนโยบายเงียบๆ โดยไม่มี error ให้เห็น
   const { data: allLogs = [], isLoading } = useQuery({
     queryKey: ["exec-logs"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("teaching_logs").select("*").order("teaching_date", { ascending: false });
-      if (error) throw error;
-      return data as TeachingLog[];
+      const PAGE_SIZE = 1000;
+      const rows: TeachingLog[] = [];
+      for (let page = 0; ; page++) {
+        const from = page * PAGE_SIZE;
+        const { data, error } = await supabase
+          .from("teaching_logs")
+          .select("*")
+          .order("id", { ascending: true })
+          .range(from, from + PAGE_SIZE - 1);
+        if (error) throw error;
+        rows.push(...((data ?? []) as TeachingLog[]));
+        if (!data || data.length < PAGE_SIZE) break;
+      }
+      return rows;
     },
     enabled: !!user,
   });
