@@ -266,7 +266,7 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss, onPass
                   <TableCell>
                     {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{startIndex + idx + 1}</TableCell>
+                  <TableCell className="text-muted-foreground">#{item.id}</TableCell>
                   <TableCell><IssueTypeBadge type={item.issue_type} /></TableCell>
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2 flex-wrap">
