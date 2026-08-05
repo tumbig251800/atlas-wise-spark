@@ -16,7 +16,8 @@ export function MasteryBarChart({ logs, groupBy }: Props) {
   });
 
   const data = Object.entries(grouped)
-    .map(([name, v]) => ({ name, avg: Math.round(v.total / v.count) }))
+    // mastery_score is 1-5; the axis/legend below are labeled as %, so convert here
+    .map(([name, v]) => ({ name, avg: Math.round((v.total / v.count / 5) * 100) }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
   if (!data.length) {
