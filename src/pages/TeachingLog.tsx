@@ -231,7 +231,7 @@ export default function TeachingLog() {
             (id) => !STUDENT_ID_PATTERN.test(id)
           );
           if (invalidHealthCareIds.length > 0) {
-            errs.healthCareIds = `รหัสนักเรียนต้องเป็นตัวเลข 4 หลัก (ไม่ถูกต้อง: ${invalidHealthCareIds.join(", ")}) — ถ้าไม่มีนักเรียนป่วย ให้เลือก "ไม่มี" ที่ตัวเลือกด้านบนแทนการพิมพ์ในช่องนี้`;
+            errs.healthCareIds = `รหัสนักเรียนต้องเป็นตัวเลข 4 หลัก (ไม่ถูกต้อง: ${invalidHealthCareIds.join(", ")}) — ถ้าไม่มีนักเรียนกลุ่มดูแลพิเศษที่ต้องประเมิน ให้ยกเลิกการติ๊กช่องประเมินนักเรียนกลุ่มดูแลพิเศษแทนการพิมพ์ในช่องนี้`;
           }
         }
       }

@@ -313,6 +313,13 @@ export function Step3Gap({ data, onChange, errors, masteryScore }: Step3Props) {
             maxLength={200}
           />
         )}
+        {/* Passive nudge for teachers who may have forgotten Box 1. Helper only —
+            not an error, never blocks navigation, hidden once Box 1 is checked. */}
+        {!data.scPresent && (
+          <p className="text-xs text-muted-foreground">
+            หากคาบนี้มีนักเรียนกลุ่มดูแลพิเศษอยู่ในห้อง อย่าลืมติ๊กช่องด้านบน
+          </p>
+        )}
         {errors.healthCareStatus && <p className="text-xs text-destructive">{errors.healthCareStatus}</p>}
         {errors.healthCareIds && <p className="text-xs text-destructive">{errors.healthCareIds}</p>}
       </div>
