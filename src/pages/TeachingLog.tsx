@@ -42,6 +42,7 @@ import {
 } from "@/hooks/useTeachingLogValidation";
 import { usePreviousMastery } from "@/hooks/usePreviousMastery";
 import { useActiveResearchForLesson } from "@/hooks/useClassroomResearch";
+import { STUDENT_ID_PATTERN, splitIds } from "@/lib/studentIds";
 
 export interface TeachingLogForm {
   teachingDate: string;
@@ -56,6 +57,7 @@ export interface TeachingLogForm {
   keyIssue: string;
   majorGap: "k-gap" | "p-gap" | "a-gap" | "a2-gap" | "system-gap" | "success" | null;
   minorGaps: ("k-gap" | "p-gap" | "a-gap" | "a2-gap" | "system-gap")[];
+  scPresent: boolean;
   healthCareStatus: "" | "none" | "has";
   healthCareIds: string;
   remedialIds: string;
@@ -77,7 +79,10 @@ const INITIAL_FORM: TeachingLogForm = {
   keyIssue: "",
   majorGap: null,
   minorGaps: [],
-  healthCareStatus: "",
+  scPresent: false,
+  // Default "none" (no special-care student assessed as primary). With the
+  // checkbox UI, "unchecked" is a definite answer, so we no longer start empty.
+  healthCareStatus: "none",
   healthCareIds: "",
   remedialIds: "",
   remedialStatuses: {},
@@ -178,6 +183,10 @@ export default function TeachingLog() {
         console.warn("Failed to parse persisted form payload", error);
       }
     }
+    // Reconcile drafts saved before sc_present existed: a record that assessed
+    // special-care students as the primary goal (healthCareStatus === "has")
+    // implies those students were present, so Box 1 must be checked/visible.
+    if (loaded.healthCareStatus === "has") loaded.scPresent = true;
     setForm(loaded);
   }, []);
 
@@ -214,7 +223,18 @@ export default function TeachingLog() {
     } else if (step === 3) {
       if (!form.majorGap) errs.majorGap = "กรุณาเลือก Major Gap";
       if (!form.healthCareStatus) errs.healthCareStatus = "กรุณาเลือกสถานะสุขภาพ";
-      if (form.healthCareStatus === "has" && !form.healthCareIds.trim()) errs.healthCareIds = "กรุณาระบุรหัสนักเรียน";
+      if (form.healthCareStatus === "has") {
+        if (!form.healthCareIds.trim()) {
+          errs.healthCareIds = "กรุณาระบุรหัสนักเรียน";
+        } else {
+          const invalidHealthCareIds = splitIds(form.healthCareIds).filter(
+            (id) => !STUDENT_ID_PATTERN.test(id)
+          );
+          if (invalidHealthCareIds.length > 0) {
+            errs.healthCareIds = `รหัสนักเรียนต้องเป็นตัวเลข 4 หลัก (ไม่ถูกต้อง: ${invalidHealthCareIds.join(", ")}) — ถ้าไม่มีนักเรียนป่วย ให้เลือก "ไม่มี" ที่ตัวเลือกด้านบนแทนการพิมพ์ในช่องนี้`;
+          }
+        }
+      }
     } else if (step === 4) {
       const isHighMastery = form.masteryScore != null && form.masteryScore >= 4;
       const isSuccess = form.majorGap === "success";
@@ -227,7 +247,14 @@ export default function TeachingLog() {
       }
       // Validate PASS/STAY only when real IDs are entered (not [None] sentinel)
       if (form.remedialIds.trim() && !remedialIsNone) {
-        const ids = form.remedialIds.split(/[\s,]+/).map(id => id.trim()).filter(Boolean);
+        const ids = splitIds(form.remedialIds);
+        const invalidIds = ids.filter((id) => !STUDENT_ID_PATTERN.test(id));
+        if (invalidIds.length > 0) {
+          const fixHint = remedialOptional
+            ? ' — ถ้าไม่มีนักเรียนต้องซ่อมเสริม ให้ลบข้อความนี้แล้วกดปุ่ม "ไม่มีนักเรียนต้องซ่อมเสริม"'
+            : " — กรณีนี้ต้องระบุรหัสนักเรียนจริง (ตัวเลข 4 หลัก) ห้ามใช้ \"-\" หรือข้อความอื่นแทน";
+          errs.remedialIds = `รหัสนักเรียนต้องเป็นตัวเลข 4 หลัก (ไม่ถูกต้อง: ${invalidIds.join(", ")})${fixHint}`;
+        }
         const missingStatus = ids.filter(id => !form.remedialStatuses[id]);
         if (missingStatus.length > 0) {
           errs.remedialStatuses = `กรุณาเลือกสถานะ PASS/STAY ให้ครบ (ยังไม่ได้เลือก ${missingStatus.length} คน)`;
@@ -314,10 +341,18 @@ export default function TeachingLog() {
         key_issue: form.keyIssue.trim() || null,
         major_gap: form.majorGap!,
         minor_gaps: form.minorGaps,
+        sc_present: form.scPresent,
         health_care_status: form.healthCareStatus === "has",
-        health_care_ids: form.healthCareStatus === "none" ? "[None]" : form.healthCareIds.trim() || null,
+        health_care_ids:
+          form.healthCareStatus === "none"
+            ? "[None]"
+            : form.healthCareIds.trim()
+              ? splitIds(form.healthCareIds).join(",")
+              : null,
         total_students: form.totalStudents,
-        remedial_ids: form.remedialIds.trim() || null,
+        remedial_ids: form.remedialIds.trim()
+          ? splitIds(form.remedialIds).join(",")
+          : null,
         next_strategy: form.nextStrategy || null,
         reflection: form.reflection.trim() || null,
         academic_term: academicTerm,
@@ -409,7 +444,7 @@ export default function TeachingLog() {
 
       let willShowSpecialCare = false;
       if (form.majorGap === "a-gap" && form.remedialIds.trim() && logData?.id) {
-        const ids = form.remedialIds.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
+        const ids = splitIds(form.remedialIds);
         if (ids.length > 0) {
           setScStudentIds(ids);
           setScLogId(logData.id);
