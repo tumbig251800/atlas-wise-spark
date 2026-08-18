@@ -1,8 +1,9 @@
 import type { TeachingLog } from "@/hooks/useDashboardData";
 import type { DiagnosticColorCounts } from "@/hooks/useDiagnosticData";
+import { parseStoredIds } from "@/lib/studentIds";
 
 export function getRemedialCountForLog(log: TeachingLog): number {
-  return (log.remedial_ids || "").split(",").filter((x) => x.trim() && x !== "[None]" && x !== "[N/A]").length;
+  return parseStoredIds(log.remedial_ids).length;
 }
 
 /**
@@ -22,11 +23,7 @@ export function buildExecutiveLogsSummary(
   const sessionDetails = last5
     .map((l) => {
       const remedialCount = getRemedialCountForLog(l);
-      const remedialIds = (l.remedial_ids || "")
-        .split(",")
-        .map((x) => x.trim())
-        .filter((x) => x && x !== "[None]" && x !== "[N/A]")
-        .join(", ");
+      const remedialIds = parseStoredIds(l.remedial_ids).join(", ");
       const totalStudents = l.total_students || 0;
       const pct = totalStudents > 0 ? ((remedialCount / totalStudents) * 100).toFixed(1) : "0";
       const pivotFlag =

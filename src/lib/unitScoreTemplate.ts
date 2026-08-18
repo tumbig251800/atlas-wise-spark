@@ -44,6 +44,13 @@ export function downloadUnitScoreTemplate() {
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
 
+  // บังคับคอลัมน์รหัสนักเรียน (C) เป็น Text format กันเลข 0 นำหน้าหายเมื่อครูพิมพ์ตรงๆ ใน Excel
+  for (let r = FIRST_DATA_ROW; r <= LAST_DATA_ROW; r++) {
+    const cellRef = `C${r}`;
+    if (!ws[cellRef]) ws[cellRef] = { t: "s", v: "" };
+    ws[cellRef].z = "@";
+  }
+
   // ใส่สูตรคอลัมน์สรุป P-T สำหรับทุกแถวนักเรียน
   for (let r = FIRST_DATA_ROW; r <= LAST_DATA_ROW; r++) {
     ws[`P${r}`] = { t: "n", f: `SUM(E${r}:H${r})` };                 // K รวม

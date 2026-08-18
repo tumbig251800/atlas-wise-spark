@@ -68,7 +68,19 @@ function rowsToSheet(rows: CompetencyTemplateRow[]): XLSX.WorkSheet {
       return v === undefined || v === null ? "" : v;
     })
   );
-  return XLSX.utils.aoa_to_sheet([headerRow, ...dataRows]);
+  const ws = XLSX.utils.aoa_to_sheet([headerRow, ...dataRows]);
+
+  // บังคับคอลัมน์ student_id (A) เป็น Text format กันเลข 0 นำหน้าหายเมื่อครูพิมพ์ตรงๆ ใน Excel
+  const studentIdCol = headerRow.indexOf("student_id");
+  if (studentIdCol >= 0) {
+    for (let r = 1; r <= dataRows.length; r++) {
+      const cellRef = XLSX.utils.encode_cell({ r, c: studentIdCol });
+      if (!ws[cellRef]) ws[cellRef] = { t: "s", v: "" };
+      ws[cellRef].z = "@";
+    }
+  }
+
+  return ws;
 }
 
 export function downloadAsXLSX(rows: CompetencyTemplateRow[], filename?: string): void {

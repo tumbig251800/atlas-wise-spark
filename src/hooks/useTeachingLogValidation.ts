@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { isEmptyIdsValue } from "@/lib/studentIds";
 
 export interface ValidationMessage {
   field: string;
@@ -38,14 +39,6 @@ export interface TeachingLogValidationInput {
 // Format a score delta without trailing ".0" (scores are usually integers).
 function formatDelta(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(1);
-}
-
-// A remedial/health-care id field counts as "empty" when it is unset, blank,
-// or the literal empty-array sentinel the form may persist.
-function isEmptyIds(value: string | null): boolean {
-  if (!value) return true;
-  const t = value.trim();
-  return t === "" || t === "[]";
 }
 
 function computeLateByDays(teachingDate: string | null): number {
@@ -124,7 +117,7 @@ export function useTeachingLogValidation(
     }
 
     // FLAG1 — sick students reported but no student ids listed.
-    if (healthCareStatus && isEmptyIds(healthCareIds)) {
+    if (healthCareStatus && isEmptyIdsValue(healthCareIds)) {
       warnings.push({
         field: "healthCareIds",
         message: "⚠️ ระบุว่ามีนักเรียนป่วย แต่ไม่ได้ระบุรหัสนักเรียน",
@@ -138,7 +131,7 @@ export function useTeachingLogValidation(
     }
 
     // FLAG4 — a-gap but no remedial plan.
-    if (majorGap === "a-gap" && isEmptyIds(remedialIds)) {
+    if (majorGap === "a-gap" && isEmptyIdsValue(remedialIds)) {
       warnings.push({
         field: "remedialIds",
         message:

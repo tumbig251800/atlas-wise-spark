@@ -95,7 +95,9 @@ async function callClaude(
 4. ถ้าคำอธิบายตัวชี้วัดก่อน-หลังนิยามไม่ตรงกันทุกคำ ให้ระบุเรื่องนี้ไว้ใน limitations อย่างตรงไปตรงมา
 5. ถ้าจำนวนคาบที่สอนจริงยังน้อยเมื่อเทียบกับแผน ให้ระบุใน limitations
 6. อย่าสร้างตารางในข้อความ — ตารางเปรียบเทียบระบบสร้างให้แล้ว เขียนเป็นความเรียงอธิบายประกอบ
-7. ใน related_concepts ห้ามอ้างอิงชื่อบุคคล ชื่อนักวิชาการ ปี ค.ศ./พ.ศ. ชื่อวารสาร หรือแหล่งอ้างอิงใดๆ โดยเด็ดขาด — อธิบายแนวคิดด้วยภาษาของตนเองล้วนๆ (การแต่งอ้างอิงปลอมทำลายความน่าเชื่อถือของรายงานทั้งฉบับ)`;
+7. ใน related_concepts ห้ามอ้างอิงชื่อบุคคล ชื่อนักวิชาการ ปี ค.ศ./พ.ศ. ชื่อวารสาร หรือแหล่งอ้างอิงใดๆ โดยเด็ดขาด — อธิบายแนวคิดด้วยภาษาของตนเองล้วนๆ (การแต่งอ้างอิงปลอมทำลายความน่าเชื่อถือของรายงานทั้งฉบับ)
+8. ห้ามแปลงหน่วยของตัวเลขข้ามกันเด็ดขาด — "รายการ" (เช่น รายการแผนช่วยเหลือที่ค้างในระบบ) ไม่ใช่ "คน" ให้อ่านหน่วยจากคำอธิบายของตัวชี้วัดแต่ละตัวเอง และห้ามยืมหน่วยของตัวชี้วัดหนึ่งไปใช้กับอีกตัวหนึ่งโดยเด็ดขาด เวลาระบุขนาดกลุ่มเป้าหมายให้ใช้ค่า n จากบล็อกสถิติ
+9. ถ้าบล็อกสถิติมีผลสัมฤทธิ์รายมิติ K/P/A มาให้ ให้ใช้ตัวเลขนั้นได้ตามจริง และห้ามเขียนใน limitations ว่าไม่มีข้อมูลรายมิติ — ระบุข้อจำกัดนั้นได้เฉพาะกรณีที่บล็อกสถิติบอกเองว่าไม่มีบันทึกไว้ในฐานข้อมูลเท่านั้น (การอ้างว่าไม่มีข้อมูลทั้งที่ครูบันทึกไว้แล้ว เท่ากับกล่าวหาครูในสิ่งที่ไม่ได้ทำผิด)`;
 
   const userPrompt = `เขียนเนื้อหารายงานวิจัยชั้นเรียนจากข้อมูลจริงต่อไปนี้
 
@@ -107,7 +109,7 @@ async function callClaude(
 หลักฐาน: ${row.evidence_summary}
 คำถามวิจัย: ${row.research_question}
 วัตถุประสงค์: ${row.objective}
-กลุ่มเป้าหมาย: ${row.target_group}
+กลุ่มเป้าหมาย: ${targetGroupText(row, stats)}
 นวัตกรรม/วิธีการ: ${row.intervention}
 เครื่องมือ: ${row.tools}
 วิธีเก็บข้อมูล: ${row.data_collection_method}
@@ -118,6 +120,14 @@ async function callClaude(
 ก่อนทำวิจัย (Baseline): ${before.label} = ${before.value} (เก็บเมื่อ ${before.captured_at ?? "-"})
 หลังทำวิจัย (Endline): ${after.label} = ${after.value} (เก็บเมื่อ ${after.captured_at ?? "-"})
 ${
+  (before.label ?? "") === (after.label ?? "")
+    ? "ตัวชี้วัดสองตัวนี้ใช้นิยามเดียวกัน เปรียบเทียบก่อน-หลังได้โดยตรง"
+    : `*** คำเตือนสำคัญ: ตัวชี้วัด Baseline กับ Endline ข้างบนนี้วัดคนละอย่างและใช้หน่วยคนละหน่วย ***
+- ตัวชี้วัด Baseline ไม่เคยถูกวัดซ้ำในตอน Endline ห้ามเขียนว่ามัน "ลดลง" "เพิ่มขึ้น" หรือ "เปลี่ยนแปลง" เด็ดขาด เพราะไม่มีข้อมูลรองรับ
+- ห้ามเขียนประโยคแนวโน้มที่รวมสองตัวเลขนี้เข้าด้วยกัน เช่น "ลดลงจาก ${before.value} เหลือ ${after.value}" ให้รายงานแยกกันคนละประโยค พร้อมระบุหน่วยของแต่ละตัวให้ตรงกับคำอธิบายของมันเอง
+- ถ้าต้องการพูดถึงแนวโน้มก่อน-หลังที่เทียบกันได้จริง ให้ใช้บล็อกสถิติ หรือใช้คู่เทียบที่ระบุอยู่ในคำอธิบายของตัวชี้วัด Endline เองเท่านั้น`
+}
+${
   stats
     ? `
 ## สถิติพื้นฐานของกลุ่มเป้าหมาย (คำนวณจากคะแนนรายบุคคลจริงโดยระบบ — ห้ามคำนวณ x̄/S.D./ร้อยละใหม่เอง ใช้ตัวเลขชุดนี้เท่านั้นเวลาพูดถึงค่าเฉลี่ยหรือส่วนเบี่ยงเบนมาตรฐาน)
@@ -127,6 +137,20 @@ ${
         stats.n_after != null
           ? `x̄ = ${stats.mean_after}, S.D. = ${stats.sd_after}, ร้อยละผ่านเกณฑ์ (${stats.criterion_label}) = ${stats.pass_rate_after}% (n=${stats.n_after})`
           : "ยังไม่มีข้อมูล"
+      }
+ผลสัมฤทธิ์รายมิติของกลุ่มเดียวกัน (ร้อยละ): ${
+        stats.dimensions.length > 0
+          ? "\n" +
+            stats.dimensions
+              .map(
+                (d) =>
+                  `- ${d.label}: ก่อน x̄ = ${d.mean_before} (S.D. ${d.sd_before}, n=${d.n_before})` +
+                  (d.mean_after != null
+                    ? ` → หลัง x̄ = ${d.mean_after} (S.D. ${d.sd_after}, n=${d.n_after})`
+                    : " → ยังไม่มีผลหลัง")
+              )
+              .join("\n")
+          : "ไม่มีคะแนนรายมิติของกลุ่มนี้บันทึกไว้ในฐานข้อมูล"
       }
 `
     : ""
@@ -188,7 +212,39 @@ interface DescriptiveStats {
   mean_after: number | null;
   sd_after: number | null;
   pass_rate_after: number | null;
+  /**
+   * K/P/A breakdown for the same target group. An EMPTY array means the
+   * teacher never recorded per-dimension scores in the database - it must
+   * never mean "the query forgot to ask for them". Until 2026-08 the SELECT
+   * genuinely omitted these columns, so reports told teachers to start
+   * recording data they had already recorded all along.
+   */
+  dimensions: DimensionStats[];
 }
+
+interface DimensionStats {
+  label: string;
+  n_before: number;
+  mean_before: number;
+  sd_before: number;
+  n_after: number | null;
+  mean_after: number | null;
+  sd_after: number | null;
+}
+
+/** One unit_assessments row reduced to percentages. */
+interface StudentScore {
+  pct: number;
+  k: number | null;
+  p: number | null;
+  a: number | null;
+}
+
+const DIMENSION_DEFS: Array<{ key: "k" | "p" | "a"; label: string }> = [
+  { key: "k", label: "ด้านความรู้ (K)" },
+  { key: "p", label: "ด้านทักษะ/กระบวนการ (P)" },
+  { key: "a", label: "ด้านคุณลักษณะอันพึงประสงค์ (A)" },
+];
 
 interface AppendixResult {
   appendix: AppendixTable;
@@ -217,6 +273,34 @@ function passRate(xs: number[], criterion: number): number {
   return round2((xs.filter((x) => x >= criterion).length / xs.length) * 100);
 }
 
+/** Percentage from a score/total pair; null when the pair was never recorded. */
+function pctOrNull(score: unknown, total: unknown): number | null {
+  if (score == null || total == null) return null;
+  const s = Number(score);
+  const t = Number(total);
+  if (Number.isNaN(s) || Number.isNaN(t) || t === 0) return null;
+  return (s / t) * 100;
+}
+
+/**
+ * The target-group sentence printed in section 4 and fed to the AI.
+ *
+ * When a stats block exists, the group was derived by code from real
+ * per-student records, so its size is a verified fact. The AI-written
+ * `target_group` stored on the suggestion row is a plan written before any
+ * outcome data existed, and has been observed to convert a COUNT OF ISSUE
+ * ROWS (action_plan_items, 20 rows) into a COUNT OF STUDENTS (20 children) -
+ * a different unit entirely. Never print that number as a headcount; prefer
+ * the code-computed group whenever we have one.
+ */
+function targetGroupText(
+  row: Record<string, unknown>,
+  stats: DescriptiveStats | null
+): string {
+  if (!stats) return (row.target_group as string) ?? "-";
+  return `${stats.group_label} จำนวน ${stats.n_before} คน — นับจากคะแนนรายบุคคลจริงในระบบ ATLAS`;
+}
+
 /**
  * Per-student appendix, identified by student ID code only — never names.
  * Built entirely by code from real assessment records; student identifiers
@@ -233,7 +317,10 @@ async function buildStudentAppendix(
   if (issueType === "UnitBlindSpot") {
     let query = supabase
       .from("unit_assessments")
-      .select("student_id, score, total_score, assessed_date")
+      .select(
+        "student_id, score, total_score, assessed_date, " +
+          "k_score, k_total, p_score, p_total, a_score, a_total"
+      )
       .eq("teacher_id", row.teacher_id)
       .eq("academic_term", row.academic_term);
     if (row.grade_level) query = query.eq("grade_level", row.grade_level);
@@ -243,12 +330,16 @@ async function buildStudentAppendix(
     if (error) throw error;
     if (!data || data.length === 0) return null;
 
-    const byMonth: Record<string, Record<string, number>> = {};
+    const byMonth: Record<string, Record<string, StudentScore>> = {};
     for (const r of data) {
       if (!r.assessed_date || !r.total_score) continue;
       const month = String(r.assessed_date).slice(0, 7);
-      (byMonth[month] ??= {})[String(r.student_id)] =
-        (Number(r.score) / Number(r.total_score)) * 100;
+      (byMonth[month] ??= {})[String(r.student_id)] = {
+        pct: (Number(r.score) / Number(r.total_score)) * 100,
+        k: pctOrNull(r.k_score, r.k_total),
+        p: pctOrNull(r.p_score, r.p_total),
+        a: pctOrNull(r.a_score, r.a_total),
+      };
     }
     const months = Object.keys(byMonth).sort();
     if (months.length === 0) return null;
@@ -259,7 +350,7 @@ async function buildStudentAppendix(
     if (lastMonth === baseMonth) return null; // no post-baseline round yet
 
     const targets = Object.entries(byMonth[baseMonth])
-      .filter(([, pct]) => pct < 50)
+      .filter(([, s]) => s.pct < 50)
       .map(([sid]) => sid)
       .sort();
     if (targets.length === 0) return null;
@@ -272,10 +363,33 @@ async function buildStudentAppendix(
     // consistent across the report. "After" values only include students
     // who actually have a latest-month score; n_after can be smaller than
     // n_before if some target students weren't re-tested yet.
-    const beforeScores = targets.map((sid) => byMonth[baseMonth][sid]);
+    const beforeScores = targets.map((sid) => byMonth[baseMonth][sid].pct);
     const afterScores = targets
-      .map((sid) => byMonth[lastMonth]?.[sid])
+      .map((sid) => byMonth[lastMonth]?.[sid]?.pct)
       .filter((v): v is number => v != null);
+
+    // K/P/A over the same target group. A dimension is skipped only when the
+    // teacher recorded nothing for it - absence here is a statement about the
+    // database, and the limitations section is allowed to say so.
+    const dimensions: DimensionStats[] = [];
+    for (const d of DIMENSION_DEFS) {
+      const dBefore = targets
+        .map((sid) => byMonth[baseMonth][sid]?.[d.key])
+        .filter((v): v is number => v != null);
+      if (dBefore.length === 0) continue;
+      const dAfter = targets
+        .map((sid) => byMonth[lastMonth]?.[sid]?.[d.key])
+        .filter((v): v is number => v != null);
+      dimensions.push({
+        label: d.label,
+        n_before: dBefore.length,
+        mean_before: round2(meanOf(dBefore)),
+        sd_before: round2(sdOf(dBefore)),
+        n_after: dAfter.length > 0 ? dAfter.length : null,
+        mean_after: dAfter.length > 0 ? round2(meanOf(dAfter)) : null,
+        sd_after: dAfter.length > 0 ? round2(sdOf(dAfter)) : null,
+      });
+    }
     const stats: DescriptiveStats = {
       group_label: `นักเรียนกลุ่มเป้าหมาย (คะแนนหลังหน่วยต่ำกว่า 50% ที่เดือน ${thaiMonthLabel(baseMonth)})`,
       criterion_label: "≥ 50%",
@@ -287,6 +401,7 @@ async function buildStudentAppendix(
       mean_after: afterScores.length > 0 ? round2(meanOf(afterScores)) : null,
       sd_after: afterScores.length > 0 ? round2(sdOf(afterScores)) : null,
       pass_rate_after: afterScores.length > 0 ? passRate(afterScores, 50) : null,
+      dimensions,
     };
 
     return {
@@ -299,8 +414,8 @@ async function buildStudentAppendix(
           "ผลเทียบเกณฑ์ล่าสุด",
         ],
         rows: targets.map((sid) => {
-          const b = byMonth[baseMonth][sid];
-          const a = byMonth[lastMonth]?.[sid];
+          const b = byMonth[baseMonth][sid]?.pct;
+          const a = byMonth[lastMonth]?.[sid]?.pct;
           const verdict = a == null ? "ไม่มีข้อมูล" : a < 50 ? "ยังไม่ผ่านเกณฑ์" : "ผ่านเกณฑ์";
           return [sid, fmtPct(b), fmtPct(a), verdict];
         }),
@@ -431,6 +546,28 @@ function buildComparisonTable(before: MetricData, after: MetricData): string {
 function buildStatsTable(stats: DescriptiveStats): string {
   const fmt = (n: number | null) => (n == null ? "-" : escapeHtml(String(n)));
   const fmtPct = (n: number | null) => (n == null ? "-" : `${escapeHtml(String(n))}%`);
+  const cell = (mean: number | null, sd: number | null) =>
+    mean == null ? "-" : `${fmt(mean)}${sd == null ? "" : ` (S.D. ${fmt(sd)})`}`;
+  const dimensionRows =
+    stats.dimensions.length > 0
+      ? `
+  <tr>
+    <td colspan="3" style="background:#f7f7f7;font-weight:600;">ผลสัมฤทธิ์รายมิติ (ร้อยละ)</td>
+  </tr>${stats.dimensions
+    .map(
+      (d) => `
+  <tr>
+    <td>${escapeHtml(d.label)}</td>
+    <td style="text-align:center;">${cell(d.mean_before, d.sd_before)}</td>
+    <td style="text-align:center;">${cell(d.mean_after, d.sd_after)}</td>
+  </tr>`
+    )
+    .join("")}`
+      : "";
+  const dimensionNote =
+    stats.dimensions.length === 0
+      ? `<p style="font-size:12px;color:#555;">หมายเหตุ: ไม่พบคะแนนรายมิติ (K/P/A) ของกลุ่มเป้าหมายบันทึกไว้ในระบบ จึงรายงานได้เฉพาะคะแนนรวม</p>`
+      : "";
   return `<table>
   <tr>
     <th style="width:32%;">ค่าสถิติ</th>
@@ -451,9 +588,9 @@ function buildStatsTable(stats: DescriptiveStats): string {
     <td style="font-weight:600;">ร้อยละผ่านเกณฑ์ (${escapeHtml(stats.criterion_label)})</td>
     <td style="text-align:center;">${fmtPct(stats.pass_rate_before)}</td>
     <td style="text-align:center;">${fmtPct(stats.pass_rate_after)}</td>
-  </tr>
+  </tr>${dimensionRows}
 </table>
-<p style="font-size:12px;color:#555;margin-top:6px;">คำนวณจากคะแนนรายบุคคลของ${escapeHtml(stats.group_label)} — S.D. ใช้สูตรส่วนเบี่ยงเบนมาตรฐานของกลุ่มตัวอย่าง (หารด้วย n-1)</p>`;
+<p style="font-size:12px;color:#555;margin-top:6px;">คำนวณจากคะแนนรายบุคคลของ${escapeHtml(stats.group_label)} — S.D. ใช้สูตรส่วนเบี่ยงเบนมาตรฐานของกลุ่มตัวอย่าง (หารด้วย n-1)</p>${dimensionNote}`;
 }
 
 function buildHTML(
@@ -655,7 +792,7 @@ function downloadDoc() {
 </div>
 
 <h2>4. กลุ่มเป้าหมาย</h2>
-<p>${escapeHtml(row.target_group as string)}</p>
+<p>${escapeHtml(targetGroupText(row, stats))}</p>
 
 <h2>5. วิธีดำเนินการวิจัย</h2>
 <p>${escapeHtml(row.intervention as string)}</p>

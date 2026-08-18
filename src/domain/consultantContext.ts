@@ -1,4 +1,5 @@
 /** Pure helpers for Consultant AI context (citation, QWR metrics, guard rules). */
+import { parseStoredIds } from "@/lib/studentIds";
 
 export type ConsultantLogRow = {
   teaching_date: string;
@@ -45,9 +46,7 @@ export function buildContextWithCitation(logs: ConsultantLogRow[]): string {
   const sessionDetails = slice
     .map((l, index) => {
       const refId = `[REF-${index + 1}]`;
-      const remedialCount = (l.remedial_ids || "")
-        .split(",")
-        .filter((x) => x.trim() && x !== "[None]" && x !== "[N/A]").length;
+      const remedialCount = parseStoredIds(l.remedial_ids).length;
       return `${refId} วันที่: ${l.teaching_date} | วิชา: ${l.subject} | ห้อง: ${l.grade_level}/${l.classroom} | หัวข้อ: ${l.topic || "ไม่ระบุ"} | Mastery: ${l.mastery_score}/5 | Gap: ${l.major_gap} | Remedial: ${remedialCount}/${l.total_students || 0} | Strategy: ${l.next_strategy || "ไม่ระบุ"} | Issue: ${l.key_issue || "ไม่ระบุ"}`;
     })
     .join("\n");
@@ -56,20 +55,10 @@ export function buildContextWithCitation(logs: ConsultantLogRow[]): string {
 
   const refList = slice.map((_, i) => `[REF-${i + 1}]`).join(", ");
   const extractedRemedialIds = [
-    ...new Set(
-      logs
-        .flatMap((l) => (l.remedial_ids || "").split(","))
-        .map((s) => s.trim())
-        .filter((s) => s && s !== "[None]" && s !== "[N/A]")
-    ),
+    ...new Set(logs.flatMap((l) => parseStoredIds(l.remedial_ids))),
   ];
   const extractedHealthCareIds = [
-    ...new Set(
-      logs
-        .flatMap((l) => (l.health_care_ids || "").split(","))
-        .map((s) => s.trim())
-        .filter((s) => s && s !== "[None]" && s !== "[N/A]")
-    ),
+    ...new Set(logs.flatMap((l) => parseStoredIds(l.health_care_ids))),
   ];
   const hasTotalStudents = slice.some((l) => (l.total_students ?? 0) > 0);
   const hasRemedialIds = extractedRemedialIds.length > 0;

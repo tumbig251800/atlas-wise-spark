@@ -77,12 +77,23 @@ export function useTrendAlerts() {
   const { data: logs = [] } = useQuery<RawLog[]>({
     queryKey: ["trend-alerts"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("teaching_logs")
-        .select("grade_level, classroom, subject, mastery_score, teaching_date, teacher_name, teacher_id, academic_term")
-        .order("teaching_date", { ascending: true });
-      if (error) throw error;
-      return data as RawLog[];
+      // teaching_logs มีเป็นพันแถว เกิน default row cap ของ Supabase (1000) ต้อง page ทีละก้อน
+      // เดิมเรียง teaching_date ascending แล้วโดนตัดที่ 1000 แถว = ข้อมูลล่าสุดหายไปทั้งหมด
+      // ทำให้ตรวจจับแนวโน้ม "คะแนนตก/red zone" ของเทอมที่ log เยอะพลาดเงียบๆ
+      const PAGE_SIZE = 1000;
+      const rows: RawLog[] = [];
+      for (let page = 0; ; page++) {
+        const from = page * PAGE_SIZE;
+        const { data, error } = await supabase
+          .from("teaching_logs")
+          .select("grade_level, classroom, subject, mastery_score, teaching_date, teacher_name, teacher_id, academic_term")
+          .order("id", { ascending: true })
+          .range(from, from + PAGE_SIZE - 1);
+        if (error) throw error;
+        rows.push(...((data ?? []) as RawLog[]));
+        if (!data || data.length < PAGE_SIZE) break;
+      }
+      return rows;
     },
     enabled: !!user && role === "director",
     staleTime: 5 * 60 * 1000, // 5 min cache

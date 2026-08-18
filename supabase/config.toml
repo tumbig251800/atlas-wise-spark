@@ -16,13 +16,10 @@ verify_jwt = false
 [functions.ai-exam-gen]
 verify_jwt = false
 
-# atlas-mcp: auth handled internally via ATLAS_MCP_API_KEY secret
-[functions.atlas-mcp]
-verify_jwt = false
-
-# kindergarten-mcp: auth handled internally via KINDERGARTEN_MCP_API_KEY secret
-[functions.kindergarten-mcp]
-verify_jwt = false
+# atlas-mcp / kindergarten-mcp: removed from production 2026-08-03 (resource
+# exhaustion — see docs/SECURITY-AUDIT-2026-08-03-open-findings.md §3). Source
+# archived under docs/archived-functions/. Deliberately NOT declared here so a
+# blind `functions deploy` can't put them back on production.
 
 # atlas-mastery-watch: auth handled internally via requireAtlasUser
 [functions.atlas-mastery-watch]

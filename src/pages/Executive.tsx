@@ -20,13 +20,7 @@ import type { TeachingLog } from "@/hooks/useDashboardData";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
 import { useTrendAlerts } from "@/hooks/useTrendAlerts";
 import { AlertTriangle, TrendingDown } from "lucide-react";
-
-function extractValidIdsFromCsv(csv: string | null): string[] {
-  return String(csv ?? "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter((s) => s && s !== "[None]" && s !== "[N/A]" && /^\d{4,5}$/.test(s));
-}
+import { parseStoredIds } from "@/lib/studentIds";
 
 function toActivityLabel(mode: string | null): string {
   if (mode === "passive") return "Passive";
@@ -45,8 +39,8 @@ function buildExecutiveChatContext(logs: TeachingLog[], filters: ExecFilters): s
 
   const refList = slice.map((_, i) => `[REF-${i + 1}]`).join(", ");
 
-  const extractedRemedialIds = [...new Set(logs.flatMap((l) => extractValidIdsFromCsv(l.remedial_ids)))];
-  const extractedHealthCareIds = [...new Set(logs.flatMap((l) => extractValidIdsFromCsv(l.health_care_ids)))];
+  const extractedRemedialIds = [...new Set(logs.flatMap((l) => parseStoredIds(l.remedial_ids)))];
+  const extractedHealthCareIds = [...new Set(logs.flatMap((l) => parseStoredIds(l.health_care_ids)))];
 
   const hasTotalStudents = slice.some((l) => (l.total_students ?? 0) > 0);
   const hasRemedialIds = extractedRemedialIds.length > 0;
@@ -55,7 +49,7 @@ function buildExecutiveChatContext(logs: TeachingLog[], filters: ExecFilters): s
   const sessionDetails = slice
     .map((l, index) => {
       const refId = `[REF-${index + 1}]`;
-      const remedialIds = extractValidIdsFromCsv(l.remedial_ids);
+      const remedialIds = parseStoredIds(l.remedial_ids);
       const remedialCount = remedialIds.length;
       const total = l.total_students ?? 0;
       return `${refId} วันที่: ${l.teaching_date} | วิชา: ${l.subject} | ห้อง: ${l.grade_level}/${l.classroom} | หัวข้อ: ${l.topic || "ไม่ระบุ"} | Activity: ${toActivityLabel(l.activity_mode)} | Mastery: ${l.mastery_score}/5 | Gap: ${l.major_gap} | Remedial: ${remedialCount}/${total} | Strategy: ${l.next_strategy || "ไม่ระบุ"} | Issue: ${l.key_issue || "ไม่ระบุ"}`;
@@ -125,12 +119,25 @@ export default function Executive() {
   const { alerts, hasAlerts, fallingCount, redzoneCount } = useTrendAlerts();
 
   // Fetch all logs (director RLS sees all)
+  // teaching_logs มีเป็นพันแถว เกิน default row cap ของ Supabase (1000) ต้อง page ทีละก้อน
+  // ไม่งั้นข้อมูลเก่าในเทอมจะหายไปจากค่าเฉลี่ย/กราฟ/ AI สรุปนโยบายเงียบๆ โดยไม่มี error ให้เห็น
   const { data: allLogs = [], isLoading } = useQuery({
     queryKey: ["exec-logs"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("teaching_logs").select("*").order("teaching_date", { ascending: false });
-      if (error) throw error;
-      return data as TeachingLog[];
+      const PAGE_SIZE = 1000;
+      const rows: TeachingLog[] = [];
+      for (let page = 0; ; page++) {
+        const from = page * PAGE_SIZE;
+        const { data, error } = await supabase
+          .from("teaching_logs")
+          .select("*")
+          .order("id", { ascending: true })
+          .range(from, from + PAGE_SIZE - 1);
+        if (error) throw error;
+        rows.push(...((data ?? []) as TeachingLog[]));
+        if (!data || data.length < PAGE_SIZE) break;
+      }
+      return rows;
     },
     enabled: !!user,
   });

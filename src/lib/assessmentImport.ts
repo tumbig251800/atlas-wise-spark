@@ -5,6 +5,7 @@
  */
 
 import { resolveSubjectForImport } from "./subjectNormalization";
+import { validateStudentId } from "./dataValidator";
 
 export interface ParsedAssessmentRow {
   student_id: string;
@@ -133,6 +134,12 @@ export function parseAssessmentCSV(text: string): AssessmentParseResult {
 
     if (!student_id || !scoreStr) {
       errors.push(`แถว ${i + 1}: ขาดรหัสนักเรียนหรือคะแนน`);
+      continue;
+    }
+
+    const idCheck = validateStudentId(student_id);
+    if (!idCheck.isValid) {
+      errors.push(`แถว ${i + 1}: ${idCheck.errors[0]}`);
       continue;
     }
 
