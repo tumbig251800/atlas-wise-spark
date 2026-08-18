@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle, Check } from "lucide-react";
 import { GAPS, SUCCESS_OPTION, getAllowedGaps, getDefaultGap, type GapValue } from "@/lib/gapOptions";
@@ -15,6 +15,7 @@ interface Step3Props {
   data: {
     majorGap: GapValue | null;
     minorGaps: ProblemGapValue[];
+    scPresent: boolean;
     healthCareStatus: "" | "none" | "has";
     healthCareIds: string;
   };
@@ -234,46 +235,90 @@ export function Step3Gap({ data, onChange, errors, masteryScore }: Step3Props) {
         </div>
       )}
 
-      {/* Health Care - Radio Group */}
+      {/* Special Care — two nested checkboxes.
+          Box 1 (scPresent): a special-care student is merely present — no effect
+          on reports or KPI. Box 2 (healthCareStatus): this session assessed them
+          as the primary target — routed out of the class KPI by the Compassion
+          Protocol. Box 2 is hidden until Box 1 is checked, and clearing Box 1
+          resets Box 2 to prevent the contradictory "assessed a student who
+          wasn't here" state. */}
       <div className="space-y-3" data-error={errors.healthCareStatus ? true : undefined}>
-        <Label>มีนักเรียนไม่สบาย <span className="text-destructive">*</span></Label>
-        <RadioGroup
-          value={data.healthCareStatus}
-          onValueChange={(v) => {
-            onChange("healthCareStatus", v);
-            if (v === "none") {
-              onChange("healthCareIds", "");
-            }
-          }}
-          className="space-y-2"
-        >
+        <Label>นักเรียนกลุ่มดูแลพิเศษ</Label>
+
+        {/* Box 1 — presence only */}
+        <label className={cn(
+          "flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all",
+          data.scPresent
+            ? "border-[hsl(var(--atlas-success))]/50 bg-[hsl(var(--atlas-success))]/10"
+            : "border-transparent bg-secondary/50 hover:bg-secondary"
+        )}>
+          <Checkbox
+            className="mt-0.5"
+            checked={data.scPresent}
+            onCheckedChange={(checked) => {
+              const next = checked === true;
+              onChange("scPresent", next);
+              // Clearing presence must reset the "primary target" flag + IDs so we
+              // never record an assessment of a student who wasn't in the room.
+              if (!next) {
+                onChange("healthCareStatus", "none");
+                onChange("healthCareIds", "");
+              }
+            }}
+          />
+          <span>
+            <span className="text-sm">มีนักเรียนกลุ่มดูแลพิเศษอยู่ในคาบนี้</span>
+            <span className="block text-xs text-muted-foreground mt-0.5">
+              ติ๊กได้ทุกคาบที่นักเรียนมาเรียน — ไม่มีผลต่อรายงานหรือคะแนนใดๆ
+            </span>
+          </span>
+        </label>
+
+        {/* Box 2 — primary-assessment flag (only when Box 1 is checked) */}
+        {data.scPresent && (
           <label className={cn(
-            "flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all",
-            data.healthCareStatus === "none"
-              ? "border-[hsl(var(--atlas-success))]/50 bg-[hsl(var(--atlas-success))]/10"
-              : "border-transparent bg-secondary/50 hover:bg-secondary"
-          )}>
-            <RadioGroupItem value="none" />
-            <span className="text-sm">ไม่มี (นักเรียนทุกคนสุขภาพดี/หายป่วยแล้ว)</span>
-          </label>
-          <label className={cn(
-            "flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all",
+            "flex items-start gap-3 p-3 ml-6 rounded-lg border-2 cursor-pointer transition-all",
             data.healthCareStatus === "has"
               ? "border-[hsl(var(--atlas-warning))]/50 bg-[hsl(var(--atlas-warning))]/10"
               : "border-transparent bg-secondary/50 hover:bg-secondary"
           )}>
-            <RadioGroupItem value="has" />
-            <span className="text-sm">มี (โปรดระบุ ID)</span>
+            <Checkbox
+              className="mt-0.5"
+              checked={data.healthCareStatus === "has"}
+              onCheckedChange={(checked) => {
+                if (checked === true) {
+                  onChange("healthCareStatus", "has");
+                } else {
+                  onChange("healthCareStatus", "none");
+                  onChange("healthCareIds", "");
+                }
+              }}
+            />
+            <span>
+              <span className="text-sm">คาบนี้ประเมินนักเรียนกลุ่มดูแลพิเศษเป็นเป้าหมายหลัก</span>
+              <span className="block text-xs text-muted-foreground mt-0.5">
+                ติ๊กเฉพาะคาบที่ตั้งใจวัดผลเด็กกลุ่มนี้โดยตรง — บันทึกจะถูกแยกไปติดตามพัฒนาการรายบุคคล ไม่นำมารวมคะแนนห้อง
+              </span>
+            </span>
           </label>
-        </RadioGroup>
-        {data.healthCareStatus === "has" && (
+        )}
+
+        {/* Student IDs — required when this session targets special-care students */}
+        {data.scPresent && data.healthCareStatus === "has" && (
           <Input
             placeholder="ระบุเลขประจำตัว (ใช้ , คั่นหากมีหลายคน)"
             value={data.healthCareIds}
             onChange={(e) => onChange("healthCareIds", e.target.value)}
-            className={cn(errors.healthCareIds && "border-destructive")}
+            className={cn("ml-6 w-[calc(100%-1.5rem)]", errors.healthCareIds && "border-destructive")}
             maxLength={200}
           />
+        )}
+        {/* Passive nudge for teachers who may have forgotten Box 1. Helper only —
+            not an error, never blocks navigation, hidden once Box 1 is checked. */}
+        {!data.scPresent && (
+          <p className="text-xs text-muted-foreground">
+            หากคาบนี้มีนักเรียนกลุ่มดูแลพิเศษอยู่ในห้อง อย่าลืมติ๊กช่องด้านบน
+          </p>
         )}
         {errors.healthCareStatus && <p className="text-xs text-destructive">{errors.healthCareStatus}</p>}
         {errors.healthCareIds && <p className="text-xs text-destructive">{errors.healthCareIds}</p>}

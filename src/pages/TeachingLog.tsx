@@ -57,6 +57,7 @@ export interface TeachingLogForm {
   keyIssue: string;
   majorGap: "k-gap" | "p-gap" | "a-gap" | "a2-gap" | "system-gap" | "success" | null;
   minorGaps: ("k-gap" | "p-gap" | "a-gap" | "a2-gap" | "system-gap")[];
+  scPresent: boolean;
   healthCareStatus: "" | "none" | "has";
   healthCareIds: string;
   remedialIds: string;
@@ -78,7 +79,10 @@ const INITIAL_FORM: TeachingLogForm = {
   keyIssue: "",
   majorGap: null,
   minorGaps: [],
-  healthCareStatus: "",
+  scPresent: false,
+  // Default "none" (no special-care student assessed as primary). With the
+  // checkbox UI, "unchecked" is a definite answer, so we no longer start empty.
+  healthCareStatus: "none",
   healthCareIds: "",
   remedialIds: "",
   remedialStatuses: {},
@@ -179,6 +183,10 @@ export default function TeachingLog() {
         console.warn("Failed to parse persisted form payload", error);
       }
     }
+    // Reconcile drafts saved before sc_present existed: a record that assessed
+    // special-care students as the primary goal (healthCareStatus === "has")
+    // implies those students were present, so Box 1 must be checked/visible.
+    if (loaded.healthCareStatus === "has") loaded.scPresent = true;
     setForm(loaded);
   }, []);
 
@@ -223,7 +231,7 @@ export default function TeachingLog() {
             (id) => !STUDENT_ID_PATTERN.test(id)
           );
           if (invalidHealthCareIds.length > 0) {
-            errs.healthCareIds = `รหัสนักเรียนต้องเป็นตัวเลข 4 หลัก (ไม่ถูกต้อง: ${invalidHealthCareIds.join(", ")}) — ถ้าไม่มีนักเรียนป่วย ให้เลือก "ไม่มี" ที่ตัวเลือกด้านบนแทนการพิมพ์ในช่องนี้`;
+            errs.healthCareIds = `รหัสนักเรียนต้องเป็นตัวเลข 4 หลัก (ไม่ถูกต้อง: ${invalidHealthCareIds.join(", ")}) — ถ้าไม่มีนักเรียนกลุ่มดูแลพิเศษที่ต้องประเมิน ให้ยกเลิกการติ๊กช่องประเมินนักเรียนกลุ่มดูแลพิเศษแทนการพิมพ์ในช่องนี้`;
           }
         }
       }
@@ -333,6 +341,7 @@ export default function TeachingLog() {
         key_issue: form.keyIssue.trim() || null,
         major_gap: form.majorGap!,
         minor_gaps: form.minorGaps,
+        sc_present: form.scPresent,
         health_care_status: form.healthCareStatus === "has",
         health_care_ids:
           form.healthCareStatus === "none"

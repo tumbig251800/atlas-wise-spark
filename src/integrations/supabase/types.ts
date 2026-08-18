@@ -1434,6 +1434,7 @@ export type Database = {
           reflection: string | null
           remedial_ids: string | null
           research_id: string | null
+          sc_present: boolean
           subject: string
           teacher_id: string
           teacher_name: string | null
@@ -1466,6 +1467,7 @@ export type Database = {
           reflection?: string | null
           remedial_ids?: string | null
           research_id?: string | null
+          sc_present?: boolean
           subject: string
           teacher_id: string
           teacher_name?: string | null
@@ -1498,6 +1500,7 @@ export type Database = {
           reflection?: string | null
           remedial_ids?: string | null
           research_id?: string | null
+          sc_present?: boolean
           subject?: string
           teacher_id?: string
           teacher_name?: string | null
