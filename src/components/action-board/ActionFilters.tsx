@@ -4,7 +4,14 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search } from "lucide-react";
 
 export type ActionFilterChip = "all" | "overdue" | "open" | "verified" | "dismissed";
-export type IssueTypeFilter = "all" | "RedZone" | "MasteryDrop" | "UnitBlindSpot" | "IntegrityFlag" | "FlatScore";
+export type IssueTypeFilter =
+  | "all"
+  | "RedZone"
+  | "MasteryDrop"
+  | "UnitBlindSpot"
+  | "IntegrityFlag"
+  | "FlatScore"
+  | "UnitAssessmentOverdue";
 
 interface Props {
   search: string;
@@ -31,6 +38,7 @@ const ISSUE_TABS: { value: IssueTypeFilter; label: string; color: string }[] = [
   { value: "UnitBlindSpot",  label: "📦 คะแนนหลังหน่วยต่ำ",   color: "data-[state=active]:bg-blue-100 data-[state=active]:text-blue-800" },
   { value: "IntegrityFlag",  label: "🚩 ข้อมูลผิดปกติ",       color: "data-[state=active]:bg-gray-100 data-[state=active]:text-gray-800" },
   { value: "FlatScore",      label: "🎯 คะแนนนิ่ง",           color: "data-[state=active]:bg-teal-100 data-[state=active]:text-teal-800" },
+  { value: "UnitAssessmentOverdue", label: "⏳ ค้างประเมิน", color: "data-[state=active]:bg-amber-100 data-[state=active]:text-amber-800" },
 ];
 
 export function ActionFilters({ search, onSearchChange, filter, onFilterChange, counts, issueType, onIssueTypeChange, issueCounts }: Props) {
