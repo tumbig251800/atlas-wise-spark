@@ -45,6 +45,11 @@ function formatDate(d: string | null): string {
   });
 }
 
+/** ค่าที่ backend ส่งมาเมื่อรายการไม่ผูกกับห้องใดห้องหนึ่ง (เช่น UnitAssessmentOverdue ที่เป็นระดับครู) */
+function isPlaceholder(v: string | null | undefined): boolean {
+  return v == null || v.trim() === "" || v.trim() === "-";
+}
+
 // watch_started_at is a full timestamptz, not a bare date.
 function formatThaiDateTime(d: string | null): string {
   if (!d) return "—";
@@ -283,7 +288,9 @@ export function ActionTable({ items, startIndex = 0, onVerify, onDismiss, onPass
                       )}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {item.grade_level ?? "—"} {item.classroom ?? ""} · {item.subject ?? "—"}
+                      {isPlaceholder(item.grade_level) && isPlaceholder(item.classroom)
+                        ? <>ทุกห้องที่สอน · {item.subject ?? "—"}</>
+                        : <>{item.grade_level ?? "—"} {item.classroom ?? ""} · {item.subject ?? "—"}</>}
                     </div>
                   </TableCell>
                   <TableCell>
