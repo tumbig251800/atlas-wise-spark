@@ -64,7 +64,7 @@ export function ActionFilters({ search, onSearchChange, filter, onFilterChange, 
 
       {/* Issue type tabs */}
       <Tabs value={issueType} onValueChange={(v) => onIssueTypeChange(v as IssueTypeFilter)}>
-        <TabsList className="w-full grid grid-cols-6">
+        <TabsList className="w-full grid grid-cols-7">
           {ISSUE_TABS.map((tab) => (
             <TabsTrigger key={tab.value} value={tab.value} className={`gap-1 text-xs ${tab.color}`}>
               {tab.label}
