@@ -7,6 +7,22 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+// แก้บั๊ก PostgREST ตัด 1000 แถว (fetchAllRows) 28 ส.ค. 2569
+const FETCH_PAGE = 1000;
+// deno-lint-ignore no-explicit-any
+async function fetchAllRows<T = any>(build: (from: number, to: number) => any, label = "rows"): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += FETCH_PAGE) {
+    const { data, error } = await build(from, from + FETCH_PAGE - 1);
+    if (error) throw error;
+    const rows: T[] = data || [];
+    out.push(...rows);
+    if (rows.length < FETCH_PAGE) break;
+    if (out.length >= 500_000) { console.warn(`fetchAllRows(${label}) hit hard cap`); break; }
+  }
+  return out;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -36,13 +52,17 @@ serve(async (req) => {
     }
 
     // Step 1: Fetch open action items
-    const { data: actionItems, error: itemsError } = await supabaseClient
-      .from("action_plan_items")
-      .select("id, teacher_id, subject, grade_level, detail, severity, issue_type, metric_label, metric_value")
-      .in("status", ["open", "watching"])
-      .order("severity", { ascending: true }); // critical first
-
-    if (itemsError) throw itemsError;
+    const actionItems = await fetchAllRows(
+      (f, t) =>
+        supabaseClient
+          .from("action_plan_items")
+          .select("id, teacher_id, subject, grade_level, detail, severity, issue_type, metric_label, metric_value")
+          .in("status", ["open", "watching"])
+          .order("severity", { ascending: true }) // critical first
+          .order("id")
+          .range(f, t),
+      "action_plan_items",
+    );
 
     if (!actionItems || actionItems.length === 0) {
       return new Response(

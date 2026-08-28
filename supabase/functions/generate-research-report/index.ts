@@ -16,6 +16,22 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+// แก้บั๊ก PostgREST ตัด 1000 แถว (fetchAllRows) 28 ส.ค. 2569
+const FETCH_PAGE = 1000;
+// deno-lint-ignore no-explicit-any
+async function fetchAllRows<T = any>(build: (from: number, to: number) => any, label = "rows"): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += FETCH_PAGE) {
+    const { data, error } = await build(from, from + FETCH_PAGE - 1);
+    if (error) throw error;
+    const rows: T[] = data || [];
+    out.push(...rows);
+    if (rows.length < FETCH_PAGE) break;
+    if (out.length >= 500_000) { console.warn(`fetchAllRows(${label}) hit hard cap`); break; }
+  }
+  return out;
+}
+
 function formatTerm(academic_term: string): { term: string; year: string } {
   const m = academic_term.match(/(\d{4})-(\d)/);
   if (m) return { year: m[1], term: m[2] };
@@ -315,19 +331,20 @@ async function buildStudentAppendix(
   const issueType = row.issue_type as string;
 
   if (issueType === "UnitBlindSpot") {
-    let query = supabase
-      .from("unit_assessments")
-      .select(
-        "student_id, score, total_score, assessed_date, " +
-          "k_score, k_total, p_score, p_total, a_score, a_total"
-      )
-      .eq("teacher_id", row.teacher_id)
-      .eq("academic_term", row.academic_term);
-    if (row.grade_level) query = query.eq("grade_level", row.grade_level);
-    if (row.classroom) query = query.eq("classroom", row.classroom);
-    if (row.subject) query = query.eq("subject", row.subject);
-    const { data, error } = await query;
-    if (error) throw error;
+    const data = await fetchAllRows((f, t) => {
+      let query = supabase
+        .from("unit_assessments")
+        .select(
+          "student_id, score, total_score, assessed_date, " +
+            "k_score, k_total, p_score, p_total, a_score, a_total"
+        )
+        .eq("teacher_id", row.teacher_id)
+        .eq("academic_term", row.academic_term);
+      if (row.grade_level) query = query.eq("grade_level", row.grade_level);
+      if (row.classroom) query = query.eq("classroom", row.classroom);
+      if (row.subject) query = query.eq("subject", row.subject);
+      return query.order("id").range(f, t);
+    }, "unit_assessments");
     if (!data || data.length === 0) return null;
 
     const byMonth: Record<string, Record<string, StudentScore>> = {};
