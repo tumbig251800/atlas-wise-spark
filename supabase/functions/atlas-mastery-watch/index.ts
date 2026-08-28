@@ -8,23 +8,36 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// ─── Tunables ───────────────────────────────────────────────────────────────
-// delta = avg(latest 3 periods) - avg(3 periods before that)
-const ACTION_THRESHOLD = -1.0; // delta <= this → straight to Action (status 'open')
-const WATCH_THRESHOLD = -0.5; // delta <= this (but > ACTION) → Watch (status 'watching')
+const ACTION_THRESHOLD = -1.0;
+const WATCH_THRESHOLD = -0.5;
 
 const BASE_METRIC_LABEL = "Mastery ลดลง (เฉลี่ย 3 คาบ)";
 const ESCALATE_SUFFIX = "ตกต่อเนื่อง — เข้านิเทศ";
-const RESOLVE_SUFFIX = "คะแนนที่ลดลง ไม่เกินเกณฑ์วิกฤต (0.5) — ไม่จำเป็นต้องเข้าแทรกแซง";
-const RECOVER_SUFFIX = "คะแนนฟื้นตัว — ปิดอัตโนมัติ";
+const RESOLVE_SUFFIX = "คะแนนฟื้นตัว — ปิดอัตโนมัติ";
 
 type SupabaseClient = ReturnType<typeof createClient>;
+
+// แก้บั๊ก PostgREST ตัด 1000 แถว (fetchAllRows) 28 ส.ค. 2569
+const FETCH_PAGE = 1000;
+// deno-lint-ignore no-explicit-any
+async function fetchAllRows<T = any>(build: (from: number, to: number) => any, label = "rows"): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += FETCH_PAGE) {
+    const { data, error } = await build(from, from + FETCH_PAGE - 1);
+    if (error) throw error;
+    const rows: T[] = data || [];
+    out.push(...rows);
+    if (rows.length < FETCH_PAGE) break;
+    if (out.length >= 500_000) { console.warn(`fetchAllRows(${label}) hit hard cap`); break; }
+  }
+  return out;
+}
 
 interface RollingResult {
   recentAvg: number;
   previousAvg: number;
   delta: number;
-  latestDate: string; // teaching_date of the most recent log (YYYY-MM-DD)
+  latestDate: string;
   teacherName: string | null;
   gradeLevel: string | null;
 }
@@ -41,7 +54,6 @@ function issueKeyFor(teacherId: string, subject: string, classroom: string): str
   return `MasteryDrop:${teacherId}:${subject}:${classroom}`;
 }
 
-// ─── Rolling-average computation (latest 3 vs previous 3) ─────────────────────
 async function computeRollingAverages(
   supabase: SupabaseClient,
   teacherId: string,
@@ -61,7 +73,6 @@ async function computeRollingAverages(
     console.error("computeRollingAverages fetch error:", error);
     return null;
   }
-  // Need a full window: recent_3 (records 1-3) + previous_3 (records 4-6).
   if (!logs || logs.length < 6) return null;
 
   const recent3 = logs.slice(0, 3).map((l: { mastery_score: number }) => l.mastery_score);
@@ -81,7 +92,6 @@ async function computeRollingAverages(
   };
 }
 
-// ─── STEP 3: Detection for a single teacher × subject × classroom combo ───────
 async function runDetection(
   supabase: SupabaseClient,
   teacherId: string,
@@ -93,14 +103,12 @@ async function runDetection(
 
   const { delta, recentAvg, previousAvg } = roll;
 
-  // Normal fluctuation — never create or update.
   if (delta > WATCH_THRESHOLD) return { action: "skipped:normal", delta };
 
   const issueKey = issueKeyFor(teacherId, subject, classroom);
   const nowIso = new Date().toISOString();
   const today = nowIso.slice(0, 10);
 
-  // Dedup: an item with the same issue_key already exists?
   const { data: existing } = await supabase
     .from("action_plan_items")
     .select("id, status, watch_started_at")
@@ -108,7 +116,6 @@ async function runDetection(
     .maybeSingle();
 
   const goesToAction = delta <= ACTION_THRESHOLD;
-  // Don't downgrade an existing Action item back to Watch.
   const existingStatus = existing?.status as string | undefined;
   const status = goesToAction || existingStatus === "open" ? "open" : "watching";
 
@@ -129,7 +136,6 @@ async function runDetection(
   };
 
   if (existing) {
-    // Preserve the original watch start time if it was already watching.
     const watchStartedAt =
       status === "watching"
         ? ((existing.watch_started_at as string | null) ?? nowIso)
@@ -158,16 +164,23 @@ async function runDetection(
   return { action: `created:${status}`, delta };
 }
 
-// ─── STEP 4: Re-evaluate every 'watching' item ───────────────────────────────
 async function runWatchReevaluation(
   supabase: SupabaseClient,
 ): Promise<{ escalated: number; resolved: number; held: number; skipped: number }> {
-  const { data: watching, error } = await supabase
-    .from("action_plan_items")
-    .select("id, teacher_id, subject, classroom, watch_started_at")
-    .eq("status", "watching");
-
-  if (error) {
+  // deno-lint-ignore no-explicit-any
+  let watching: any[];
+  try {
+    watching = await fetchAllRows(
+      (f, t) =>
+        supabase
+          .from("action_plan_items")
+          .select("id, teacher_id, subject, classroom, watch_started_at")
+          .eq("status", "watching")
+          .order("id")
+          .range(f, t),
+      "action_plan_items",
+    );
+  } catch (error) {
     console.error("Watch reevaluation fetch error:", error);
     return { escalated: 0, resolved: 0, held: 0, skipped: 0 };
   }
@@ -190,7 +203,6 @@ async function runWatchReevaluation(
 
     const roll = await computeRollingAverages(supabase, teacherId, subject, classroom);
     if (!roll) {
-      // Can't re-evaluate yet — just stamp the check time.
       await supabase
         .from("action_plan_items")
         .update({ watch_checked_at: nowIso, updated_at: nowIso })
@@ -199,8 +211,6 @@ async function runWatchReevaluation(
       continue;
     }
 
-    // Only escalate/resolve when NEW evidence has arrived since watching began;
-    // otherwise the item would flip on the very cycle it was created.
     const watchStartedDate = ((item.watch_started_at as string | null) ?? "").slice(0, 10);
     const hasNewData = !watchStartedDate || roll.latestDate > watchStartedDate;
 
@@ -219,7 +229,6 @@ async function runWatchReevaluation(
     }
 
     if (roll.delta <= WATCH_THRESHOLD) {
-      // Still dropping → escalate to Action.
       await supabase
         .from("action_plan_items")
         .update({
@@ -232,7 +241,6 @@ async function runWatchReevaluation(
         .eq("id", item.id);
       escalated++;
     } else if (roll.delta > 0) {
-      // Recovered → auto-resolve.
       await supabase
         .from("action_plan_items")
         .update({
@@ -240,14 +248,13 @@ async function runWatchReevaluation(
           status: "resolved",
           auto_resolved: true,
           resolved_at: nowIso,
-          resolution_note: RECOVER_SUFFIX,
-          metric_label: `${BASE_METRIC_LABEL} — ${RECOVER_SUFFIX}`,
+          resolution_note: RESOLVE_SUFFIX,
+          metric_label: `${BASE_METRIC_LABEL} — ${RESOLVE_SUFFIX}`,
           watch_started_at: null,
         })
         .eq("id", item.id);
       resolved++;
     } else {
-      // Between WATCH_THRESHOLD and 0 → keep watching, refresh figures only.
       await supabase.from("action_plan_items").update(refreshed).eq("id", item.id);
       held++;
     }
@@ -256,7 +263,6 @@ async function runWatchReevaluation(
   return { escalated, resolved, held, skipped };
 }
 
-// ─── Main Handler ─────────────────────────────────────────────────────────────
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -274,9 +280,6 @@ serve(async (req) => {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // Two auth paths:
-    //  • Internal/cron calls present the service-role key as the bearer token.
-    //  • UI calls (supabase.functions.invoke) present a user JWT → requireAtlasUser.
     const authHeader = req.headers.get("authorization") || req.headers.get("Authorization") || "";
     const bearer = authHeader.toLowerCase().startsWith("bearer ")
       ? authHeader.slice(7).trim()
@@ -299,14 +302,10 @@ serve(async (req) => {
       subject?: string;
       classroom?: string;
     };
-    // No body (e.g. a bare cron call) defaults to a full batch re-evaluation.
     const mode = body.mode ?? "batch";
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Re-evaluate pre-existing watching items FIRST so that any item created by
-    // detection in this same call is not immediately re-processed.
-    // "batch" === sweep every watching item (the scheduled-cron entry point).
     let reevaluation = null;
     if (mode === "reevaluate" || mode === "both" || mode === "batch") {
       reevaluation = await runWatchReevaluation(supabase);
