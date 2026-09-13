@@ -2,6 +2,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search } from "lucide-react";
+import { getIssueTypeSuspension, withSuspensionLabel } from "@/lib/issueTypeSuspension";
 
 export type ActionFilterChip = "all" | "overdue" | "open" | "verified" | "dismissed";
 export type IssueTypeFilter =
@@ -35,7 +36,7 @@ const ISSUE_TABS: { value: IssueTypeFilter; label: string; color: string }[] = [
   { value: "all",            label: "ทุกประเภท",              color: "" },
   { value: "RedZone",        label: "🔴 เสี่ยงสูง",           color: "data-[state=active]:bg-red-100 data-[state=active]:text-red-800" },
   { value: "MasteryDrop",    label: "📉 คะแนนร่วง",           color: "data-[state=active]:bg-orange-100 data-[state=active]:text-orange-800" },
-  { value: "UnitBlindSpot",  label: "📦 คะแนนหลังหน่วยต่ำ",   color: "data-[state=active]:bg-blue-100 data-[state=active]:text-blue-800" },
+  { value: "UnitBlindSpot",  label: "📦 หลังหน่วยรายนักเรียน", color: "data-[state=active]:bg-blue-100 data-[state=active]:text-blue-800" },
   { value: "IntegrityFlag",  label: "🚩 ข้อมูลผิดปกติ",       color: "data-[state=active]:bg-gray-100 data-[state=active]:text-gray-800" },
   { value: "FlatScore",      label: "🎯 คะแนนนิ่ง",           color: "data-[state=active]:bg-teal-100 data-[state=active]:text-teal-800" },
   { value: "UnitAssessmentOverdue", label: "⏳ ค้างประเมิน", color: "data-[state=active]:bg-amber-100 data-[state=active]:text-amber-800" },
@@ -66,8 +67,13 @@ export function ActionFilters({ search, onSearchChange, filter, onFilterChange, 
       <Tabs value={issueType} onValueChange={(v) => onIssueTypeChange(v as IssueTypeFilter)}>
         <TabsList className="w-full grid grid-cols-7">
           {ISSUE_TABS.map((tab) => (
-            <TabsTrigger key={tab.value} value={tab.value} className={`gap-1 text-xs ${tab.color}`}>
-              {tab.label}
+            <TabsTrigger
+              key={tab.value}
+              value={tab.value}
+              className={`gap-1 text-xs ${tab.color}`}
+              title={getIssueTypeSuspension(tab.value)?.reason}
+            >
+              {withSuspensionLabel(tab.value, tab.label)}
               <Badge variant="secondary" className="text-xs px-1">
                 {issueCounts[tab.value]}
               </Badge>

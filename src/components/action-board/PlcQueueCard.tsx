@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Users, FileText, TrendingDown, Calendar } from "lucide-react";
 import type { PlcQueueGroup } from "@/hooks/usePlcQueue";
+import { withSuspensionLabel } from "@/lib/issueTypeSuspension";
 
 interface PlcQueueCardProps {
   group: PlcQueueGroup;
@@ -25,7 +26,7 @@ const ISSUE_TYPE_COLORS: Record<string, string> = {
 };
 
 export function PlcQueueCard({ group, onAiDraft, isLoading }: PlcQueueCardProps) {
-  const issueTypeLabel = ISSUE_TYPE_LABELS[group.dominantType] ?? group.dominantType;
+  const issueTypeLabel = withSuspensionLabel(group.dominantType, ISSUE_TYPE_LABELS[group.dominantType] ?? group.dominantType);
   const cardColor = ISSUE_TYPE_COLORS[group.dominantType] ?? "bg-gray-50 text-gray-700 border-gray-200";
 
   return (

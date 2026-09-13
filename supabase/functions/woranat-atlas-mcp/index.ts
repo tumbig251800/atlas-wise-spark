@@ -1,6 +1,21 @@
-// v2.8.0 (28 ส.ค. 2569) — เพิ่ม fetchAllRows กันบั๊ก PostgREST ตัด 1000 แถว (PLC/PBL tools)
+// v2.10.0 (13 ก.ย. 2569) — ติดสถานะระงับกฎ UnitBlindSpot ใน atlas_wf6_candidate_audit และ atlas_action_items
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import {
+  bangkokCalendarDate,
+  evaluateWf6Candidates,
+  normalizeAcademicTerm,
+  summarizeWf6Candidates,
+  type Wf6ActionItemRow,
+  type Wf6AssessmentRow,
+  type Wf6ProfileRow,
+  type Wf6TeachingLogRow,
+} from "../_shared/wf6CandidateAudit.ts";
+import {
+  buildSuspensionNotice,
+  isSuspendedIssueType,
+  suspensionNoticesFor,
+} from "../_shared/issueTypeSuspension.ts";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -108,6 +123,23 @@ const TOOLS = [
         teacher_id: { type: "string", description: "UUID ครู" }
       },
       required: []
+    }
+  },
+  {
+    name: "atlas_wf6_candidate_audit",
+    description: "[กฎระงับแล้วตั้งแต่ 13 ก.ย. 2569 — WF-6 หยุดสร้างเคสอัตโนมัติแล้ว ณ วันที่ตรวจสอบ ผลเป็นข้อมูลประกอบเท่านั้น ไม่ใช่รายการที่ต้องเปิดเคสหรือจัดคิว PLC] ตรวจผู้สมัครเคส UnitBlindSpot ตามเงื่อนไขเดียวกับ WF-6 โดยอ่านผลหลังหน่วย บันทึกหลังสอน และ Action Board; ค่าเริ่มต้นคืนเฉพาะยอดรวมเพื่อลด PII",
+    inputSchema: {
+      type: "object",
+      properties: {
+        term: { type: "string", description: "รหัสภาคเรียน เช่น 2569-1 (บังคับ)" },
+        as_of_date: { type: "string", description: "วันที่อ้างอิง YYYY-MM-DD; ไม่ใส่ = วันนี้เวลาไทย" },
+        grade_level: { type: "string", description: "กรองระดับชั้น เช่น ป.6 (optional)" },
+        classroom: { type: "string", description: "กรองห้อง เช่น KBW หรือ 2 (optional)" },
+        subject: { type: "string", description: "กรองวิชาแบบตรงตัว (optional)" },
+        include_details: { type: "boolean", description: "true = แสดงรายละเอียดที่มี PII; default false" },
+        limit: { type: "number", description: "จำนวนรายละเอียดสูงสุดเมื่อ include_details=true (default 20, max 100)", minimum: 1, maximum: 100 }
+      },
+      required: ["term"]
     }
   },
   {
@@ -739,15 +771,107 @@ async function callTool(supabase: any, name: string, args: any): Promise<any> {
           auto_resolved: i.auto_resolved,
           resolution_note: i.resolution_note
         }));
+        const suspendedNotices = suspensionNoticesFor(result.map((i: any) => i.issue_type));
         const summary = {
           total: result.length,
           by_status: result.reduce((acc: any, i: any) => { acc[i.status] = (acc[i.status] || 0) + 1; return acc; }, {}),
           items_with_plc: result.filter((i: any) => i.has_plc).length,
           items_with_nidet: result.filter((i: any) => i.has_nidet).length,
-          items_untouched: result.filter((i: any) => !i.has_plc && !i.has_nidet && (i.status === "open" || i.status === "watching")).length,
+          items_untouched: result.filter((i: any) => !i.has_plc && !i.has_nidet && (i.status === "open" || i.status === "watching") && !isSuspendedIssueType(i.issue_type)).length,
+          ...(suspendedNotices.length > 0 && {
+            suspended_issue_types: suspendedNotices,
+            suspended_note: "items_untouched ไม่รวมประเภทที่ระงับแล้ว; total และ by_status ยังรวมทุกประเภท",
+          }),
           items: result
         };
         return { content: [{ type: "text", text: JSON.stringify(summary, null, 2) }] };
+      }
+
+      case "atlas_wf6_candidate_audit": {
+        if (typeof args.term !== "string" || !args.term.trim()) {
+          return { content: [{ type: "text", text: "Error: ต้องระบุ term" }], isError: true };
+        }
+        const canonicalTerm = normalizeAcademicTerm(args.term);
+        if (!/^\d{4}-\d+$/.test(canonicalTerm)) {
+          return { content: [{ type: "text", text: "Error: term ต้องอยู่ในรูป 2569-1 หรือ 1/2569" }], isError: true };
+        }
+        const [year, semester] = canonicalTerm.split("-");
+        const termVariants = [...new Set([canonicalTerm, `${semester}/${year}`])];
+        const asOfDate = typeof args.as_of_date === "string" && args.as_of_date
+          ? args.as_of_date
+          : bangkokCalendarDate(new Date());
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(asOfDate)) {
+          return { content: [{ type: "text", text: "Error: as_of_date ต้องอยู่ในรูป YYYY-MM-DD" }], isError: true };
+        }
+
+        const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+        const assessments = await fetchAllRows<Wf6AssessmentRow>((from, to) => {
+          let query = admin.from("unit_assessments")
+            .select("id,student_id,student_name,academic_term,assessed_date,created_at,score,total_score,grade_level,classroom,subject,unit_name,teacher_id")
+            .in("academic_term", termVariants);
+          if (args.grade_level) query = query.eq("grade_level", args.grade_level);
+          if (args.classroom) query = query.eq("classroom", args.classroom);
+          if (args.subject) query = query.eq("subject", args.subject);
+          return query.order("id", { ascending: true }).range(from, to);
+        }, "wf6_unit_assessments");
+
+        const teachingLogs = await fetchAllRows<Wf6TeachingLogRow>((from, to) => {
+          let query = admin.from("teaching_logs")
+            .select("academic_term,teaching_date,grade_level,classroom,subject,remedial_ids,health_care_status")
+            .in("academic_term", termVariants);
+          if (args.grade_level) query = query.eq("grade_level", args.grade_level);
+          if (args.classroom) query = query.eq("classroom", args.classroom);
+          if (args.subject) query = query.eq("subject", args.subject);
+          return query.order("id", { ascending: true }).range(from, to);
+        }, "wf6_teaching_logs");
+
+        const actionItems = await fetchAllRows<Wf6ActionItemRow>((from, to) => admin.from("action_plan_items")
+          .select("issue_type,issue_key,subject,grade_level,classroom,created_at,evidence_context")
+          .eq("issue_type", "UnitBlindSpot")
+          .order("id", { ascending: true })
+          .range(from, to), "wf6_action_items");
+
+        const teacherIds = [...new Set(assessments
+          .map((row) => row.teacher_id)
+          .filter((teacherId): teacherId is string => Boolean(teacherId)))];
+        let profiles: Wf6ProfileRow[] = [];
+        if (teacherIds.length) {
+          const { data, error } = await admin.from("profiles")
+            .select("user_id,full_name")
+            .in("user_id", teacherIds);
+          if (error) throw error;
+          profiles = data || [];
+        }
+
+        const candidates = evaluateWf6Candidates({
+          term: canonicalTerm,
+          asOfDate,
+          assessments,
+          teachingLogs,
+          actionItems,
+          profiles,
+        });
+        const summary = summarizeWf6Candidates(candidates, {
+          term: canonicalTerm,
+          asOfDate,
+          includeDetails: args.include_details === true,
+          limit: Number(args.limit) || 20,
+        });
+        const suspension = buildSuspensionNotice("UnitBlindSpot");
+        return { content: [{ type: "text", text: JSON.stringify({
+          ...(suspension && {
+            rule_status: suspension.rule_status,
+            suspended_since: suspension.suspended_since,
+            notice: suspension.notice,
+          }),
+          ...summary,
+          source_counts: {
+            unit_assessments: assessments.length,
+            teaching_logs: teachingLogs.length,
+            unit_blind_spot_action_items: actionItems.length,
+          },
+          note: "ผลเป็น audit ตามกติกา WF-6 และไม่รวมการประเมินที่มีหลักฐานช่วยเหลือหรือมี Action Item เดิมแล้ว",
+        }, null, 2) }] };
       }
 
       case "atlas_plc_effectiveness": {
@@ -1463,7 +1587,7 @@ Deno.serve(async (req: Request) => {
     return new Response(null, { status: 200, headers: CORS_HEADERS });
   }
   if (req.method === "HEAD" || req.method === "GET") {
-    return new Response(JSON.stringify({ status: "ok", server: "Woranat_School_Atlas_MCP", version: "2.8.0" }), {
+    return new Response(JSON.stringify({ status: "ok", server: "Woranat_School_Atlas_MCP", version: "2.10.0" }), {
       status: 200,
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
     });
@@ -1519,7 +1643,7 @@ Deno.serve(async (req: Request) => {
   try {
     switch (method) {
       case "initialize":
-        result = { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "Woranat_School_Atlas_MCP", version: "2.8.0" } };
+        result = { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "Woranat_School_Atlas_MCP", version: "2.10.0" } };
         break;
       case "ping":
         result = {};

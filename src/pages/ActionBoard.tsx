@@ -9,7 +9,8 @@ import { supabase } from "@/lib/atlasSupabase";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useActionItems, usePassActionItem, ACTION_ITEMS_KEY, daysRemaining, type ActionItem } from "@/hooks/useActionItems";
-import { isActiveQueueStatus, isHistoryStatus } from "@/pages/actionBoardStatus";
+import { computeFilterCounts, isActiveQueueStatus, isHistoryStatus, matchesFilter } from "@/pages/actionBoardStatus";
+import { getIssueTypeSuspension, isSuspendedIssueType } from "@/lib/issueTypeSuspension";
 import { ActionStatsBar } from "@/components/action-board/ActionStatsBar";
 import { ActionFilters, type ActionFilterChip, type IssueTypeFilter } from "@/components/action-board/ActionFilters";
 import { ActionTable } from "@/components/action-board/ActionTable";
@@ -29,24 +30,6 @@ import type { PlcSession } from "@/types/plc";
 const PAGE_SIZE = 20;
 
 const SEVERITY_RANK: Record<string, number> = { critical: 0, high: 1, medium: 2 };
-
-function matchesFilter(item: ActionItem, filter: ActionFilterChip): boolean {
-  switch (filter) {
-    case "all":
-      return true;
-    case "overdue": {
-      if (item.status !== "open" && item.status !== "resolved") return false;
-      const d = daysRemaining(item.due_date);
-      return d !== null && d <= 0;
-    }
-    case "open":
-      return item.status === "open" || item.status === "resolved";
-    case "verified":
-      return item.status === "verified";
-    case "dismissed":
-      return item.status === "dismissed";
-  }
-}
 
 function matchesSearch(item: ActionItem, q: string): boolean {
   if (!q) return true;
@@ -91,13 +74,7 @@ export default function ActionBoard() {
 
   const all = items ?? [];
 
-  const counts: Record<ActionFilterChip, number> = useMemo(() => ({
-    all: all.length,
-    overdue: all.filter((i) => matchesFilter(i, "overdue")).length,
-    open: all.filter((i) => matchesFilter(i, "open")).length,
-    verified: all.filter((i) => matchesFilter(i, "verified")).length,
-    dismissed: all.filter((i) => matchesFilter(i, "dismissed")).length,
-  }), [all]);
+  const counts: Record<ActionFilterChip, number> = useMemo(() => computeFilterCounts(all), [all]);
 
   const ISSUE_TYPES: IssueTypeFilter[] = ["RedZone", "MasteryDrop", "UnitBlindSpot", "IntegrityFlag", "FlatScore", "UnitAssessmentOverdue"];
   const issueCounts = useMemo((): Record<IssueTypeFilter, number> => {
@@ -130,6 +107,7 @@ export default function ActionBoard() {
   // Separate UnitBlindSpot for grouped view
   const blindSpotQueue = useMemo(() => queueItems.filter(i => i.issue_type === "UnitBlindSpot"), [queueItems]);
   const otherQueue = useMemo(() => queueItems.filter(i => i.issue_type !== "UnitBlindSpot"), [queueItems]);
+  const blindSpotSuspension = getIssueTypeSuspension("UnitBlindSpot");
 
   // Group blindspot by teacher → grade/classroom/subject
   const blindSpotGroups = useMemo(() => {
@@ -149,6 +127,7 @@ export default function ActionBoard() {
     const teachers = new Set<string>();
     const units = new Set<string>();
     for (const i of queueItems) {
+      if (isSuspendedIssueType(i.issue_type)) continue;
       const t = i.teacher_id ?? i.teacher_name ?? "?";
       teachers.add(t);
       units.add(`${t}|${i.subject ?? ""}|${i.grade_level ?? ""}`);
@@ -349,6 +328,19 @@ export default function ActionBoard() {
               {/* UnitBlindSpot — grouped by teacher → grade/class/subject */}
               {blindSpotGroups.length > 0 && (
                 <div className="space-y-3">
+                  {blindSpotSuspension && (
+                    <div
+                      role="note"
+                      className="rounded-md border border-slate-300 bg-slate-50 px-4 py-2 text-sm text-slate-700"
+                    >
+                      <span className="font-semibold">
+                        ⏸ คะแนนหลังหน่วยต่ำรายนักเรียน (UnitBlindSpot) — {blindSpotSuspension.label} ตั้งแต่ {blindSpotSuspension.sinceLabel}
+                      </span>
+                      <div className="text-xs text-slate-600 mt-0.5">
+                        {blindSpotSuspension.reason} · เคสด้านล่างแสดงเพื่อให้ปิดหรือย้อนดูเท่านั้น
+                      </div>
+                    </div>
+                  )}
                   {blindSpotGroups.map((tg) => (
                     <div key={tg.teacher} className="border border-indigo-200 rounded-lg overflow-hidden">
                       {/* Teacher header */}
