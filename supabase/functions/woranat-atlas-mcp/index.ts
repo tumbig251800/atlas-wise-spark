@@ -1,4 +1,4 @@
-// v2.9.0 (11 ก.ย. 2569) — เพิ่ม read-only audit สำหรับเทียบผล WF-6 กับข้อมูลต้นทาง
+// v2.10.0 (13 ก.ย. 2569) — ติดสถานะระงับกฎ UnitBlindSpot ใน atlas_wf6_candidate_audit และ atlas_action_items
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 import {
@@ -11,6 +11,11 @@ import {
   type Wf6ProfileRow,
   type Wf6TeachingLogRow,
 } from "../_shared/wf6CandidateAudit.ts";
+import {
+  buildSuspensionNotice,
+  isSuspendedIssueType,
+  suspensionNoticesFor,
+} from "../_shared/issueTypeSuspension.ts";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -122,7 +127,7 @@ const TOOLS = [
   },
   {
     name: "atlas_wf6_candidate_audit",
-    description: "ตรวจผู้สมัครเคส UnitBlindSpot ตามเงื่อนไขเดียวกับ WF-6 โดยอ่านผลหลังหน่วย บันทึกหลังสอน และ Action Board; ค่าเริ่มต้นคืนเฉพาะยอดรวมเพื่อลด PII",
+    description: "[กฎระงับแล้วตั้งแต่ 13 ก.ย. 2569 — WF-6 หยุดสร้างเคสอัตโนมัติแล้ว ณ วันที่ตรวจสอบ ผลเป็นข้อมูลประกอบเท่านั้น ไม่ใช่รายการที่ต้องเปิดเคสหรือจัดคิว PLC] ตรวจผู้สมัครเคส UnitBlindSpot ตามเงื่อนไขเดียวกับ WF-6 โดยอ่านผลหลังหน่วย บันทึกหลังสอน และ Action Board; ค่าเริ่มต้นคืนเฉพาะยอดรวมเพื่อลด PII",
     inputSchema: {
       type: "object",
       properties: {
@@ -766,12 +771,17 @@ async function callTool(supabase: any, name: string, args: any): Promise<any> {
           auto_resolved: i.auto_resolved,
           resolution_note: i.resolution_note
         }));
+        const suspendedNotices = suspensionNoticesFor(result.map((i: any) => i.issue_type));
         const summary = {
           total: result.length,
           by_status: result.reduce((acc: any, i: any) => { acc[i.status] = (acc[i.status] || 0) + 1; return acc; }, {}),
           items_with_plc: result.filter((i: any) => i.has_plc).length,
           items_with_nidet: result.filter((i: any) => i.has_nidet).length,
-          items_untouched: result.filter((i: any) => !i.has_plc && !i.has_nidet && (i.status === "open" || i.status === "watching")).length,
+          items_untouched: result.filter((i: any) => !i.has_plc && !i.has_nidet && (i.status === "open" || i.status === "watching") && !isSuspendedIssueType(i.issue_type)).length,
+          ...(suspendedNotices.length > 0 && {
+            suspended_issue_types: suspendedNotices,
+            suspended_note: "items_untouched ไม่รวมประเภทที่ระงับแล้ว; total และ by_status ยังรวมทุกประเภท",
+          }),
           items: result
         };
         return { content: [{ type: "text", text: JSON.stringify(summary, null, 2) }] };
@@ -847,7 +857,13 @@ async function callTool(supabase: any, name: string, args: any): Promise<any> {
           includeDetails: args.include_details === true,
           limit: Number(args.limit) || 20,
         });
+        const suspension = buildSuspensionNotice("UnitBlindSpot");
         return { content: [{ type: "text", text: JSON.stringify({
+          ...(suspension && {
+            rule_status: suspension.rule_status,
+            suspended_since: suspension.suspended_since,
+            notice: suspension.notice,
+          }),
           ...summary,
           source_counts: {
             unit_assessments: assessments.length,
@@ -1571,7 +1587,7 @@ Deno.serve(async (req: Request) => {
     return new Response(null, { status: 200, headers: CORS_HEADERS });
   }
   if (req.method === "HEAD" || req.method === "GET") {
-    return new Response(JSON.stringify({ status: "ok", server: "Woranat_School_Atlas_MCP", version: "2.9.0" }), {
+    return new Response(JSON.stringify({ status: "ok", server: "Woranat_School_Atlas_MCP", version: "2.10.0" }), {
       status: 200,
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
     });
@@ -1627,7 +1643,7 @@ Deno.serve(async (req: Request) => {
   try {
     switch (method) {
       case "initialize":
-        result = { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "Woranat_School_Atlas_MCP", version: "2.9.0" } };
+        result = { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "Woranat_School_Atlas_MCP", version: "2.10.0" } };
         break;
       case "ping":
         result = {};

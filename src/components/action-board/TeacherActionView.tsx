@@ -13,6 +13,7 @@ import { NidetVisitCard } from "@/components/action-board/NidetVisitCard";
 import { ImpactLoopPanel } from "@/components/action-board/ImpactLoopPanel";
 import { downloadPlcDocx } from "@/lib/downloadPlcDocx";
 import { useToast } from "@/hooks/use-toast";
+import { getIssueTypeSuspension, isSuspendedIssueType } from "@/lib/issueTypeSuspension";
 
 interface Props {
   teacherId: string;
@@ -381,7 +382,22 @@ function TeacherProposedCard({ item }: { item: ActionItem }) {
   );
 }
 
+function SuspendedIssueCard({ item }: { item: ActionItem }) {
+  const suspension = getIssueTypeSuspension(item.issue_type);
+  return (
+    <div className="rounded-lg border border-slate-300 bg-slate-50 p-4 space-y-1">
+      <div className="font-medium text-slate-800">
+        ⏸ ประเด็นคะแนนหลังหน่วยรายนักเรียน — {suspension?.label} ตั้งแต่ {suspension?.sinceLabel}
+      </div>
+      <div className="text-sm text-slate-700">
+        ไม่ต้องเตรียมรับการนิเทศจากประเด็นนี้ รายการนี้แสดงไว้เพื่อความโปร่งใสเท่านั้น
+      </div>
+    </div>
+  );
+}
+
 function TeacherCard({ item }: { item: ActionItem }) {
+  if (isSuspendedIssueType(item.issue_type)) return <SuspendedIssueCard item={item} />;
   if (item.status === "watching") return <WatchingCard item={item} />;
   if (item.status === "resolved") return <ResolvedCard item={item} />;
   // status === 'open' from here.
@@ -466,7 +482,9 @@ export function TeacherActionView({ teacherId }: Props) {
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <h2 className="text-lg font-semibold">ปัญหาที่ต้องติดตาม</h2>
-            <span className="text-sm text-muted-foreground">({list.length} รายการ)</span>
+            <span className="text-sm text-muted-foreground">
+              ({list.filter((item) => !isSuspendedIssueType(item.issue_type)).length} รายการ)
+            </span>
           </div>
           {list.map((item) => (
             <TeacherCard key={item.id} item={item} />

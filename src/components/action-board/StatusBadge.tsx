@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { daysRemaining } from "@/hooks/useActionItems";
+import { getIssueTypeSuspension, withSuspensionLabel } from "@/lib/issueTypeSuspension";
 
 interface Props {
   status: string;
@@ -52,14 +53,18 @@ export function IssueTypeBadge({ type }: { type: string }) {
     RedZone:       { label: "🔴 เสี่ยงสูง",          className: "bg-red-100 text-red-800 border border-red-300" },
     MasteryDrop:   { label: "📉 คะแนนร่วง",           className: "bg-orange-100 text-orange-800 border border-orange-300" },
     IntegrityFlag: { label: "🚩 ข้อมูลผิดปกติ",       className: "bg-purple-100 text-purple-800 border border-purple-300" },
-    UnitBlindSpot: { label: "📦 คะแนนหลังหน่วยต่ำ",   className: "bg-indigo-100 text-indigo-800 border border-indigo-300" },
+    UnitBlindSpot: { label: "📦 คะแนนหลังหน่วยต่ำรายนักเรียน", className: "bg-indigo-100 text-indigo-800 border border-indigo-300" },
     FlatScore:     { label: "🎯 คะแนนนิ่ง",           className: "bg-teal-100 text-teal-800 border border-teal-300" },
     UnitAssessmentOverdue: { label: "⏳ ค้างประเมินหลังหน่วย", className: "bg-amber-100 text-amber-800 border border-amber-300" },
   };
   const info = map[type] ?? { label: type, className: "bg-gray-100 text-gray-800" };
+  const suspension = getIssueTypeSuspension(type);
   return (
-    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${info.className}`}>
-      {info.label}
+    <span
+      className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${suspension ? "bg-slate-100 text-slate-600 border border-slate-300" : info.className}`}
+      title={suspension?.reason}
+    >
+      {withSuspensionLabel(type, info.label)}
     </span>
   );
 }

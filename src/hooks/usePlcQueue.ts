@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useActionItems, type ActionItem } from "./useActionItems";
+import { isSuspendedIssueType } from "@/lib/issueTypeSuspension";
 
 export type PlcQueueGroup = {
   id: string;
@@ -54,6 +55,7 @@ export function usePlcQueue() {
     const queueableItems = allItems.filter(
       (item) =>
         item.issue_type !== "IntegrityFlag" &&
+        !isSuspendedIssueType(item.issue_type) &&
         (item.status === "open" || item.status === "watching")
     );
 
