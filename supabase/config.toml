@@ -34,3 +34,8 @@ verify_jwt = false
 # (outage 2026-09-21 21:47–22:2x after a deploy without --no-verify-jwt).
 [functions.woranat-atlas-mcp]
 verify_jwt = false
+
+# woranat-chatgpt-mcp: ChatGPT OAuth bearer token is checked inside the function
+# (deployed with verify_jwt=false; keep it that way).
+[functions.woranat-chatgpt-mcp]
+verify_jwt = false

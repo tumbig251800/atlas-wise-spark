@@ -7,6 +7,11 @@ const INDIVIDUAL_TOOLS = new Set([
   "kg_child_status",
   "atlas_pbl_student",
   "atlas_pbl_failing",
+  // woranat-atlas-mcp v2.11.0 — return per-student names
+  "atlas_unit_assessments_zero",
+  "atlas_exam_results",
+  "atlas_reading_results",
+  "atlas_student_lookup",
 ]);
 
 const CORS = {
