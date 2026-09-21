@@ -1,6 +1,18 @@
-// v2.8.0 (28 ส.ค. 2569) — เพิ่ม fetchAllRows กันบั๊ก PostgREST ตัด 1000 แถว (PLC/PBL tools)
+// v2.9.0 (21 ก.ย. 2569) — เพิ่ม atlas_unit_assessments_zero, atlas_exam_results, atlas_reading_results, atlas_student_lookup (read-only, ตรรกะร่วมกับ woranat-atlas-mcp ผ่าน _shared/academicRecords.ts)
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { normalizeAcademicTerm } from "../_shared/wf6CandidateAudit.ts";
+import {
+  academicTermVariants,
+  buildExamReport,
+  buildReadingReport,
+  buildZeroReport,
+  findStudentDuplicates,
+  matchesAssessmentKind,
+  searchStudents,
+  type AssessmentKindFilter,
+  type RecordIdentityRow,
+} from "../_shared/academicRecords.ts";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -238,6 +250,71 @@ const TOOLS = [
     }
   },
   {
+    name: "atlas_unit_assessments_zero",
+    description: "คะแนนหลังหน่วยที่ได้ 0 คะแนนรายรายการ (ไม่กรองด้วยกฎ WF-6) พร้อมรหัส/ชื่อ-นามสกุลนักเรียน ชั้น/ห้อง วิชา หน่วย คะแนนเต็ม วันที่สอบ ขาดสอบ และครูผู้กรอก + สรุป by_class / by_teacher. include_missing=true รวมแถวที่ยังไม่มีคะแนน (null_score) และนักเรียนที่ยังไม่มีแถวในหน่วยที่เพื่อนร่วมห้องมีคะแนนแล้ว (not_recorded)",
+    inputSchema: {
+      type: "object",
+      properties: {
+        term: { type: "string", description: "รหัสภาคเรียน เช่น 2569-1 หรือ 1/2569" },
+        grade_level: { type: "string", description: "ระดับชั้น เช่น ป.3 (optional)" },
+        classroom: { type: "string", description: "ห้องเรียน เช่น KBW หรือ 2 (optional)" },
+        subject: { type: "string", description: "วิชาแบบตรงตัว (optional)" },
+        assessed_date_from: { type: "string", description: "วันที่สอบเริ่มต้น YYYY-MM-DD (optional)" },
+        assessed_date_to: { type: "string", description: "วันที่สอบสิ้นสุด YYYY-MM-DD (optional)" },
+        assessment_kind: { type: "string", enum: ["unit", "midterm", "all"], description: "unit = หลังหน่วย (default), midterm = กลางภาค, all = ทั้งหมด" },
+        include_missing: { type: "boolean", description: "true = รวมแถวที่ score ว่าง และนักเรียนที่ยังไม่ถูกบันทึกในหน่วยที่เพื่อนร่วมห้องมีคะแนนแล้ว (default false)" }
+      },
+      required: ["term"]
+    }
+  },
+  {
+    name: "atlas_exam_results",
+    description: "ผลสอบรายชุดข้อสอบ (exam_papers + exam_student_results) — ข้อมูลชุดข้อสอบ ผลรายคน (รหัส ชื่อ-นามสกุล K/P/A total ร้อยละ ขาดสอบ gap_flag result) และสรุปต่อชุด (n, เฉลี่ย, ผ่าน/ไม่ผ่าน, ขาดสอบ)",
+    inputSchema: {
+      type: "object",
+      properties: {
+        term: { type: "string", description: "รหัสภาคเรียน เช่น 2569-1 หรือ 1/2569" },
+        exam_type: { type: "string", description: "ประเภทการสอบ เช่น midterm (optional)" },
+        grade_level: { type: "string", description: "ระดับชั้น เช่น ป.3 (optional)" },
+        classroom: { type: "string", description: "ห้องเรียน เช่น KBW หรือ 2 (optional)" },
+        subject: { type: "string", description: "วิชาแบบตรงตัว (optional)" },
+        only_flagged: { type: "boolean", description: "true = แสดงเฉพาะรายคนที่ result ไม่ใช่ pass / ขาดสอบ / total = 0 (default false)" }
+      },
+      required: ["term"]
+    }
+  },
+  {
+    name: "atlas_reading_results",
+    description: "ผลการประเมินการอ่านรายรอบ (reading_rounds + reading_results) — ข้อมูลรอบ ผลรายคน (ชื่อ-นามสกุล อ่านออกเสียง อ่านรู้เรื่อง รวม ระดับ อ่านไม่ออก ขาดสอบ) และสรุปต่อรอบ (นับตามระดับ อ่านไม่ออก ขาดสอบ)",
+    inputSchema: {
+      type: "object",
+      properties: {
+        term: { type: "string", description: "รหัสภาคเรียน เช่น 2569-1 หรือ 1/2569" },
+        grade_level: { type: "string", description: "ระดับชั้น เช่น ป.2 (optional)" },
+        classroom: { type: "string", description: "ห้องเรียน เช่น KBW หรือ 2 (optional)" },
+        round_code: { type: "string", description: "รหัสรอบ เช่น pre หรือ post (optional)" },
+        only_flagged: { type: "boolean", description: "true = แสดงเฉพาะรายคนที่อ่านไม่ออก / ขาดสอบ / ระดับ 'ปรับปรุง' (default false)" }
+      },
+      required: ["term"]
+    }
+  },
+  {
+    name: "atlas_student_lookup",
+    description: "ค้นหานักเรียน (mode=search: ชื่อบางส่วนหรือรหัส จำกัด 50 รายการ) หรือตรวจข้อมูลซ้ำ/ไม่ตรงกัน (mode=duplicates: รหัสซ้ำใน students, ชื่อซ้ำในห้องเดียวกันคนละรหัส, รหัสใน unit_assessments/pbl_assessments ที่ไม่พบใน students, รหัสเดียวกันแต่คนละชื่อ) — ผล duplicates เป็นรายการที่ควรตรวจสอบ ไม่ใช่ข้อสรุปว่าผิด",
+    inputSchema: {
+      type: "object",
+      properties: {
+        mode: { type: "string", enum: ["search", "duplicates"], description: "search (default) หรือ duplicates" },
+        query: { type: "string", description: "ชื่อบางส่วน หรือรหัสนักเรียน (สำหรับ mode=search)" },
+        grade_level: { type: "string", description: "ระดับชั้น (optional)" },
+        classroom: { type: "string", description: "ห้องเรียน (optional)" },
+        include_inactive: { type: "boolean", description: "รวมนักเรียนที่ไม่ active (default false)" },
+        term: { type: "string", description: "จำกัดการตรวจ duplicates เฉพาะภาคเรียนนี้ (optional; ไม่ระบุ = ทุกภาคเรียน)" }
+      },
+      required: []
+    }
+  },
+  {
     name: "atlas_teaching_logs_by_teacher",
     description: "บันทึกหลังสอนรายครู (drill-down) — กรองตามครู (ชื่อหรือ teacher_id) + ภาคเรียน + ช่วงวันที่ เรียงวันที่ล่าสุดก่อน. ค่าเริ่มต้นไม่รวม Special Care; ถ้าต้องการดูภาระงานจริงทั้งหมดให้ตั้ง include_special_care = true",
     inputSchema: {
@@ -318,6 +395,10 @@ const CODEX_READ_ONLY_TOOL_NAMES = new Set([
   "atlas_pbl_student",
   "atlas_pbl_unit_crosscheck",
   "atlas_teaching_logs_by_teacher",
+  "atlas_unit_assessments_zero",
+  "atlas_exam_results",
+  "atlas_reading_results",
+  "atlas_student_lookup",
 ]);
 
 const CODEX_READ_ONLY_TOOLS = TOOLS.filter((tool) =>
@@ -384,6 +465,38 @@ async function countExcludedSpecialCare(supabase: any, term: string): Promise<nu
 
 const avgOf = (arr: number[]) =>
   arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : null;
+
+// ---- v2.11.0 read-only academic-record helpers ----
+const jsonText = (payload: unknown) => ({ content: [{ type: "text", text: JSON.stringify(payload, null, 2) }] });
+const errorText = (message: string) => ({ content: [{ type: "text", text: `Error: ${message}` }], isError: true });
+
+/** Canonical term (2569-1) from "2569-1" or "1/2569"; null when missing/invalid. */
+function parseTermArg(term: unknown): string | null {
+  if (typeof term !== "string" || !term.trim()) return null;
+  const canonical = normalizeAcademicTerm(term);
+  return /^\d{4}-\d+$/.test(canonical) ? canonical : null;
+}
+
+function adminClient() {
+  return createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+}
+
+async function fetchStudentsDirectory(admin: any) {
+  return await fetchAllRows<any>((from, to) => admin.from("students")
+    .select("id,student_id,first_name,last_name,grade_level,classroom,is_active")
+    .order("id", { ascending: true })
+    .range(from, to), "students");
+}
+
+/** fetchAllRows over `.in(column, ids)` in chunks so the request URL stays short. */
+async function fetchAllRowsIn<T = any>(ids: string[], build: (chunk: string[], from: number, to: number) => any, label: string): Promise<T[]> {
+  const out: T[] = [];
+  for (let i = 0; i < ids.length; i += 100) {
+    const chunk = ids.slice(i, i + 100);
+    out.push(...await fetchAllRows<T>((from, to) => build(chunk, from, to), label));
+  }
+  return out;
+}
 
 async function callTool(supabase: any, name: string, args: any): Promise<any> {
   try {
@@ -1388,6 +1501,183 @@ async function callTool(supabase: any, name: string, args: any): Promise<any> {
         }, null, 2) }] };
       }
 
+      case "atlas_unit_assessments_zero": {
+        const canonicalTerm = parseTermArg(args.term);
+        if (!canonicalTerm) return errorText("ต้องระบุ term ในรูป 2569-1 หรือ 1/2569");
+        const termVariants = academicTermVariants(canonicalTerm);
+        const dateFrom = args.assessed_date_from;
+        const dateTo = args.assessed_date_to;
+        for (const [key, value] of [["assessed_date_from", dateFrom], ["assessed_date_to", dateTo]] as const) {
+          if (value !== undefined && (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value))) {
+            return errorText(`${key} ต้องอยู่ในรูป YYYY-MM-DD`);
+          }
+        }
+        const kind = (args.assessment_kind ?? "unit") as AssessmentKindFilter;
+        if (!["unit", "midterm", "all"].includes(kind)) return errorText("assessment_kind ต้องเป็น unit, midterm หรือ all");
+        const includeMissing = args.include_missing === true;
+        const admin = adminClient();
+        // include_missing needs every row of each unit to know which classmates were recorded.
+        const rows = (await fetchAllRows<any>((from, to) => {
+          let query = admin.from("unit_assessments")
+            .select("id,student_id,student_name,grade_level,classroom,subject,unit_name,academic_term,score,total_score,assessed_date,teacher_id,assessment_kind,is_absent")
+            .in("academic_term", termVariants);
+          if (!includeMissing) query = query.eq("score", 0);
+          if (kind === "unit") query = query.or("assessment_kind.eq.unit,assessment_kind.is.null");
+          if (kind === "midterm") query = query.eq("assessment_kind", "midterm");
+          if (args.grade_level) query = query.eq("grade_level", args.grade_level);
+          if (args.classroom) query = query.eq("classroom", args.classroom);
+          if (args.subject) query = query.eq("subject", args.subject);
+          if (dateFrom) query = query.gte("assessed_date", dateFrom);
+          if (dateTo) query = query.lte("assessed_date", dateTo);
+          return query.order("id", { ascending: true }).range(from, to);
+        }, "unit_assessments_zero")).filter((r: any) => matchesAssessmentKind(r.assessment_kind, kind));
+        const [students, profiles, setups] = await Promise.all([
+          fetchStudentsDirectory(admin),
+          fetchAllRows<any>((from, to) => admin.from("profiles").select("id,user_id,full_name").order("id", { ascending: true }).range(from, to), "profiles"),
+          fetchAllRows<any>((from, to) => admin.from("unit_assessment_setups")
+            .select("id,academic_term,subject,grade_level,classroom,unit_name,unit_display_name,total_score")
+            .in("academic_term", termVariants)
+            .order("id", { ascending: true })
+            .range(from, to), "unit_assessment_setups"),
+        ]);
+        const report = buildZeroReport({ rows, students, profiles, setups, includeMissing });
+        return jsonText({
+          term: canonicalTerm,
+          filters: {
+            grade_level: args.grade_level || null, classroom: args.classroom || null, subject: args.subject || null,
+            assessed_date_from: dateFrom || null, assessed_date_to: dateTo || null,
+            assessment_kind: kind, include_missing: includeMissing,
+          },
+          zero_count: report.zero_count,
+          zero_student_count: report.zero_student_count,
+          missing_count: report.missing_count,
+          null_score_count: report.null_score_count,
+          not_recorded_count: report.not_recorded_count,
+          by_class: report.by_class,
+          by_teacher: report.by_teacher,
+          assessments: report.items,
+          note: "score = 0 คือค่าที่บันทึกในระบบ ไม่ได้ยืนยันว่านักเรียนขาดสอบหรือทำได้ศูนย์จริง — ใช้ is_absent ประกอบ และควรตรวจสอบกับครูผู้กรอก" +
+            (includeMissing ? "" : " (missing_count = 0 เพราะไม่ได้ตั้ง include_missing)"),
+        });
+      }
+
+      case "atlas_exam_results": {
+        const canonicalTerm = parseTermArg(args.term);
+        if (!canonicalTerm) return errorText("ต้องระบุ term ในรูป 2569-1 หรือ 1/2569");
+        const termVariants = academicTermVariants(canonicalTerm);
+        const admin = adminClient();
+        const papers = await fetchAllRows<any>((from, to) => {
+          let query = admin.from("exam_papers")
+            .select("id,academic_term,exam_type,grade_level,classroom,subject,subject_display,teacher_name,exam_date,k_total,p_total,a_total,total_score,pass_threshold,status")
+            .in("academic_term", termVariants);
+          if (args.exam_type) query = query.eq("exam_type", args.exam_type);
+          if (args.grade_level) query = query.eq("grade_level", args.grade_level);
+          if (args.classroom) query = query.eq("classroom", args.classroom);
+          if (args.subject) query = query.eq("subject", args.subject);
+          return query.order("id", { ascending: true }).range(from, to);
+        }, "exam_papers");
+        const filters = {
+          exam_type: args.exam_type || null, grade_level: args.grade_level || null, classroom: args.classroom || null,
+          subject: args.subject || null, only_flagged: args.only_flagged === true,
+        };
+        if (papers.length === 0) return jsonText({ term: canonicalTerm, filters, paper_count: 0, message: "ไม่พบชุดข้อสอบตามเงื่อนไข" });
+        const [results, students] = await Promise.all([
+          fetchAllRowsIn<any>(papers.map((p: any) => p.id), (chunk, from, to) => admin.from("exam_student_results")
+            .select("id,paper_id,student_id,student_name,k_score,p_score,a_score,total,is_absent,gap_flag,result")
+            .in("paper_id", chunk)
+            .order("id", { ascending: true })
+            .range(from, to), "exam_student_results"),
+          fetchStudentsDirectory(admin),
+        ]);
+        return jsonText({ term: canonicalTerm, filters, ...buildExamReport(papers, results, students, args.only_flagged === true) });
+      }
+
+      case "atlas_reading_results": {
+        const canonicalTerm = parseTermArg(args.term);
+        if (!canonicalTerm) return errorText("ต้องระบุ term ในรูป 2569-1 หรือ 1/2569");
+        const termVariants = academicTermVariants(canonicalTerm);
+        const admin = adminClient();
+        const rounds = await fetchAllRows<any>((from, to) => {
+          let query = admin.from("reading_rounds")
+            .select("id,academic_term,round_code,round_name,grade_level,test_date,aloud_total,comprehend_total,status")
+            .in("academic_term", termVariants);
+          if (args.grade_level) query = query.eq("grade_level", args.grade_level);
+          if (args.round_code) query = query.eq("round_code", args.round_code);
+          return query.order("id", { ascending: true }).range(from, to);
+        }, "reading_rounds");
+        const filters = {
+          grade_level: args.grade_level || null, classroom: args.classroom || null,
+          round_code: args.round_code || null, only_flagged: args.only_flagged === true,
+        };
+        if (rounds.length === 0) return jsonText({ term: canonicalTerm, filters, round_count: 0, message: "ไม่พบรอบการประเมินการอ่านตามเงื่อนไข" });
+        const [results, students] = await Promise.all([
+          fetchAllRowsIn<any>(rounds.map((r: any) => r.id), (chunk, from, to) => {
+            let query = admin.from("reading_results")
+              .select("id,round_id,student_id,student_name,classroom,aloud_score,comprehend_score,total,is_absent,level,is_nonreader")
+              .in("round_id", chunk);
+            if (args.classroom) query = query.eq("classroom", args.classroom);
+            return query.order("id", { ascending: true }).range(from, to);
+          }, "reading_results"),
+          fetchStudentsDirectory(admin),
+        ]);
+        return jsonText({ term: canonicalTerm, filters, ...buildReadingReport(rounds, results, students, args.only_flagged === true) });
+      }
+
+      case "atlas_student_lookup": {
+        const mode = args.mode ?? "search";
+        if (mode !== "search" && mode !== "duplicates") return errorText("mode ต้องเป็น search หรือ duplicates");
+        let termVariants: string[] | null = null;
+        if (args.term !== undefined && args.term !== null && args.term !== "") {
+          const canonicalTerm = parseTermArg(args.term);
+          if (!canonicalTerm) return errorText("term ต้องอยู่ในรูป 2569-1 หรือ 1/2569");
+          termVariants = academicTermVariants(canonicalTerm);
+        }
+        const lookupFilters = {
+          grade_level: args.grade_level || undefined,
+          classroom: args.classroom || undefined,
+          include_inactive: args.include_inactive === true,
+        };
+        const admin = adminClient();
+        const students = await fetchStudentsDirectory(admin);
+        const filters = { ...lookupFilters, grade_level: lookupFilters.grade_level ?? null, classroom: lookupFilters.classroom ?? null };
+        if (mode === "search") {
+          return jsonText({ mode, query: args.query ?? null, filters, ...searchStudents(students, args.query, lookupFilters, 50) });
+        }
+        const [unitRows, pblProjects] = await Promise.all([
+          fetchAllRows<any>((from, to) => {
+            let query = admin.from("unit_assessments").select("id,student_id,student_name,grade_level,classroom");
+            if (termVariants) query = query.in("academic_term", termVariants);
+            return query.order("id", { ascending: true }).range(from, to);
+          }, "unit_assessments_identity"),
+          fetchAllRows<any>((from, to) => {
+            let query = admin.from("pbl_projects").select("id,grade_level,classroom");
+            if (termVariants) query = query.in("academic_term", termVariants);
+            return query.order("id", { ascending: true }).range(from, to);
+          }, "pbl_projects"),
+        ]);
+        const projectClass = new Map<string, any>(pblProjects.map((p: any) => [p.id, p]));
+        const pblRows = await fetchAllRowsIn<any>([...projectClass.keys()], (chunk, from, to) => admin.from("pbl_assessments")
+          .select("id,project_id,student_id,student_name")
+          .in("project_id", chunk)
+          .order("id", { ascending: true })
+          .range(from, to), "pbl_assessments_identity");
+        const records: RecordIdentityRow[] = [
+          ...unitRows.map((r: any) => ({ source: "unit_assessments" as const, student_id: String(r.student_id ?? ""), student_name: r.student_name, grade_level: r.grade_level, classroom: r.classroom })),
+          ...pblRows.map((r: any) => {
+            const p = projectClass.get(r.project_id);
+            return { source: "pbl_assessments" as const, student_id: String(r.student_id ?? ""), student_name: r.student_name, grade_level: p?.grade_level ?? null, classroom: p?.classroom ?? null };
+          }),
+        ].filter((r) => r.student_id);
+        return jsonText({
+          mode,
+          term: termVariants ? termVariants[0] : null,
+          filters,
+          scanned: { students: students.length, unit_assessments: unitRows.length, pbl_assessments: pblRows.length },
+          ...findStudentDuplicates(students, records, lookupFilters),
+          note: "ชื่อถูกเทียบหลังตัดคำนำหน้า (เด็กชาย/ด.ช./…) ช่องว่าง และเครื่องหมาย - ออก — รายการทั้งหมดเป็นข้อมูลที่ควรตรวจสอบ ไม่ใช่ข้อสรุปว่าบันทึกผิด",
+        });
+      }
+
       case "atlas_teaching_logs_by_teacher": {
         const includeSpecialCare = args.include_special_care === true;
         let query = supabase
@@ -1490,7 +1780,7 @@ Deno.serve(async (req: Request) => {
     return new Response(null, { status: 200, headers: CORS_HEADERS });
   }
   if (req.method === "HEAD" || req.method === "GET") {
-    return new Response(JSON.stringify({ status: "ok", server: "woranat-codex-mcp", version: "2.8.0" }), {
+    return new Response(JSON.stringify({ status: "ok", server: "woranat-codex-mcp", version: "2.9.0" }), {
       status: 200,
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
     });
@@ -1537,7 +1827,7 @@ Deno.serve(async (req: Request) => {
   try {
     switch (method) {
       case "initialize":
-        result = { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "woranat-codex-mcp", version: "2.8.0" } };
+        result = { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "woranat-codex-mcp", version: "2.9.0" } };
         break;
       case "ping":
         result = {};
