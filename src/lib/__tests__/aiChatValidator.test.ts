@@ -174,7 +174,9 @@ describe("validateAiChatOutput", () => {
         "ภาพรวมของการสอนวิชานี้เป็นไปด้วยดี ควรแนะนำแนวทางเสริมให้นักเรียนเพิ่มเติม"
       );
       expect(r.ok).toBe(true);
-      expect(r.reason).toBe("advice_only");
+      // Pure advice has no claim markers at all, so it passes at the earlier
+      // "no_claims" gate and never reaches the advice_only branch.
+      expect(r.reason).toBe("no_claims");
     });
 
     it("rejects advice answers if they contain factual claims like Mastery", () => {
