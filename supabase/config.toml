@@ -39,3 +39,7 @@ verify_jwt = false
 # (deployed with verify_jwt=false; keep it that way).
 [functions.woranat-chatgpt-mcp]
 verify_jwt = false
+
+# woranat-codex-mcp: auth handled internally via x-api-key / WORANAT_CODEX_MCP_KEY.
+[functions.woranat-codex-mcp]
+verify_jwt = false
