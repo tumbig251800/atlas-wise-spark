@@ -85,7 +85,6 @@ type Upstream = "atlas" | "kindergarten";
 
 async function callUpstream(upstream: Upstream, body: unknown) {
   const supabaseUrl = env("SUPABASE_URL");
-  const serviceRoleKey = env("SUPABASE_SERVICE_ROLE_KEY");
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     Accept: "application/json, text/event-stream",
@@ -94,10 +93,11 @@ async function callUpstream(upstream: Upstream, body: unknown) {
 
   if (upstream === "atlas") {
     endpoint = `${supabaseUrl}/functions/v1/woranat-atlas-mcp`;
-    headers.Authorization = `Bearer ${serviceRoleKey}`;
-    headers.apikey = serviceRoleKey;
+    // atlas-mcp authenticates on header `x-api-key` == ATLAS_MCP_API_KEY
+    // (see woranat-atlas-mcp/index.ts). Must match exactly or every call 401s.
+    headers["x-api-key"] = env("ATLAS_MCP_API_KEY");
   } else {
-    endpoint = `${supabaseUrl}/functions/v1/kindergarten-mcp`;
+    endpoint = `${supabaseUrl}/functions/v1/kindergarten-mcp-7d40d75d3e4121d5b9d3034f2cd0db7253a28398`;
     // kindergarten-mcp authenticates on header `x-api-key` == KINDERGARTEN_MCP_API_KEY
     // (see kindergarten-mcp/index.ts). Must match exactly or every call 401s.
     headers["x-api-key"] = env("KINDERGARTEN_MCP_API_KEY");
