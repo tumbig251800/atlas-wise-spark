@@ -28,3 +28,14 @@ verify_jwt = false
 # atlas-integrity-recheck: auth handled internally via requireAtlasUser
 [functions.atlas-integrity-recheck]
 verify_jwt = false
+
+# woranat-atlas-mcp: auth handled internally via x-api-key / ATLAS_MCP_API_KEY.
+# MCP clients and n8n send no JWT — verify_jwt=true makes every call 401
+# (outage 2026-09-21 21:47–22:2x after a deploy without --no-verify-jwt).
+[functions.woranat-atlas-mcp]
+verify_jwt = false
+
+# woranat-chatgpt-mcp: ChatGPT OAuth bearer token is checked inside the function
+# (deployed with verify_jwt=false; keep it that way).
+[functions.woranat-chatgpt-mcp]
+verify_jwt = false
