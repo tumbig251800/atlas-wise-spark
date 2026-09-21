@@ -37,6 +37,7 @@ import {
   type HistoryFilterOptions,
 } from "@/components/history/HistoryFilters";
 import { ExportFilteredLogsButton } from "@/components/history/ExportFilteredLogsButton";
+import { downloadTeachingLogsDocx } from "@/lib/downloadTeachingLogsDocx";
 import { persistFilters } from "@/hooks/useDashboardData";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -231,39 +232,7 @@ export default function History() {
     }
   };
 
-  const buildExportTxt = (rows: TeachingLog[]) => {
-    const blocks = rows.map((log, idx) => {
-      const gap = gapConfig[log.major_gap]?.label ?? log.major_gap;
-      const activity = activityModeLabel[log.activity_mode] ?? log.activity_mode;
-      return [
-        `รายการที่ ${idx + 1}`,
-        `วันที่สอน: ${formatDate(log.teaching_date)}`,
-        `วิชา: ${log.subject ?? "-"}`,
-        `ระดับชั้น/ห้อง: ${log.grade_level ?? "-"} / ${log.classroom ?? "-"}`,
-        `หน่วยการเรียนรู้: ${log.learning_unit ?? "-"}`,
-        `หัวข้อ: ${log.topic ?? "-"}`,
-        `จำนวนนักเรียน: ${log.total_students ?? "-"}`,
-        `Mastery: ${log.mastery_score ?? "-"}/5`,
-        `Gap: ${gap}`,
-        `รูปแบบกิจกรรม: ${activity}`,
-        `Key Issue: ${log.key_issue ?? "-"}`,
-        `Next Strategy: ${log.next_strategy ?? "-"}`,
-        `Reflection: ${log.reflection ?? "-"}`,
-      ].join("\n");
-    });
-
-    return [
-      "ATLAS - บันทึกหลังสอนของฉัน",
-      `ผู้ใช้: ${user?.email ?? "-"}`,
-      `จำนวนรายการ: ${rows.length}`,
-      `ช่วงวันที่: ${exportFromDate || "ทั้งหมด"} ถึง ${exportToDate || "ทั้งหมด"}`,
-      "",
-      blocks.join("\n\n------------------------------\n\n"),
-      "",
-    ].join("\n");
-  };
-
-  const downloadMyLogsTxt = async (loadAll: boolean) => {
+  const downloadMyLogsDocx = async (loadAll: boolean) => {
     if (!user?.id) return;
     setExportLoading(true);
     try {
@@ -290,17 +259,10 @@ export default function History() {
         return;
       }
 
-      const txt = buildExportTxt(rows);
-      const blob = new Blob([txt], { type: "text/plain;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      const stamp = new Date().toISOString().slice(0, 10);
-      a.href = url;
-      a.download = `atlas-my-teaching-logs-${stamp}.txt`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      await downloadTeachingLogsDocx(rows, {
+        ownerLabel: rows[0]?.teacher_name || user.email || "-",
+        filenameHint: rows[0]?.teacher_name || "",
+      });
 
       toast({
         title: "ดาวน์โหลดสำเร็จ",
@@ -679,7 +641,7 @@ export default function History() {
               <DialogHeader>
                 <DialogTitle>ดาวน์โหลดบันทึกของฉัน</DialogTitle>
                 <DialogDescription>
-                  เลือกช่วงวันที่แล้วดาวน์โหลดเป็นไฟล์ .txt หรือกดโหลดทั้งหมด
+                  เลือกช่วงวันที่แล้วดาวน์โหลดเป็นไฟล์ Word (.docx) หรือกดโหลดทั้งหมด
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-3">
@@ -702,16 +664,16 @@ export default function History() {
                 <div className="flex items-center gap-2 pt-2">
                   <Button
                     variant="outline"
-                    onClick={() => downloadMyLogsTxt(true)}
+                    onClick={() => downloadMyLogsDocx(true)}
                     disabled={exportLoading}
                   >
                     โหลดทั้งหมด
                   </Button>
                   <Button
-                    onClick={() => downloadMyLogsTxt(false)}
+                    onClick={() => downloadMyLogsDocx(false)}
                     disabled={exportLoading}
                   >
-                    {exportLoading ? "กำลังดาวน์โหลด..." : "ดาวน์โหลด .txt"}
+                    {exportLoading ? "กำลังดาวน์โหลด..." : "ดาวน์โหลด Word"}
                   </Button>
                 </div>
               </div>
