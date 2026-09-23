@@ -328,6 +328,166 @@ export function buildZeroReport(input: BuildZeroReportInput): ZeroReport {
 
 // ---------------------------------------------------------------- atlas_exam_results
 
+/* ---------- atlas_unit_scores (เพิ่ม 23 ก.ย. 2569 สำหรับ IRIS) ---------- */
+
+export interface UnitScoreItem {
+  student_code: string;
+  first_name: string | null;
+  last_name: string | null;
+  grade_level: string;
+  classroom: string;
+  subject: string;
+  unit_name: string | null;
+  unit_display_name: string | null;
+  assessment_kind: string;
+  score: number | null;
+  total_score: number | null;
+  percent: number | null;
+  status: "pass" | "not_pass" | "absent" | "no_score";
+  assessed_date: string | null;
+  teacher_name: string | null;
+}
+
+export interface BuildUnitScoresInput {
+  rows: UnitAssessmentRow[];
+  students: StudentRow[];
+  profiles: ProfileRow[];
+  setups: UnitSetupRow[];
+  /** เกณฑ์ผ่านเป็นร้อยละ (default 50 — เท่ากับ pass_threshold 0.5 ของข้อสอบ) */
+  passPercent?: number;
+}
+
+/**
+ * คะแนนหลังหน่วย/กลางภาคแบบเต็มทุกคน (ไม่ใช่เฉพาะ 0) — สรุปรายหน่วยและรายคน
+ * ชื่อนักเรียนแก้จากตาราง students (ตามรหัส) ถ้าไม่พบใช้ student_name ในแถวนั้น
+ */
+export function buildUnitScoresReport(input: BuildUnitScoresInput) {
+  const passPercent = input.passPercent ?? 50;
+  const teacherName = buildTeacherNameLookup(input.profiles);
+
+  const byCode = new Map<string, StudentRow>();
+  for (const s of input.students) {
+    if (s.student_id) byCode.set(String(s.student_id).trim(), s);
+    byCode.set(String(s.id).trim(), s);
+  }
+  const identify = (r: UnitAssessmentRow) => {
+    const key = String(r.student_id ?? "").trim();
+    const s = byCode.get(key);
+    if (s) return { student_code: String(s.student_id ?? s.id), first_name: s.first_name ?? null, last_name: s.last_name ?? null };
+    const parts = String(r.student_name ?? "").trim().split(/\s+/);
+    const last = parts.length > 1 ? parts.pop()! : null;
+    return { student_code: key, first_name: parts.join(" ") || null, last_name: last };
+  };
+
+  const displayNames = new Map<string, string>();
+  for (const s of input.setups) {
+    const key = [normalizeAcademicTerm(s.academic_term), s.grade_level, s.classroom, s.subject, s.unit_name ?? ""].join("");
+    if (s.unit_display_name && !displayNames.has(key)) displayNames.set(key, s.unit_display_name);
+  }
+
+  const items: UnitScoreItem[] = input.rows.map((r) => {
+    const who = identify(r);
+    const score = toNumber(r.score);
+    const total = toNumber(r.total_score);
+    const percent = score !== null && total !== null && total > 0 ? round1((score / total) * 100) : null;
+    const status: UnitScoreItem["status"] = r.is_absent ? "absent" : percent === null ? "no_score" : percent >= passPercent ? "pass" : "not_pass";
+    return {
+      student_code: who.student_code,
+      first_name: who.first_name,
+      last_name: who.last_name,
+      grade_level: r.grade_level,
+      classroom: r.classroom,
+      subject: r.subject,
+      unit_name: r.unit_name,
+      unit_display_name: displayNames.get([normalizeAcademicTerm(r.academic_term), r.grade_level, r.classroom, r.subject, r.unit_name ?? ""].join("")) ?? null,
+      assessment_kind: r.assessment_kind ?? "unit",
+      score,
+      total_score: total,
+      percent,
+      status,
+      assessed_date: r.assessed_date ?? null,
+      teacher_name: teacherName(r.teacher_id),
+    };
+  });
+  items.sort((x, y) => x.grade_level.localeCompare(y.grade_level) || x.classroom.localeCompare(y.classroom) || x.subject.localeCompare(y.subject) || String(x.unit_name ?? "").localeCompare(String(y.unit_name ?? "")) || x.student_code.localeCompare(y.student_code));
+
+  const avg = (xs: number[]) => (xs.length ? round1(xs.reduce((p, c) => p + c, 0) / xs.length) : null);
+
+  const unitGroups = new Map<string, UnitScoreItem[]>();
+  for (const it of items) {
+    const key = [it.grade_level, it.classroom, it.subject, it.unit_name ?? "", it.assessment_kind].join("");
+    const list = unitGroups.get(key) ?? [];
+    list.push(it);
+    unitGroups.set(key, list);
+  }
+  const by_unit = [...unitGroups.values()].map((list) => {
+    const scored = list.filter((x) => x.percent !== null);
+    const pcts = scored.map((x) => x.percent as number);
+    return {
+      grade_level: list[0].grade_level,
+      classroom: list[0].classroom,
+      subject: list[0].subject,
+      unit_name: list[0].unit_name,
+      unit_display_name: list[0].unit_display_name,
+      assessment_kind: list[0].assessment_kind,
+      total_score: mode(list.map((x) => x.total_score)),
+      assessed_date: mode(list.map((x) => x.assessed_date)),
+      teacher_name: mode(list.map((x) => x.teacher_name)),
+      n: list.length,
+      n_scored: scored.length,
+      avg_percent: avg(pcts),
+      min_percent: pcts.length ? Math.min(...pcts) : null,
+      max_percent: pcts.length ? Math.max(...pcts) : null,
+      pass: list.filter((x) => x.status === "pass").length,
+      not_pass: list.filter((x) => x.status === "not_pass").length,
+      absent: list.filter((x) => x.status === "absent").length,
+      no_score: list.filter((x) => x.status === "no_score").length,
+    };
+  });
+
+  const studentGroups = new Map<string, UnitScoreItem[]>();
+  for (const it of items) {
+    const list = studentGroups.get(it.student_code) ?? [];
+    list.push(it);
+    studentGroups.set(it.student_code, list);
+  }
+  const by_student = [...studentGroups.values()].map((list) => {
+    const scored = list.filter((x) => x.percent !== null);
+    const weakest = scored.length ? scored.reduce((m, x) => ((x.percent as number) < (m.percent as number) ? x : m)) : null;
+    return {
+      student_code: list[0].student_code,
+      first_name: list[0].first_name,
+      last_name: list[0].last_name,
+      grade_level: list[0].grade_level,
+      classroom: list[0].classroom,
+      units: list.length,
+      avg_percent: avg(scored.map((x) => x.percent as number)),
+      pass: list.filter((x) => x.status === "pass").length,
+      not_pass: list.filter((x) => x.status === "not_pass").length,
+      absent: list.filter((x) => x.status === "absent").length,
+      weakest: weakest ? { subject: weakest.subject, unit_name: weakest.unit_name, unit_display_name: weakest.unit_display_name, percent: weakest.percent } : null,
+    };
+  }).sort((x, y) => (x.avg_percent ?? 999) - (y.avg_percent ?? 999));
+
+  const scoredAll = items.filter((x) => x.percent !== null);
+  return {
+    pass_percent: passPercent,
+    totals: {
+      rows: items.length,
+      students: studentGroups.size,
+      units: unitGroups.size,
+      avg_percent: avg(scoredAll.map((x) => x.percent as number)),
+      pass: items.filter((x) => x.status === "pass").length,
+      not_pass: items.filter((x) => x.status === "not_pass").length,
+      absent: items.filter((x) => x.status === "absent").length,
+      no_score: items.filter((x) => x.status === "no_score").length,
+    },
+    by_unit,
+    by_student,
+    items,
+  };
+}
+
 export interface ExamPaperRow {
   id: string;
   academic_term: string;
