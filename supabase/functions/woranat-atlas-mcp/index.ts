@@ -463,6 +463,25 @@ async function countExcludedSpecialCare(supabase: any, term: string): Promise<nu
   return count ?? 0;
 }
 
+/**
+ * user_id ของครูที่ profiles.is_active = false (ลาออก/ย้าย/ไม่ได้ปฏิบัติหน้าที่แล้ว)
+ * ใช้กรองออกจากรายงานภาพรวม/roster ปัจจุบัน โดยไม่ลบบันทึกหลังสอนเดิมออกจากฐานข้อมูล
+ * และไม่กระทบเครื่องมือค้นหาประวัติรายครู (atlas_teaching_logs_by_teacher) ซึ่งยังต้องค้นย้อนหลังได้
+ *
+ * หมายเหตุ: ตาราง profiles มี RLS ที่ไม่มี policy สำหรับ role "anon" เลย (มีแค่ authenticated
+ * เจ้าของแถวตัวเอง/ผู้บริหาร และ role n8n_wf3) การ query ด้วย client ปกติ (ANON key) ของ callTool
+ * จะได้แถวว่างเสมอ จึงต้องใช้ service-role client (adminClient) เพื่อให้อ่านสถานะครูได้จริง
+ */
+async function fetchInactiveTeacherIds(): Promise<Set<string>> {
+  const admin = adminClient();
+  const rows = await fetchAllRows<any>((from, to) => admin
+    .from("profiles")
+    .select("user_id")
+    .eq("is_active", false)
+    .range(from, to), "profiles_inactive");
+  return new Set(rows.map((r: any) => r.user_id));
+}
+
 const avgOf = (arr: number[]) =>
   arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : null;
 
@@ -527,19 +546,23 @@ async function callTool(supabase: any, name: string, args: any): Promise<any> {
       }
 
       case "atlas_classroom_kpi": {
-        const [data, scData] = await Promise.all([
+        const [data, scData, inactiveTeacherIdsKpi] = await Promise.all([
           fetchAllTeachingLogs(
             supabase,
-            "classroom, grade_level, subject, mastery_score, major_gap, teacher_name",
+            "teacher_id, classroom, grade_level, subject, mastery_score, major_gap, teacher_name",
             (query) => query.eq("academic_term", args.term),
           ),
           fetchAllTeachingLogs(
             supabase,
-            "classroom, grade_level, teacher_name",
+            "teacher_id, classroom, grade_level, teacher_name",
             (query) => query.eq("academic_term", args.term),
             "special_care",
           ),
+          fetchInactiveTeacherIds(),
         ]);
+        // หมายเหตุ: คะแนน/Gap ยังนับครบตามข้อมูลจริง — กรองเฉพาะ "ชื่อครู" ที่แสดงในรายชื่อผู้สอนของห้อง
+        // ไม่ตัดครูลาออกออกจาก scores/gap_distribution เพื่อไม่ให้ KPI ห้องเรียนคลาดเคลื่อน
+        const isInactiveTeacher = (row: any) => row.teacher_id && inactiveTeacherIdsKpi.has(row.teacher_id);
         const classrooms: Record<string, any> = {};
         const ensureClass = (grade_level: string, classroom: string) => {
           const key = `${grade_level}-${classroom}`;
@@ -552,12 +575,12 @@ async function callTool(supabase: any, name: string, args: any): Promise<any> {
           const c = ensureClass(row.grade_level, row.classroom);
           c.scores.push(row.mastery_score || 0);
           c.gaps[row.major_gap] = (c.gaps[row.major_gap] || 0) + 1;
-          if (row.teacher_name) c.teachers.add(row.teacher_name);
+          if (row.teacher_name && !isInactiveTeacher(row)) c.teachers.add(row.teacher_name);
           c.log_count++;
         }
         for (const row of scData) {
           const c = ensureClass(row.grade_level, row.classroom);
-          if (row.teacher_name) c.teachers.add(row.teacher_name);
+          if (row.teacher_name && !isInactiveTeacher(row)) c.teachers.add(row.teacher_name);
           c.sc_count++;
         }
         const result = Object.values(classrooms).map((c: any) => ({
@@ -717,19 +740,24 @@ async function callTool(supabase: any, name: string, args: any): Promise<any> {
       }
 
       case "atlas_teacher_list": {
-        const [data, scData] = await Promise.all([
+        const [rawData, rawScData, inactiveTeacherIds] = await Promise.all([
           fetchAllTeachingLogs(
             supabase,
-            "teacher_name, classroom, subject, mastery_score, major_gap",
+            "teacher_id, teacher_name, classroom, subject, mastery_score, major_gap",
             (query) => query.eq("academic_term", args.term),
           ),
           fetchAllTeachingLogs(
             supabase,
-            "teacher_name",
+            "teacher_id, teacher_name",
             (query) => query.eq("academic_term", args.term),
             "special_care",
           ),
+          fetchInactiveTeacherIds(),
         ]);
+        const isInactive = (row: any) => row.teacher_id && inactiveTeacherIds.has(row.teacher_id);
+        const excludedInactiveLogCount = rawData.filter(isInactive).length + rawScData.filter(isInactive).length;
+        const data = rawData.filter((r: any) => !isInactive(r));
+        const scData = rawScData.filter((r: any) => !isInactive(r));
         const teachers: Record<string, any> = {};
         const ensureTeacher = (t: string) => {
           if (!teachers[t]) teachers[t] = { teacher_name: t, in_kpi: 0, sc: 0, scores: [], gaps: {} };
@@ -762,9 +790,10 @@ async function callTool(supabase: any, name: string, args: any): Promise<any> {
         return { content: [{ type: "text", text: JSON.stringify({
           term: args.term,
           term_filter_applied: true,
-          note: "logs_total = ภาระงานจริง (ใช้วัด compliance) | logs_in_kpi = ฐานคำนวณคุณภาพ ไม่รวม Special Care | avg_mastery_score, success_rate, gap_distribution คำนวณจาก logs_in_kpi เท่านั้น — ห้ามใช้ logs_in_kpi ตัดสินว่าครูกรอกน้อย",
+          note: "logs_total = ภาระงานจริง (ใช้วัด compliance) | logs_in_kpi = ฐานคำนวณคุณภาพ ไม่รวม Special Care | avg_mastery_score, success_rate, gap_distribution คำนวณจาก logs_in_kpi เท่านั้น — ห้ามใช้ logs_in_kpi ตัดสินว่าครูกรอกน้อย | ครูที่ profiles.is_active = false (ลาออก/ย้าย) ถูกตัดออกจากรายชื่อนี้แล้วอัตโนมัติ",
           included_log_count: data.length,
           excluded_special_care_count: scData.length,
+          excluded_inactive_teacher_log_count: excludedInactiveLogCount,
           teachers: result,
         }, null, 2) }] };
       }
