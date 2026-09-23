@@ -1,3 +1,4 @@
+// v2.13.0 (23 ก.ย. 2569) — เพิ่ม atlas_unit_scores (คะแนนหลังหน่วยแบบเต็ม) สำหรับ IRIS
 // v2.11.0 (21 ก.ย. 2569) — atlas_unit_assessments_zero (assessment_kind, not_recorded, สรุปรายห้อง/รายครู) + atlas_exam_results, atlas_reading_results, atlas_student_lookup (read-only)
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
@@ -20,6 +21,7 @@ import {
   academicTermVariants,
   buildExamReport,
   buildReadingReport,
+  buildUnitScoresReport,
   buildZeroReport,
   findStudentDuplicates,
   matchesAssessmentKind,
@@ -294,6 +296,24 @@ const TOOLS = [
         assessed_date_to: { type: "string", description: "วันที่สอบสิ้นสุด YYYY-MM-DD (optional)" },
         assessment_kind: { type: "string", enum: ["unit", "midterm", "all"], description: "unit = หลังหน่วย (default), midterm = กลางภาค, all = ทั้งหมด" },
         include_missing: { type: "boolean", description: "true = รวมแถวที่ score ว่าง และนักเรียนที่ยังไม่ถูกบันทึกในหน่วยที่เพื่อนร่วมห้องมีคะแนนแล้ว (default false)" }
+      },
+      required: ["term"]
+    }
+  },
+  {
+    name: "atlas_unit_scores",
+    description: "คะแนนหลังหน่วย/กลางภาคแบบเต็มทุกคน (ไม่ใช่เฉพาะที่ได้ 0) — รายการรายคน (รหัส ชื่อ-นามสกุล วิชา หน่วย คะแนน/เต็ม ร้อยละ ผ่าน/ไม่ผ่าน ขาดสอบ ครูผู้กรอก) + สรุปรายหน่วย (n เฉลี่ย ผ่าน/ไม่ผ่าน) + สรุปรายคน (เฉลี่ย หน่วยที่อ่อนสุด) เกณฑ์ผ่าน 50% กรองตามชั้น/ห้อง/วิชา/หน่วย/รหัสนักเรียนได้ (เพิ่มสำหรับ IRIS 23 ก.ย. 2569)",
+    inputSchema: {
+      type: "object",
+      properties: {
+        term: { type: "string", description: "รหัสภาคเรียน เช่น 2569-1 หรือ 1/2569" },
+        grade_level: { type: "string", description: "ระดับชั้น เช่น ป.4 (optional)" },
+        classroom: { type: "string", description: "ห้องเรียน เช่น KBW หรือ 2 (optional)" },
+        subject: { type: "string", description: "วิชาแบบตรงตัว (optional)" },
+        unit_name: { type: "string", description: "ชื่อหน่วย เช่น 2 (optional)" },
+        student_code: { type: "string", description: "รหัสนักเรียน — ดูเฉพาะคนเดียว (optional)" },
+        assessment_kind: { type: "string", enum: ["unit", "midterm", "all"], description: "unit = หลังหน่วย (default), midterm = กลางภาค, all = ทั้งหมด" },
+        limit: { type: "number", description: "จำนวนรายการรายคนสูงสุดที่คืน (default 300, สูงสุด 1000) — สรุปคำนวณจากทั้งหมดเสมอ" }
       },
       required: ["term"]
     }
@@ -1555,6 +1575,55 @@ async function callTool(supabase: any, name: string, args: any): Promise<any> {
         });
       }
 
+      case "atlas_unit_scores": {
+        const canonicalTerm = parseTermArg(args.term);
+        if (!canonicalTerm) return errorText("ต้องระบุ term ในรูป 2569-1 หรือ 1/2569");
+        const termVariants = academicTermVariants(canonicalTerm);
+        const kind = (args.assessment_kind ?? "unit") as AssessmentKindFilter;
+        if (!["unit", "midterm", "all"].includes(kind)) return errorText("assessment_kind ต้องเป็น unit, midterm หรือ all");
+        const limitRaw = Number(args.limit);
+        const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.floor(limitRaw), 1000) : 300;
+        const studentCode = args.student_code !== undefined && args.student_code !== null ? String(args.student_code).trim() : "";
+        const admin = adminClient();
+        const rows = (await fetchAllRows<any>((from, to) => {
+          let query = admin.from("unit_assessments")
+            .select("id,student_id,student_name,grade_level,classroom,subject,unit_name,academic_term,score,total_score,assessed_date,teacher_id,assessment_kind,is_absent")
+            .in("academic_term", termVariants);
+          if (kind === "unit") query = query.or("assessment_kind.eq.unit,assessment_kind.is.null");
+          if (kind === "midterm") query = query.eq("assessment_kind", "midterm");
+          if (args.grade_level) query = query.eq("grade_level", args.grade_level);
+          if (args.classroom) query = query.eq("classroom", args.classroom);
+          if (args.subject) query = query.eq("subject", args.subject);
+          if (args.unit_name) query = query.eq("unit_name", String(args.unit_name));
+          if (studentCode) query = query.eq("student_id", studentCode);
+          return query.order("id", { ascending: true }).range(from, to);
+        }, "unit_scores")).filter((r: any) => matchesAssessmentKind(r.assessment_kind, kind));
+        const [students, profiles, setups] = await Promise.all([
+          fetchStudentsDirectory(admin),
+          fetchAllRows<any>((from, to) => admin.from("profiles").select("id,user_id,full_name").order("id", { ascending: true }).range(from, to), "profiles"),
+          fetchAllRows<any>((from, to) => admin.from("unit_assessment_setups")
+            .select("id,academic_term,subject,grade_level,classroom,unit_name,unit_display_name,total_score")
+            .in("academic_term", termVariants)
+            .order("id", { ascending: true })
+            .range(from, to), "unit_assessment_setups"),
+        ]);
+        const report = buildUnitScoresReport({ rows, students, profiles, setups });
+        return jsonText({
+          term: canonicalTerm,
+          filters: {
+            grade_level: args.grade_level || null, classroom: args.classroom || null, subject: args.subject || null,
+            unit_name: args.unit_name || null, student_code: studentCode || null, assessment_kind: kind,
+          },
+          pass_percent: report.pass_percent,
+          totals: report.totals,
+          by_unit: report.by_unit,
+          by_student: report.by_student,
+          assessments_truncated: report.items.length > limit,
+          assessments: report.items.slice(0, limit),
+          note: "ร้อยละ = คะแนน/คะแนนเต็ม × 100, ผ่าน = ≥ 50% (เกณฑ์เดียวกับข้อสอบ) · score = 0 ไม่ยืนยันว่าขาดสอบหรือทำได้ศูนย์จริง ใช้ is_absent ประกอบ · ตัวเลขน้อยแปลว่าควรตรวจสอบ ไม่ใช่ข้อสรุป",
+        });
+      }
+
       case "atlas_exam_results": {
         const canonicalTerm = parseTermArg(args.term);
         if (!canonicalTerm) return errorText("ต้องระบุ term ในรูป 2569-1 หรือ 1/2569");
@@ -1901,7 +1970,7 @@ Deno.serve(async (req: Request) => {
     return new Response(null, { status: 200, headers: CORS_HEADERS });
   }
   if (req.method === "HEAD" || req.method === "GET") {
-    return new Response(JSON.stringify({ status: "ok", server: "Woranat_School_Atlas_MCP", version: "2.11.0" }), {
+    return new Response(JSON.stringify({ status: "ok", server: "Woranat_School_Atlas_MCP", version: "2.13.0" }), {
       status: 200,
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
     });
@@ -1957,7 +2026,7 @@ Deno.serve(async (req: Request) => {
   try {
     switch (method) {
       case "initialize":
-        result = { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "Woranat_School_Atlas_MCP", version: "2.11.0" } };
+        result = { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "Woranat_School_Atlas_MCP", version: "2.13.0" } };
         break;
       case "ping":
         result = {};
