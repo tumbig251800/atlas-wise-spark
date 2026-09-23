@@ -1,4 +1,4 @@
-// v2.14.0 (23 ก.ย. 2569) — เพิ่ม create_plc_session (WRITE, มี dry_run) สำหรับ IRIS
+// v2.15.0 (23 ก.ย. 2569) — เพิ่ม atlas_research_suggestions (READ) วิจัยในชั้นเรียน สำหรับ IRIS
 // v2.13.0 (23 ก.ย. 2569) — เพิ่ม atlas_unit_scores (คะแนนหลังหน่วยแบบเต็ม) สำหรับ IRIS
 // v2.11.0 (21 ก.ย. 2569) — atlas_unit_assessments_zero (assessment_kind, not_recorded, สรุปรายห้อง/รายครู) + atlas_exam_results, atlas_reading_results, atlas_student_lookup (read-only)
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -213,6 +213,24 @@ const TOOLS = [
         max_plans: { type: "number", description: "จำนวนแผนสูงสุด (default: 3)" },
         prefer_type: { type: "string", description: "ประเภทที่ต้องการ: subject | grade_band | cross (optional)" },
         min_coverage_percent: { type: "number", description: "% coverage ขั้นต่ำ (default: 30)" }
+      },
+      required: []
+    }
+  },
+  {
+    name: "atlas_research_suggestions",
+    description: "วิจัยในชั้นเรียน (classroom_research_suggestions): หัวข้อวิจัยที่ระบบเสนอจากปัญหาที่ตรวจพบ + เรื่องที่ครูเลือกทำและความคืบหน้า — คืนยอดรวมแยกสถานะ/ประเภทปัญหา/ครู และรายการ; ใส่ include_details=true เพื่อดูแผนวิจัยเต็ม (คำถามวิจัย วิธีดำเนินการ เครื่องมือ ตัวชี้วัด ข้อมูลก่อน/หลัง)",
+    inputSchema: {
+      type: "object",
+      properties: {
+        status: { type: "string", description: "filter: suggested (ระบบเสนอ ยังไม่เลือก) | selected (ครูเลือกแล้ว) | in_progress (กำลังทำ) | completed (เสร็จ) | abandoned (ยกเลิก) | active (= selected + in_progress)" },
+        term: { type: "string", description: "ภาคเรียน เช่น 2569-1 หรือ 1/2569 (ไม่ใส่ = ทุกภาคเรียน)" },
+        teacher_id: { type: "string", description: "UUID ครู (optional)" },
+        teacher_name: { type: "string", description: "ชื่อครู บางส่วนก็ได้ (optional)" },
+        grade_level: { type: "string", description: "ระดับชั้น เช่น ป.4 (optional)" },
+        classroom: { type: "string", description: "ห้อง เช่น KBW หรือ 2 (optional)" },
+        issue_type: { type: "string", description: "ประเภทปัญหาต้นเรื่อง: GapRepeat | UnitBlindSpot | StayLong | RedZone | AbandonedRepropose | PBLWeakCompetency | PBLStudentFailing (optional)" },
+        include_details: { type: "boolean", description: "true = แนบแผนวิจัยเต็มทุกรายการ (ข้อความยาว ใช้เมื่อเจาะรายเรื่อง); default false" }
       },
       required: []
     }
@@ -966,6 +984,65 @@ async function callTool(supabase: any, name: string, args: any): Promise<any> {
             suspended_note: "items_untouched ไม่รวมประเภทที่ระงับแล้ว; total และ by_status ยังรวมทุกประเภท",
           }),
           items: result
+        };
+        return { content: [{ type: "text", text: JSON.stringify(summary, null, 2) }] };
+      }
+
+      case "atlas_research_suggestions": {
+        const BRIEF = "id, suggestion_key, academic_term, teacher_id, teacher_name, grade_level, classroom, subject, issue_type, status, research_title, detected_problem, ethics_confirmed, doc_draft_url, doc_final_url, linked_action_plan_id, created_at, updated_at";
+        const FULL = BRIEF + ", evidence_summary, research_question, objective, target_group, intervention, tools, data_collection_method, analysis_method, success_indicator, before_data, after_data";
+        const wantDetails = args.include_details === true;
+        // "active" = เรื่องที่ครูรับไปทำแล้วและยังไม่จบ (selected + in_progress)
+        const statusFilter = typeof args.status === "string" ? args.status.trim() : "";
+        const termVariants = typeof args.term === "string" && args.term.trim()
+          ? (() => {
+              const canonical = normalizeAcademicTerm(args.term);
+              const [year, semester] = canonical.split("-");
+              return [...new Set([canonical, `${semester}/${year}`])];
+            })()
+          : null;
+
+        // ตารางนี้มี RLS กรองรายครู — client หลักใช้ anon key จะเห็น 0 แถว ต้องใช้ service role
+        // เหมือนเครื่องมืออื่นที่ต้องเห็นทั้งโรงเรียน (IRIS เป็นผู้ช่วยผู้อำนวยการ)
+        const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+        const rows = await fetchAllRows((from, to) => {
+          let query = admin
+            .from("classroom_research_suggestions")
+            .select(wantDetails ? FULL : BRIEF);
+          if (statusFilter === "active") query = query.in("status", ["selected", "in_progress"]);
+          else if (statusFilter) query = query.eq("status", statusFilter);
+          if (termVariants) query = query.in("academic_term", termVariants);
+          if (args.teacher_id) query = query.eq("teacher_id", args.teacher_id);
+          if (args.grade_level) query = query.eq("grade_level", args.grade_level);
+          if (args.classroom) query = query.eq("classroom", args.classroom);
+          if (args.issue_type) query = query.eq("issue_type", args.issue_type);
+          if (args.teacher_name) query = query.ilike("teacher_name", `%${String(args.teacher_name).trim()}%`);
+          return query.order("updated_at", { ascending: false }).order("id").range(from, to);
+        }, "classroom_research_suggestions");
+
+        const tally = (key: string) => rows.reduce((acc: any, r: any) => {
+          const k = r[key] ?? "-";
+          acc[k] = (acc[k] || 0) + 1;
+          return acc;
+        }, {});
+        const hasAfter = rows.filter((r: any) => wantDetails ? r.after_data : r.status === "completed").length;
+        const summary = {
+          filters: {
+            status: statusFilter || "all", term: termVariants ? termVariants[0] : "all",
+            teacher_id: args.teacher_id ?? null, teacher_name: args.teacher_name ?? null,
+            grade_level: args.grade_level ?? null, classroom: args.classroom ?? null, issue_type: args.issue_type ?? null,
+          },
+          total: rows.length,
+          by_status: tally("status"),
+          by_issue_type: tally("issue_type"),
+          by_teacher: tally("teacher_name"),
+          by_term: tally("academic_term"),
+          with_final_doc: rows.filter((r: any) => r.doc_final_url).length,
+          ethics_confirmed: rows.filter((r: any) => r.ethics_confirmed).length,
+          completed_with_after_data: hasAfter,
+          status_note: "suggested = ระบบเสนอ ครูยังไม่เลือก · selected = ครูเลือกแล้ว · in_progress = กำลังทำ · completed = เสร็จ · abandoned = ยกเลิก",
+          details_included: wantDetails,
+          items: rows,
         };
         return { content: [{ type: "text", text: JSON.stringify(summary, null, 2) }] };
       }
@@ -2049,7 +2126,7 @@ Deno.serve(async (req: Request) => {
     return new Response(null, { status: 200, headers: CORS_HEADERS });
   }
   if (req.method === "HEAD" || req.method === "GET") {
-    return new Response(JSON.stringify({ status: "ok", server: "Woranat_School_Atlas_MCP", version: "2.14.0" }), {
+    return new Response(JSON.stringify({ status: "ok", server: "Woranat_School_Atlas_MCP", version: "2.15.0" }), {
       status: 200,
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
     });
@@ -2105,7 +2182,7 @@ Deno.serve(async (req: Request) => {
   try {
     switch (method) {
       case "initialize":
-        result = { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "Woranat_School_Atlas_MCP", version: "2.14.0" } };
+        result = { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "Woranat_School_Atlas_MCP", version: "2.15.0" } };
         break;
       case "ping":
         result = {};
