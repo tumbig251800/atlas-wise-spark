@@ -1,3 +1,4 @@
+// v2.14.0 (23 ก.ย. 2569) — เพิ่ม create_plc_session (WRITE, มี dry_run) สำหรับ IRIS
 // v2.13.0 (23 ก.ย. 2569) — เพิ่ม atlas_unit_scores (คะแนนหลังหน่วยแบบเต็ม) สำหรับ IRIS
 // v2.11.0 (21 ก.ย. 2569) — atlas_unit_assessments_zero (assessment_kind, not_recorded, สรุปรายห้อง/รายครู) + atlas_exam_results, atlas_reading_results, atlas_student_lookup (read-only)
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -380,6 +381,31 @@ const TOOLS = [
         limit: { type: "number", description: "จำนวนบันทึกสูงสุด (default 100)" }
       },
       required: ["term"]
+    }
+  },
+  {
+    name: "create_plc_session",
+    description: "[WRITE] บันทึกการประชุม PLC ใหม่ (INSERT INTO plc_sessions) — ใช้ dry_run:true ก่อนเสมอเพื่อดูตัวอย่างว่าจะบันทึกอะไรโดยยังไม่เขียนจริง แล้วค่อยเรียกซ้ำด้วย dry_run:false เพื่อบันทึกจริง teacher_names จะถูกจับคู่กับรายชื่อครูที่มีตัวตนในระบบ (profiles) โดยอัตโนมัติ ถ้าไม่ตรงกับใครเลยหรือตรงกับหลายคนจะคืนเป็น unresolved ให้ตรวจสอบก่อนบันทึกจริง — ถ้า outcome_type เป็น continue_plc (ค่าเริ่มต้น) ต้องระบุ next_plc_date ด้วย",
+    inputSchema: {
+      type: "object",
+      properties: {
+        session_date: { type: "string", description: "วันที่ประชุม YYYY-MM-DD (ไม่ใส่ = วันนี้)" },
+        plc_type: { type: "string", enum: ["subject", "grade_band", "cross"], description: "ประเภท PLC" },
+        grade_band: { type: "string", enum: ["ป.1-3", "ป.4-6", "ทั้งโรงเรียน"], description: "ช่วงชั้น (ใส่เมื่อ plc_type = grade_band)" },
+        subject: { type: "string", description: "วิชา (ใส่เมื่อ plc_type = subject)" },
+        facilitator_name: { type: "string", description: "ผู้นำการประชุม" },
+        teacher_names: { type: "array", items: { type: "string" }, description: "ชื่อครูที่เข้าร่วม (ชื่อจริงพอ ระบบจะจับคู่กับรายชื่อในระบบเอง)" },
+        topic: { type: "string", description: "หัวข้อ/ประเด็นการประชุม" },
+        problem_statement: { type: "string", description: "ปัญหาที่พบ (optional)" },
+        approach: { type: "string", description: "แนวทาง/ข้อตกลงร่วมกัน (optional)" },
+        action_steps: { type: "string", description: "สิ่งที่แต่ละคนจะทำต่อ (optional)" },
+        discussion_points: { type: "array", items: { type: "string" }, description: "ประเด็นที่คุยกัน (optional)" },
+        outcome_type: { type: "string", enum: ["resolved", "need_supervision", "continue_plc"], description: "ผลลัพธ์ (default continue_plc)" },
+        next_plc_date: { type: "string", description: "วันนัดครั้งถัดไป YYYY-MM-DD (บังคับถ้า outcome_type = continue_plc)" },
+        linked_action_item_ids: { type: "array", items: { type: "number" }, description: "id ของ action_plan_items ที่ประชุมนี้เกี่ยวข้อง (optional)" },
+        dry_run: { type: "boolean", description: "true = แสดงตัวอย่างที่จะบันทึกเท่านั้น ยังไม่เขียนจริง (ค่าเริ่มต้น true เพื่อความปลอดภัย)" }
+      },
+      required: ["plc_type", "facilitator_name", "topic"]
     }
   },
   {
@@ -1899,6 +1925,59 @@ async function callTool(supabase: any, name: string, args: any): Promise<any> {
         }, null, 2) }] };
       }
 
+      case "create_plc_session": {
+        const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+        const dryRun = args.dry_run !== false; // ค่าเริ่มต้นปลอดภัยไว้ก่อน: ต้องตั้ง false ชัดเจนถึงจะเขียนจริง
+        const errs: string[] = [];
+        if (!args.plc_type || !["subject", "grade_band", "cross"].includes(args.plc_type)) errs.push("plc_type ต้องเป็น subject, grade_band หรือ cross");
+        if (!args.facilitator_name || typeof args.facilitator_name !== "string") errs.push("ต้องระบุ facilitator_name");
+        if (!args.topic || typeof args.topic !== "string") errs.push("ต้องระบุ topic");
+        const outcomeType = args.outcome_type ?? "continue_plc";
+        if (!["resolved", "need_supervision", "continue_plc"].includes(outcomeType)) errs.push("outcome_type ต้องเป็น resolved, need_supervision หรือ continue_plc");
+        if (outcomeType === "continue_plc" && !args.next_plc_date) errs.push("outcome_type เป็น continue_plc ต้องระบุ next_plc_date ด้วย");
+        if (args.next_plc_date && args.session_date && args.next_plc_date <= args.session_date) errs.push("next_plc_date ต้องอยู่หลัง session_date");
+        if (args.grade_band && !["ป.1-3", "ป.4-6", "ทั้งโรงเรียน"].includes(args.grade_band)) errs.push('grade_band ต้องเป็น "ป.1-3", "ป.4-6" หรือ "ทั้งโรงเรียน"');
+        if (errs.length > 0) return { content: [{ type: "text", text: `Error: ${errs.join(" / ")}` }], isError: true };
+
+        // จับคู่ teacher_names กับครูตัวจริงในระบบ (profiles) — ชื่อที่จับคู่ไม่ได้จะไม่บล็อกการบันทึก แค่ทำเครื่องหมายไว้
+        const teacherNames: string[] = Array.isArray(args.teacher_names) ? args.teacher_names.filter((n: unknown) => typeof n === "string" && n.trim()) : [];
+        const { data: profiles, error: profErr } = await admin.from("profiles").select("id, full_name, is_active").eq("is_active", true);
+        if (profErr) throw profErr;
+        const unresolved: string[] = [];
+        const members = teacherNames.map((name: string) => {
+          const needle = name.trim();
+          const matches = (profiles ?? []).filter((p: any) => p.full_name && p.full_name.includes(needle));
+          if (matches.length === 1) return { teacher_id: matches[0].id, teacher_name: matches[0].full_name };
+          unresolved.push(needle);
+          return { teacher_id: null, teacher_name: needle };
+        });
+
+        const row = {
+          session_date: args.session_date || bangkokCalendarDate(new Date().toISOString()),
+          plc_type: args.plc_type,
+          grade_band: args.grade_band ?? null,
+          subject: args.subject ?? null,
+          facilitator_name: args.facilitator_name,
+          members,
+          topic: args.topic,
+          problem_statement: args.problem_statement ?? "",
+          root_cause: "",
+          approach: args.approach ?? "",
+          action_steps: args.action_steps ?? "",
+          discussion_points: Array.isArray(args.discussion_points) ? args.discussion_points : null,
+          outcome_type: outcomeType,
+          next_plc_date: args.next_plc_date ?? null,
+          linked_action_item_ids: Array.isArray(args.linked_action_item_ids) ? args.linked_action_item_ids : [],
+        };
+
+        if (dryRun) {
+          return { content: [{ type: "text", text: JSON.stringify({ dry_run: true, would_insert: row, unresolved_teacher_names: unresolved }, null, 2) }] };
+        }
+        const { data, error } = await admin.from("plc_sessions").insert(row).select("id, session_date, topic, outcome_type, next_plc_date, members").single();
+        if (error) return { content: [{ type: "text", text: `Error: ${error.message}` }], isError: true };
+        return { content: [{ type: "text", text: JSON.stringify({ dry_run: false, created: data, unresolved_teacher_names: unresolved }, null, 2) }] };
+      }
+
       case "update_action_item": {
         const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
         if (!Array.isArray(args.ids) || args.ids.length === 0) {
@@ -1970,7 +2049,7 @@ Deno.serve(async (req: Request) => {
     return new Response(null, { status: 200, headers: CORS_HEADERS });
   }
   if (req.method === "HEAD" || req.method === "GET") {
-    return new Response(JSON.stringify({ status: "ok", server: "Woranat_School_Atlas_MCP", version: "2.13.0" }), {
+    return new Response(JSON.stringify({ status: "ok", server: "Woranat_School_Atlas_MCP", version: "2.14.0" }), {
       status: 200,
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
     });
@@ -2026,7 +2105,7 @@ Deno.serve(async (req: Request) => {
   try {
     switch (method) {
       case "initialize":
-        result = { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "Woranat_School_Atlas_MCP", version: "2.13.0" } };
+        result = { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "Woranat_School_Atlas_MCP", version: "2.14.0" } };
         break;
       case "ping":
         result = {};
