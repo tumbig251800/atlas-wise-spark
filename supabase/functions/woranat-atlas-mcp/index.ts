@@ -1,3 +1,4 @@
+// v2.16.0 (26 ก.ย. 2569) — เพิ่ม atlas_special_care_codes (READ) รหัสนักเรียน Special Care ของเทอม ให้ IRIS กันออกจากการจัดอันดับ/ไม่พูดชื่อ
 // v2.15.0 (23 ก.ย. 2569) — เพิ่ม atlas_research_suggestions (READ) วิจัยในชั้นเรียน สำหรับ IRIS
 // v2.13.0 (23 ก.ย. 2569) — เพิ่ม atlas_unit_scores (คะแนนหลังหน่วยแบบเต็ม) สำหรับ IRIS
 // v2.11.0 (21 ก.ย. 2569) — atlas_unit_assessments_zero (assessment_kind, not_recorded, สรุปรายห้อง/รายครู) + atlas_exam_results, atlas_reading_results, atlas_student_lookup (read-only)
@@ -233,6 +234,18 @@ const TOOLS = [
         include_details: { type: "boolean", description: "true = แนบแผนวิจัยเต็มทุกรายการ (ข้อความยาว ใช้เมื่อเจาะรายเรื่อง); default false" }
       },
       required: []
+    }
+  },
+  {
+    name: "atlas_special_care_codes",
+    description: "รหัสนักเรียนกลุ่ม Special Care ของภาคเรียน (รหัสเท่านั้น ไม่มีชื่อ) — รหัสใน health_care_ids ของบันทึกหลังสอนที่ติ๊ก Special Care (health_care_status = true) นิยามเดียวกับที่ KPI กันออก ใช้กันเด็กกลุ่มนี้ออกจากการจัดอันดับ/รายชื่อ และห้ามเอ่ยชื่อตาม Compassion Protocol · include_normal_logs=true = รวมรหัสที่บันทึกไว้ในบันทึกปกติด้วย",
+    inputSchema: {
+      type: "object",
+      properties: {
+        term: { type: "string", description: "ภาคเรียน เช่น 2569-1 หรือ 1/2569 (จำเป็น)" },
+        include_normal_logs: { type: "boolean", description: "true = รวมรหัสที่อยู่ใน health_care_ids ของบันทึกปกติ (ไม่ติ๊ก Special Care) ด้วย · default false" }
+      },
+      required: ["term"]
     }
   },
   {
@@ -986,6 +999,47 @@ async function callTool(supabase: any, name: string, args: any): Promise<any> {
           items: result
         };
         return { content: [{ type: "text", text: JSON.stringify(summary, null, 2) }] };
+      }
+
+      case "atlas_special_care_codes": {
+        // อ่านอย่างเดียว · คืนเฉพาะรหัส (ไม่มีชื่อ) · นิยาม = รหัสในบันทึกที่ติ๊ก Special Care (ตรงกับที่ KPI กันออก)
+        // 26 ก.ย. 2569 เทอม 2569-1: 25 รหัสในบันทึกติ๊ก Special Care · อีก 12 รหัสอยู่ในบันทึกปกติเท่านั้น (10 คนเป็นห้อง ป.1/1
+        // ที่ถูกบันทึกทั้งห้อง 16/16 — น่าจะกรอกช่องคลาดเคลื่อน) จึงไม่นับโดยค่าเริ่มต้น แต่รายงานจำนวนไว้ให้ตรวจสอบ
+        if (typeof args.term !== "string" || !args.term.trim()) {
+          return { content: [{ type: "text", text: JSON.stringify({ error: "ต้องระบุ term เช่น 2569-1" }) }], isError: true };
+        }
+        const canonical = normalizeAcademicTerm(args.term);
+        const [year, semester] = canonical.split("-");
+        const variants = [...new Set([canonical, `${semester}/${year}`])];
+        const admin = adminClient();
+        const rows = await fetchAllRows<any>((from, to) => admin
+          .from("teaching_logs")
+          .select("id,health_care_status,health_care_ids")
+          .in("academic_term", variants)
+          .not("health_care_ids", "is", null)
+          .order("id", { ascending: true })
+          .range(from, to), "teaching_logs");
+        const inSc = new Set<string>();
+        const inNormal = new Set<string>();
+        for (const r of rows) {
+          for (const raw of String(r.health_care_ids ?? "").split(",")) {
+            const code = raw.trim();
+            if (!/^\d+$/.test(code)) continue; // ข้าม "[None]" / ค่าว่าง
+            (r.health_care_status ? inSc : inNormal).add(code);
+          }
+        }
+        const normalOnly = [...inNormal].filter((c) => !inSc.has(c));
+        const all = (args.include_normal_logs === true ? [...new Set([...inSc, ...inNormal])] : [...inSc]).sort();
+        const result = {
+          term: canonical,
+          count: all.length,
+          codes: all,
+          definition: args.include_normal_logs === true ? "special_care_logs + normal_logs" : "special_care_logs (health_care_status = true)",
+          from_special_care_logs: inSc.size,
+          recorded_in_normal_logs_only: normalOnly.length,
+          note: "รหัสเท่านั้น ห้ามเอ่ยชื่อ · ใช้กันออกจากการจัดอันดับ/รายชื่อสาธารณะ · ข้อมูลใช้ภายในเพื่อช่วยเหลือ",
+        };
+        return { content: [{ type: "text", text: JSON.stringify(result) }] };
       }
 
       case "atlas_research_suggestions": {
@@ -2126,7 +2180,7 @@ Deno.serve(async (req: Request) => {
     return new Response(null, { status: 200, headers: CORS_HEADERS });
   }
   if (req.method === "HEAD" || req.method === "GET") {
-    return new Response(JSON.stringify({ status: "ok", server: "Woranat_School_Atlas_MCP", version: "2.15.0" }), {
+    return new Response(JSON.stringify({ status: "ok", server: "Woranat_School_Atlas_MCP", version: "2.16.0" }), {
       status: 200,
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" }
     });
@@ -2182,7 +2236,7 @@ Deno.serve(async (req: Request) => {
   try {
     switch (method) {
       case "initialize":
-        result = { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "Woranat_School_Atlas_MCP", version: "2.15.0" } };
+        result = { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "Woranat_School_Atlas_MCP", version: "2.16.0" } };
         break;
       case "ping":
         result = {};
